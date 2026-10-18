@@ -1,5 +1,6 @@
-"""The User model. Written in step 1 because Django needs AUTH_USER_MODEL before the first migrate.
-OtpChallenge follows in step 2. Fields: design/core.md, "Data model"."""
+"""Accounts: User and OtpChallenge. Fields: design/core.md, "Data model"."""
+import secrets
+
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.core.validators import RegexValidator
@@ -7,6 +8,13 @@ from django.db import models
 from django.utils import timezone
 
 phone_validator = RegexValidator(r"^\+[1-9]\d{6,14}$", "Phone must be in E.164 format, e.g. +905551234567.")
+
+
+class Role(models.TextChoices):
+    """Roles a sign-in can ask for (OtpChallenge.role). Admin is not requested, it is granted."""
+    PARTICIPANT = "participant"
+    ORGANIZER = "organizer"
+    PHOTOGRAPHER = "photographer"
 
 
 class UserManager(BaseUserManager):
@@ -71,3 +79,31 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.phone
+
+
+def new_challenge_id() -> str:
+    return "otp_" + secrets.token_urlsafe(16)
+
+
+class OtpChallenge(models.Model):
+    """One SMS code sent to one phone. Rows older than 24 h are deleted on each successful
+    verification; the recent ones are what the per-phone rate limit counts."""
+    id = models.CharField(primary_key=True, max_length=32, default=new_challenge_id, editable=False)
+    phone = models.CharField(max_length=16, validators=[phone_validator])
+    code_hash = models.CharField(max_length=128)              # the code is never stored in clear
+    role = models.CharField(max_length=16, choices=Role.choices, default=Role.PARTICIPANT)
+    event = models.ForeignKey("events.Event", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)    # wrong codes entered
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["phone", "created_at"], name="otp_phone_recent"),   # rate limit
+            models.Index(fields=["created_at"], name="otp_created"),                 # purge
+        ]
+
+    def __str__(self):
+        return f"{self.phone} {self.created_at:%Y-%m-%d %H:%M}"
