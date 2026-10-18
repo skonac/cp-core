@@ -71,8 +71,8 @@ if [ -f "$CONF_DIR/env" ]; then echo "kept existing env"; else
   exit 0
 fi
 
-say "manage wrapper /usr/local/bin/cp-core-manage"
-install -m 755 "$DEST/deploy/cp-core-manage" /usr/local/bin/cp-core-manage
+say "commands /usr/local/bin/cp-core-manage, cp-core-run"
+install -m 755 "$DEST/deploy/cp-core-manage" "$DEST/deploy/cp-core-run" /usr/local/bin/
 echo "ok"
 
 say "check + migrate (as $RUN_USER)"
@@ -80,13 +80,4 @@ as_user cp-core-manage check
 as_user cp-core-manage migrate --noinput
 
 say "restart runserver in screen 'core' (as $RUN_USER)"
-as_user screen -S core -X quit >/dev/null 2>&1 || true
-as_user screen -dmS core env CP_ENV_FILE="$CONF_DIR/env" PYTHONDONTWRITEBYTECODE=1 \
-        "$DEST/.venv/bin/python" "$DEST/manage.py" runserver 127.0.0.1:8000
-sleep 4
-if curl -fsS -o /dev/null http://127.0.0.1:8000/api/health; then
-  echo "cp-core is up: $(curl -s http://127.0.0.1:8000/api/health)"
-else
-  echo "cp-core did not answer; look at it with:  screen -r core" >&2
-  exit 1
-fi
+as_user /usr/local/bin/cp-core-run
