@@ -57,7 +57,7 @@ say "python $PY and venv"
 export UV_PYTHON_INSTALL_DIR="$DEST/python"
 "$UV" -q python install "$PY"
 [ -x "$DEST/.venv/bin/python" ] || "$UV" -q venv --python "$PY" "$DEST/.venv"
-"$UV" -q pip sync --python "$DEST/.venv/bin/python" "$DEST/requirements.txt"
+"$UV" -q pip install --python "$DEST/.venv/bin/python" -r "$DEST/requirements.txt"   # resolves dependencies (requirements.txt lists top-level packages only)
 readlink -f "$DEST/.venv/bin/python"
 
 say "settings $CONF_DIR/env"
