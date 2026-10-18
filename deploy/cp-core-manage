@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Run a Django management command against the deployed cp-core with its settings:
+#   cp-core-manage migrate
+#   cp-core-manage import_photos --event rk238 ~/photos
+#   cp-core-manage shell
+exec env CP_ENV_FILE=/etc/cp-core/env PYTHONDONTWRITEBYTECODE=1 \
+     /opt/cleverphotos/core/.venv/bin/python /opt/cleverphotos/core/manage.py "$@"
