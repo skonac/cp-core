@@ -110,6 +110,11 @@ USE_I18N = True
 USE_TZ = True   # timestamps stored in UTC (timestamptz)
 
 STATIC_URL = "static/"
+
+# Django pages: where login sends people (URL names from config/urls.py)
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "organizer:home"
+LOGOUT_REDIRECT_URL = "login"
 STATIC_ROOT = BASE_DIR / "static_root"   # collectstatic target, served by nginx later
 
 LOGGING = {

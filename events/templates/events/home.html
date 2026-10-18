@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Events{% endblock %}
+{% block content %}
+<div class="row" style="align-items:center">
+  <div style="flex:1"><h1>{% if show_expired %}Expired events{% else %}Your events{% endif %}</h1>
+    <span class="muted">Credits: <b>{{ credits.balance }}</b> · you can upload <b>{{ credits.allowance }}</b> more photos</span></div>
+  <a class="button" href="{% url 'organizer:event_new' %}">New event</a>
+</div>
+<h2></h2>
+<table>
+  <tr><th>Code</th><th>Name</th><th>Date</th><th>Type</th><th>Status</th><th>Photos</th></tr>
+  {% for e in events %}
+  <tr>
+    <td><a class="code" href="{% url 'organizer:event' e.code %}">{{ e.display_code }}</a></td>
+    <td><a href="{% url 'organizer:event' e.code %}">{{ e.name }}</a></td>
+    <td>{{ e.date|date:"Y-m-d" }}</td><td>{{ e.get_type_display }}</td>
+    <td><span class="pill {{ e.status }}">{{ e.get_status_display }}</span></td>
+    <td>{{ e.photo_count }}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="6" class="muted">No events{% if not show_expired %} yet. Create one to start uploading{% endif %}.</td></tr>
+  {% endfor %}
+</table>
+<p class="small">{% if show_expired %}<a href="?">← Back to current events</a>{% else %}<a href="?expired=1">Show expired events</a>{% endif %}</p>
+{% endblock %}

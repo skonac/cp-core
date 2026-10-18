@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}{{ event.name }}{% endblock %}
+{% block content %}
+<p class="small"><a href="{% url 'organizer:home' %}">← Events</a></p>
+<h1>{{ event.name }} <span class="pill {{ event.status }}">{{ event.get_status_display }}</span></h1>
+<p class="muted">Code <span class="code">{{ event.display_code }}</span> · {{ event.date|date:"Y-m-d" }} · {{ event.get_type_display }}{% if event.location_label %} · {{ event.location_label }}{% endif %}{% if user.is_staff and event.owner != user %} · owner {{ event.owner.phone }}{% endif %}</p>
+
+<div class="card stats" id="stats" data-url="{% url 'organizer:status' event.code %}">
+  <div><b data-k="total">{{ counts.total }}</b><span class="muted small">photos</span></div>
+  <div><b data-k="pending">{{ counts.pending }}</b><span class="muted small">waiting</span></div>
+  <div><b data-k="processing">{{ counts.processing }}</b><span class="muted small">processing</span></div>
+  <div><b data-k="done">{{ counts.done }}</b><span class="muted small">done</span></div>
+  <div><b data-k="failed">{{ counts.failed }}</b><span class="muted small">failed</span></div>
+  <div><b data-k="faces">{{ counts.faces }}</b><span class="muted small">faces</span></div>
+</div>
+
+<div class="row" style="margin-top:16px">
+  <div class="card">
+    <h2 style="margin-top:0">Upload photos</h2>
+    {% if event.status == Status.EXPIRED %}
+      <p class="muted">Expired events take no uploads.</p>
+    {% else %}
+      <p class="muted small">Credits: <b id="balance">{{ credits.balance }}</b> · room for <b id="allowance">{{ credits.allowance }}</b> more photos. 1 photo = 1 credit.</p>
+      <form id="upload" data-url="{% url 'organizer:upload' event.code %}" data-allowance="{{ credits.allowance }}">
+        {% csrf_token %}
+        <p><input type="file" name="files" accept="image/jpeg,image/png,image/webp,image/heic,.heic" multiple required></p>
+        <button id="upload-btn">Upload</button> <span id="upload-note" class="small muted"></span>
+      </form>
+      <div id="log"></div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Access</h2>
+    {% if event.status == Status.OPEN %}
+      <p class="small muted">Participants can open the event.</p>
+      <form method="post">{% csrf_token %}<button class="secondary" name="action" value="close">Close access</button></form>
+    {% elif event.status == Status.CLOSED %}
+      <p class="small muted">Participants see “no longer accessible”. You can still upload.</p>
+      <form method="post">{% csrf_token %}<button name="action" value="open">Open access</button></form>
+    {% else %}
+      <p class="small muted">Expired: media removed, read-only.</p>
+    {% endif %}
+    <h2>Settings</h2>
+    <form method="post">{% csrf_token %}
+      {% include "events/_event_fields.html" %}
+      <button class="secondary" name="action" value="settings" {% if event.status == Status.EXPIRED %}disabled{% endif %}>Save settings</button>
+    </form>
+  </div>
+</div>
+
+<h2>Photos</h2>
+{% if page.paginator.count %}
+<div class="grid">
+  {% for img in page %}
+  <a href="{% url 'organizer:photo' event.code img.seq %}">
+    <img loading="lazy" src="{% url 'organizer:event' event.code %}photos/{{ img.seq_str }}_t.jpg" alt="{{ img.seq_str }}">
+    <span class="meta"><span>{{ img.seq_str }}</span>
+      {% if img.status == "done" %}<span>{{ img.num_faces }} face{{ img.num_faces|pluralize }}</span>{% else %}<span class="pill {{ img.status }}">{{ img.status }}</span>{% endif %}</span>
+  </a>
+  {% endfor %}
+</div>
+{% if page.has_other_pages %}<p class="small">Page {{ page.number }} of {{ page.paginator.num_pages }} ·
+  {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">previous</a>{% endif %}
+  {% if page.has_next %}<a href="?page={{ page.next_page_number }}">next</a>{% endif %}</p>{% endif %}
+{% else %}
+<p class="muted">No photos yet.</p>
+{% endif %}
+
+<script>
+// Upload: one file per request, two at a time, so a large batch shows progress and one bad
+// file doesn't sink the rest. The server checks credits again for every file.
+(() => {
+  const form = document.getElementById("upload");
+  if (!form) return;
+  const log = document.getElementById("log"), note = document.getElementById("upload-note");
+  const csrf = form.querySelector("[name=csrfmiddlewaretoken]").value;
+  const line = (text, bad) => { const d = document.createElement("div"); d.textContent = text; if (bad) d.className = "bad"; log.prepend(d); };
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const files = [...form.files.files], allowance = +form.dataset.allowance;
+    if (files.length > allowance) {
+      note.textContent = `Your credits cover ${allowance} more photo(s); select at most ${allowance}.`;
+      return;
+    }
+    const button = document.getElementById("upload-btn"); button.disabled = true;
+    let next = 0, ok = 0, failed = 0;
+    const worker = async () => {
+      while (next < files.length) {
+        const f = files[next++], body = new FormData(); body.append("file", f);
+        let answer;
+        try {
+          const r = await fetch(form.dataset.url, { method: "POST", body, headers: { "X-CSRFToken": csrf } });
+          answer = await r.json().catch(() => ({ ok: false, code: "http_" + r.status }));
+        } catch { answer = { ok: false, code: "network_error" }; }
+        if (answer.ok) { ok++; line(`${answer.seq}  ${f.name}`); } else { failed++; line(`-----  ${f.name}  ${answer.code}`, true); }
+        if ("allowance" in answer) {
+          document.getElementById("balance").textContent = answer.balance;
+          document.getElementById("allowance").textContent = form.dataset.allowance = answer.allowance;
+        }
+        note.textContent = `${ok + failed} / ${files.length} sent · ${ok} accepted · ${failed} refused`;
+      }
+    };
+    await Promise.all([worker(), worker()]);
+    note.textContent += " · reload the page to see them";
+    button.disabled = false; form.reset();
+  });
+})();
+
+// Processing counters: refresh every 3 s while photos are waiting or processing.
+(() => {
+  const stats = document.getElementById("stats");
+  const tick = async () => {
+    const c = await (await fetch(stats.dataset.url)).json();
+    for (const el of stats.querySelectorAll("[data-k]")) el.textContent = c[el.dataset.k];
+    if (c.pending + c.processing > 0 || document.getElementById("upload-btn")?.disabled) setTimeout(tick, 3000);
+  };
+  setTimeout(tick, 3000);
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Log in{% endblock %}
+{% block content %}
+<div class="card" style="max-width:420px; margin:40px auto">
+  <h1>Log in</h1>
+  <p class="muted small">Phone and password (staff accounts). SMS sign-in comes later.</p>
+  <form method="post">{% csrf_token %}
+    {% if form.non_field_errors %}<ul class="errorlist">{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+    <p><label for="id_username">Phone</label><input type="tel" name="username" id="id_username" placeholder="+905551234567" autofocus required></p>
+    <p><label for="id_password">Password</label><input type="password" name="password" id="id_password" required></p>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button>Log in</button>
+  </form>
+</div>
+{% endblock %}

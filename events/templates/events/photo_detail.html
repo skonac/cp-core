@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ event.name }} · {{ image.seq_str }}{% endblock %}
+{% block content %}
+<p class="small"><a href="{% url 'organizer:event' event.code %}">← {{ event.name }}</a>
+  {% if prev %} · <a href="{% url 'organizer:photo' event.code prev %}">previous</a>{% endif %}
+  {% if next %} · <a href="{% url 'organizer:photo' event.code next %}">next</a>{% endif %}</p>
+<h1>Photo {{ image.seq_str }} <span class="pill {{ image.status }}">{{ image.status }}</span></h1>
+<p class="muted small">{{ image.width }}×{{ image.height }} · {{ image.bytes|filesizeformat }}
+  {% if image.taken_at %} · taken {{ image.taken_at|date:"Y-m-d H:i" }}{% endif %}
+  · uploaded {{ image.created_at|date:"Y-m-d H:i" }}
+  {% if image.status == "done" %} · {{ image.num_faces }} face{{ image.num_faces|pluralize }} · {{ image.engine }}{% endif %}
+  {% if image.error %} · <span style="color:var(--bad)">error {{ image.error }}: {{ image.error_detail }}</span>{% endif %}</p>
+
+<div style="position:relative; display:inline-block; max-width:100%">
+  <img src="{% url 'organizer:event' event.code %}photos/{{ image.seq_str }}_d.jpg" alt="" style="display:block; max-width:100%; max-height:80vh; height:auto">
+  {% for f in faces %}
+  <div title="score {{ f.score|floatformat:2 }}" style="position:absolute; left:{{ f.left|stringformat:'.3f' }}%; top:{{ f.top|stringformat:'.3f' }}%; width:{{ f.width|stringformat:'.3f' }}%; height:{{ f.height|stringformat:'.3f' }}%; border:2px solid #39f; border-radius:3px; box-shadow:0 0 0 1px rgba(0,0,0,.4)">
+    <span style="position:absolute; top:-18px; left:-2px; background:#39f; color:#fff; font-size:11px; padding:0 4px; border-radius:3px">{{ f.score|floatformat:2 }}</span>
+  </div>
+  {% endfor %}
+</div>
+
+<p style="margin-top:14px"><a class="button secondary" href="{% url 'organizer:event' event.code %}photos/{{ image.seq_str }}_m.jpg">Full size</a></p>
+<form method="post" style="margin-top:20px">{% csrf_token %}
+  <button class="danger" name="action" value="delete" onclick="return confirm('Delete this photo? The credit is not refunded.')">Delete photo</button>
+  <span class="muted small">Removes the files and faces. The credit is not refunded.</span>
+</form>
+{% endblock %}
