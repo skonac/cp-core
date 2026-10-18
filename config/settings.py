@@ -113,7 +113,7 @@ STATIC_URL = "static/"
 
 # Django pages: where login sends people (URL names from config/urls.py)
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "organizer:home"
+LOGIN_REDIRECT_URL = "home"          # "/" sends organizers and participants to their own pages
 LOGOUT_REDIRECT_URL = "login"
 STATIC_ROOT = BASE_DIR / "static_root"   # collectstatic target, served by nginx later
 

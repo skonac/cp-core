@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}My events{% endblock %}
+{% block content %}
+<h1>My events</h1>
+<p class="muted">Events you open through their link or QR code.</p>
+<table>
+  <tr><th>Event</th><th>Date</th><th>Your photos</th><th>Last visit</th></tr>
+  {% for r in rows %}
+  <tr>
+    <td><a href="{% url 'participant:event' r.event.code %}">{{ r.event.name }}</a>
+      {% if r.access.blocked == "closed" %} <span class="pill closed">closed</span>{% elif r.access.blocked == "expired" %} <span class="pill expired">ended</span>{% endif %}</td>
+    <td>{{ r.event.date|date:"Y-m-d" }}</td>
+    <td>{% if r.count is not None %}{{ r.count }}{% else %}<span class="muted">–</span>{% endif %}</td>
+    <td class="muted small">{{ r.member.last_activity_at|date:"Y-m-d H:i" }}</td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="4" class="muted">No events yet.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

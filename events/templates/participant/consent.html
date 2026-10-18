@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Consent{% endblock %}
+{% block content %}
+<div class="card" style="max-width:640px">
+  <h1>Processing of your facial data</h1>
+  <p class="notice warn small">Placeholder text. The final KVKK notice (aydınlatma metni) and explicit consent text will replace it after legal review.</p>
+  <p>To find the event photos you appear in, we turn your selfie into a numeric face representation and compare it with the faces in the photos of the events you join.</p>
+  <ul>
+    <li>Your selfie and its face representation are not shown to organizers or other participants.</li>
+    <li>They are used only to find your photos in events you open.</li>
+    <li>Deleting your account deletes them.</li>
+  </ul>
+  <form method="post">{% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button name="agree" value="yes">I consent</button>
+    <a class="button secondary" href="/me/">Not now</a>
+  </form>
+</div>
+{% endblock %}

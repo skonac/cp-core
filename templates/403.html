@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Not allowed{% endblock %}
+{% block content %}
+<div class="card" style="max-width:520px; margin:40px auto">
+  <h1>Not allowed</h1>
+  <p class="muted">This page is for organizers. You are signed in as {{ user.phone|default:"nobody" }}.</p>
+  <p><a href="/">Go to your page</a></p>
+</div>
+{% endblock %}

@@ -24,6 +24,9 @@
   .code { font-family:ui-monospace,Menlo,monospace; font-weight:700; letter-spacing:.06em; }
   .pill { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12px; font-weight:600; background:#eef0f4; }
   .pill.open, .pill.done { background:#e3f4ea; color:var(--ok); } .pill.closed, .pill.pending, .pill.processing { background:#fdf1dc; color:var(--warn); }
+  .pill.ready { background:#e3f4ea; color:var(--ok); } .pill.rejected { background:#f9e1de; color:var(--bad); }
+  .notice { padding:14px 16px; border-radius:8px; background:#eef1ff; border:1px solid #d6dcff; margin:12px 0; }
+  .notice.warn { background:#fdf1dc; border-color:#f3dcae; }
   .pill.expired, .pill.failed { background:#f9e1de; color:var(--bad); }
   button, .button { font:inherit; padding:7px 14px; border-radius:6px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; display:inline-block; }
   button.secondary, .button.secondary { background:#fff; color:var(--accent); } button.danger { background:#fff; color:var(--bad); border-color:var(--bad); }
@@ -45,7 +48,12 @@
 </head>
 <body>
 <header><div class="bar">
-  <a class="brand" href="{% url 'organizer:home' %}">Cleverphotos · organizer</a>
+  <a class="brand" href="/">Cleverphotos</a>
+  {% if user.is_authenticated %}
+    <a href="{% url 'participant:my_events' %}">My events</a>
+    <a href="{% url 'participant:my_face' %}">My face</a>
+    {% if user.is_organizer or user.is_staff %}<a href="{% url 'organizer:home' %}">Organizer</a>{% endif %}
+  {% endif %}
   <span class="spacer"></span>
   {% if user.is_authenticated %}
     <span class="muted small">{{ user.phone }}</span>

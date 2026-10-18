@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ event.name }}{% endblock %}
+{% block content %}
+<p class="small"><a href="{% url 'participant:event' event.code %}">← {{ event.name }}</a></p>
+<img src="/e/{{ event.code }}/photos/{{ image.seq_str }}_d.jpg" alt="" style="display:block; max-width:100%; max-height:80vh; height:auto; border-radius:6px">
+<p style="margin-top:14px">
+  {% if downloads_left %}
+    <a class="button" href="{% url 'participant:download' event.code image.seq %}">Download full size</a>
+    <span class="muted small">{{ downloads_left }} download{{ downloads_left|pluralize }} of this photo left today</span>
+  {% else %}
+    <span class="muted">Download limit for this photo reached; try again tomorrow.</span>
+  {% endif %}
+</p>
+{% endblock %}

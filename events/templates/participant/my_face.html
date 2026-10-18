@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}My face{% endblock %}
+{% block content %}
+<h1>My face</h1>
+<p class="muted">One selfie is enough; a second one (different light or angle) helps. Only you in the photo, face clearly visible.</p>
+{% if not user.is_consent %}
+  <div class="notice">Before you add a selfie we need your consent. <a href="/consent/?next=/me/face/">Read and give consent</a></div>
+{% endif %}
+<div class="row" style="margin-top:12px">
+  {% for slot, label, selfie in slots %}
+  <div class="card" style="max-width:360px">
+    <h2 style="margin-top:0">{{ label }}</h2>
+    {% if selfie %}
+      <img src="{% url 'participant:selfie_thumb' selfie.pk %}" alt="" style="width:160px; border-radius:6px; display:block; margin-bottom:8px">
+      {% if selfie.status == "done" and selfie.num_faces == 1 %}<span class="pill ready">ready</span>
+      {% elif selfie.status == "done" and selfie.num_faces == 0 %}<span class="pill rejected">no face found</span>
+      {% elif selfie.status == "done" %}<span class="pill rejected">{{ selfie.num_faces }} faces: only you, please</span>
+      {% elif selfie.status == "failed" %}<span class="pill rejected">could not read</span>
+      {% else %}<span class="pill processing">checking…</span>{% endif %}
+    {% else %}
+      <p class="muted small">No selfie yet.</p>
+    {% endif %}
+    {% if user.is_consent %}
+    <form method="post" enctype="multipart/form-data" style="margin-top:12px">{% csrf_token %}
+      <input type="hidden" name="slot" value="{{ slot }}">
+      <p><input type="file" name="file" accept="image/*" capture="user" required></p>
+      <button class="secondary">{% if selfie %}Replace{% else %}Upload{% endif %}</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
