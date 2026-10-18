@@ -63,6 +63,7 @@ AUTH_USER_MODEL = "accounts.User"   # must exist before the first migrate
 
 MIDDLEWARE = [
     "common.middleware.RequestIdMiddleware",   # first: every response gets X-Request-ID
+    "common.middleware.RealIpMiddleware",      # client IP from nginx (rate limits, logs)
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -71,6 +72,11 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+# Behind nginx: it terminates HTTPS and passes the scheme and the client IP.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")   # nginx: proxy_set_header X-Forwarded-Proto $scheme
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in env("CP_CSRF_TRUSTED_ORIGINS",
+                        "https://cp.futuruniq.com,https://cp.gesli.net").split(",") if o.strip()]
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
