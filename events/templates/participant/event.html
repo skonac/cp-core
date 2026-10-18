@@ -10,41 +10,42 @@
   <div class="notice warn">Sorry, this event has ended and its photos are no longer available.</div>
 {% else %}
 
-  {% if access.can_match or access.matching == "consent_required" %}
-  <h2>Your photos{% if mine %} <span class="muted">({{ mine|length }})</span>{% endif %}</h2>
-  {% if access.matching == "consent_required" %}
-    <div class="notice">To find the photos you are in, we need your consent to process a selfie. <a href="/consent/?next=/e/{{ event.code }}/">Give consent</a></div>
-  {% elif access.matching == "no_selfie" %}
-    <div class="notice">Add a selfie and we will find the photos you are in. <a href="{% url 'participant:my_face' %}">Add a selfie</a></div>
-  {% elif access.matching == "selfie_processing" %}
-    <div class="notice">Your selfie is being checked. This takes a few seconds; refresh the page.</div>
-  {% elif access.matching == "selfie_rejected" %}
-    <div class="notice warn">We could not use your selfie (one face, clearly visible, please). <a href="{% url 'participant:my_face' %}">Try another</a></div>
-  {% elif not mine %}
-    <div class="notice">No photos of you yet.{% if pending %} {{ pending }} photo{{ pending|pluralize }} still being processed.{% endif %}</div>
-  {% endif %}
-  {% if mine %}
-    {% if pending %}<p class="muted small">{{ pending }} more photo{{ pending|pluralize }} still being processed; refresh later for more.</p>{% endif %}
-    <div class="grid">
-      {% for img in mine %}
-      <a href="{% url 'participant:photo' event.code img.seq %}"><img loading="lazy" src="/e/{{ event.code }}/photos/{{ img.seq_str }}_t.jpg" alt=""></a>
-      {% endfor %}
-    </div>
-  {% endif %}
-  {% elif access.matching == "matching_off" and not access.can_browse %}
-    <div class="notice">This event has no photo search.</div>
+  <nav class="tabs">
+    {% if access.can_match or access.matching == "consent_required" %}
+      <a href="{% url 'participant:event' event.code %}" class="{% if view == 'mine' %}on{% endif %}">Photos of me{% if mine_count is not None %} ({{ mine_count }}){% endif %}</a>
+    {% endif %}
+    {% if access.can_browse %}
+      <a href="{% url 'participant:event_all' event.code %}" class="{% if view == 'all' %}on{% endif %}">All photos ({{ all_count }})</a>
+    {% endif %}
+  </nav>
+
+  {% if view == "mine" %}
+    {% if access.matching == "consent_required" %}
+      <div class="notice">To find the photos you are in, we need your consent to process a selfie. <a href="/consent/?next=/e/{{ event.code }}/">Give consent</a></div>
+    {% elif access.matching == "matching_off" %}
+      <div class="notice">This event has no photo search.</div>
+    {% elif access.matching == "no_selfie" %}
+      <div class="notice">Add a selfie and we will find the photos you are in. <a href="{% url 'participant:my_face' %}">Add a selfie</a></div>
+    {% elif access.matching == "selfie_processing" %}
+      <div class="notice">Your selfie is being checked. This takes a few seconds; refresh the page.</div>
+    {% elif access.matching == "selfie_rejected" %}
+      <div class="notice warn">We could not use your selfie (one face, clearly visible, please). <a href="{% url 'participant:my_face' %}">Try another</a></div>
+    {% elif not mine_count %}
+      <div class="notice">No photos of you yet.{% if pending %} {{ pending }} photo{{ pending|pluralize }} still being processed.{% endif %}</div>
+    {% elif pending %}
+      <p class="muted small">{{ pending }} more photo{{ pending|pluralize }} still being processed; refresh later for more.</p>
+    {% endif %}
   {% endif %}
 
-  {% if all_page %}
-  <h2>All photos <span class="muted">({{ all_page.paginator.count }})</span></h2>
+  {% if page %}
   <div class="grid">
-    {% for img in all_page %}
+    {% for img in page %}
     <a href="{% url 'participant:photo' event.code img.seq %}"><img loading="lazy" src="/e/{{ event.code }}/photos/{{ img.seq_str }}_t.jpg" alt=""></a>
     {% endfor %}
   </div>
-  {% if all_page.has_other_pages %}<p class="small">Page {{ all_page.number }} of {{ all_page.paginator.num_pages }} ·
-    {% if all_page.has_previous %}<a href="?page={{ all_page.previous_page_number }}">previous</a>{% endif %}
-    {% if all_page.has_next %}<a href="?page={{ all_page.next_page_number }}">next</a>{% endif %}</p>{% endif %}
+  {% if page.has_other_pages %}<p class="small">Page {{ page.number }} of {{ page.paginator.num_pages }} ·
+    {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">previous</a>{% endif %}
+    {% if page.has_next %}<a href="?page={{ page.next_page_number }}">next</a>{% endif %}</p>{% endif %}
   {% endif %}
 {% endif %}
 {% endblock %}

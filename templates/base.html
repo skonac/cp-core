@@ -25,6 +25,10 @@
   .pill { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12px; font-weight:600; background:#eef0f4; }
   .pill.open, .pill.done { background:#e3f4ea; color:var(--ok); } .pill.closed, .pill.pending, .pill.processing { background:#fdf1dc; color:var(--warn); }
   .pill.ready { background:#e3f4ea; color:var(--ok); } .pill.rejected { background:#f9e1de; color:var(--bad); }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:16px 0 14px; }
+  .tabs a { padding:8px 14px; border:1px solid transparent; border-bottom:none; border-radius:6px 6px 0 0; color:var(--muted); margin-bottom:-1px; }
+  .tabs a.on { background:var(--card); border-color:var(--line); color:var(--ink); font-weight:600; }
+  .tabs a:hover { text-decoration:none; color:var(--ink); }
   .notice { padding:14px 16px; border-radius:8px; background:#eef1ff; border:1px solid #d6dcff; margin:12px 0; }
   .notice.warn { background:#fdf1dc; border-color:#f3dcae; }
   .pill.expired, .pill.failed { background:#f9e1de; color:var(--bad); }

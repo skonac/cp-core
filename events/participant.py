@@ -34,9 +34,9 @@ def access_for(user, event) -> Access:
         return Access(blocked="expired")
     if event.status == Event.Status.CLOSED and not is_host:
         return Access(blocked="closed")
-    if event.is_consent_required and not user.is_consent:
+    if event.is_consent_required and not user.is_consent and not is_host:
         return Access(blocked="consent_required")
-    a = Access(can_browse=event.is_browse_all)
+    a = Access(can_browse=event.is_browse_all or is_host)   # the host always sees everything
     if not event.is_processing_faces:
         a.matching = "matching_off"
     elif not user.is_consent:

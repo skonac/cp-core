@@ -55,22 +55,32 @@ def _photos(event):
 
 
 @login_required
-def event_page(request, code):
+def event_page(request, code, view="mine"):
+    """/e/<code>/ = photos I'm in (the main path); /e/<code>/all/ = every photo, if the event allows."""
     event = _event_or_404(code)
     touch_membership(request.user, event)
     access = access_for(request.user, event)
     if access.blocked == "consent_required":
         return redirect(f"/consent/?next=/e/{event.code}/")
-    mine, all_page, pending = [], None, 0
+    if view == "all" and not access.can_browse:
+        return redirect("participant:event", code=event.code)
+    if view == "mine" and not access.can_match and access.can_browse:
+        return redirect("participant:event_all", code=event.code)   # no face search here: all is the only view
+    page, mine_count, pending = None, None, 0
     if not access.blocked:
         if access.can_match and access.matching == "ready":
-            scores = my_photos(request.user, event)
-            mine = list(_photos(event).filter(pk__in=scores).order_by("taken_at", "seq"))
-        if access.can_browse:
-            all_page = Paginator(_photos(event).order_by("taken_at", "seq"), 200).get_page(request.GET.get("page"))
-        pending = _photos(event).filter(status__in=["pending", "processing"]).count() if event.is_processing_faces else 0
+            mine_ids = list(my_photos(request.user, event))
+            mine_count = len(mine_ids)
+        photos = _photos(event).order_by("taken_at", "seq")
+        if view == "all":
+            page = Paginator(photos, 200).get_page(request.GET.get("page"))
+        elif mine_count:
+            page = Paginator(photos.filter(pk__in=mine_ids), 200).get_page(request.GET.get("page"))
+        if event.is_processing_faces:
+            pending = _photos(event).filter(status__in=["pending", "processing"]).count()
     return render(request, "participant/event.html", {
-        "event": event, "access": access, "mine": mine, "all_page": all_page, "pending": pending})
+        "event": event, "access": access, "view": view, "page": page, "mine_count": mine_count,
+        "all_count": _photos(event).count() if access.can_browse else None, "pending": pending})
 
 
 def _visible_photo(request, code, seq):
