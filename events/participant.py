@@ -49,3 +49,9 @@ def access_for(user, event) -> Access:
 
 def may_see_photo(user, event, image, access: Access) -> bool:
     return access.can_browse or (access.can_match and is_my_photo(user, image))
+
+
+def public_status(event) -> str:
+    """Our status -> the cp-web contract's names."""
+    return {Event.Status.OPEN: "active", Event.Status.CLOSED: "access_closed",
+            Event.Status.EXPIRED: "expired"}[event.status]

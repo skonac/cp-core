@@ -152,6 +152,8 @@ EVENT_CODE_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz"   # 31 symbols: no 0/1, 
 OTP_TTL = 120               # seconds
 OTP_MAX_PER_15MIN = 3       # codes per phone
 OTP_MAX_ATTEMPTS = 5        # wrong codes per challenge
+OTP_RESEND_AFTER = 30       # seconds before another code may be requested
+OTP_DELIVERY = env("CP_OTP_DELIVERY", "log")   # "log": code goes to the log + OtpChallenge.dev_code, no SMS
 EVENT_LOOKUP_PER_MIN = 30   # public event lookups per IP
 
 WORKER_TOKEN = env("CP_WORKER_TOKEN", "")

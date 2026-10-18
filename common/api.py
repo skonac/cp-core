@@ -3,16 +3,23 @@
     success: {"success": true,  "code": "event_retrieved", "message": "", "data": {...}, "requestId": "req_..."}
     error:   {"success": false, "code": "event_not_found", "message": "...", "data": null, "requestId": "req_..."}
 
-Endpoints return ok(...) for success and raise ApiError(...) for failures; the handlers
-below turn everything else (404, validation, crashes) into the same shape.
+Endpoints return respond(...) and raise ApiError(...); the handlers below turn everything
+else (404, validation, crashes) into the same shape. JSON field names are camelCase.
 """
 import logging
 
-from django.http import Http404
-from ninja import NinjaAPI
-from ninja.errors import AuthenticationError, ValidationError as SchemaValidationError
+from django.http import Http404, JsonResponse
+from ninja import NinjaAPI, Schema
+from ninja.errors import AuthenticationError, HttpError, ValidationError as SchemaValidationError
+from pydantic import ConfigDict
+from pydantic.alias_generators import to_camel
 
 log = logging.getLogger("cp.api")
+
+
+class CamelSchema(Schema):
+    """Request bodies: snake_case in Python, camelCase on the wire (phone_number <-> phoneNumber)."""
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
 class ApiError(Exception):
@@ -31,13 +38,17 @@ def ok(request, code: str, data=None, message: str = "") -> dict:
     return {"success": True, "code": code, "message": message, "data": data, "requestId": _request_id(request)}
 
 
+def respond(request, code: str, data=None, status: int = 200, message: str = "") -> JsonResponse:
+    return JsonResponse(ok(request, code, data, message), status=status, json_dumps_params={"ensure_ascii": False})
+
+
 def make_api(**kwargs) -> NinjaAPI:
     api = NinjaAPI(**kwargs)
 
     def error(request, status: int, code: str, message: str, **extra):
         body = {"success": False, "code": code, "message": message, "data": None, "requestId": _request_id(request)}
         body.update(extra)
-        return api.create_response(request, body, status=status)
+        return JsonResponse(body, status=status, json_dumps_params={"ensure_ascii": False})
 
     @api.exception_handler(ApiError)
     def on_api_error(request, exc: ApiError):
@@ -50,6 +61,13 @@ def make_api(**kwargs) -> NinjaAPI:
     @api.exception_handler(AuthenticationError)
     def on_auth(request, exc):
         return error(request, 401, "authentication_required", "Sign in required.")
+
+    @api.exception_handler(HttpError)
+    def on_http_error(request, exc: HttpError):
+        # Ninja's own errors; the one that matters: a POST/PATCH/DELETE without X-CSRFToken.
+        message = str(exc)
+        code = "csrf_failed" if "CSRF" in message else {400: "bad_request", 403: "forbidden", 404: "not_found"}.get(exc.status_code, "error")
+        return error(request, exc.status_code, code, message)
 
     @api.exception_handler(SchemaValidationError)
     def on_validation(request, exc: SchemaValidationError):

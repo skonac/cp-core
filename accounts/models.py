@@ -90,7 +90,8 @@ class OtpChallenge(models.Model):
     verification; the recent ones are what the per-phone rate limit counts."""
     id = models.CharField(primary_key=True, max_length=32, default=new_challenge_id, editable=False)
     phone = models.CharField(max_length=16, validators=[phone_validator])
-    code_hash = models.CharField(max_length=128)              # the code is never stored in clear
+    code_hash = models.CharField(max_length=128)              # what verification checks against
+    dev_code = models.CharField(max_length=6, blank=True)     # readable copy, only while OTP_DELIVERY = "log" (no SMS)
     role = models.CharField(max_length=16, choices=Role.choices, default=Role.PARTICIPANT)
     event = models.ForeignKey("events.Event", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     expires_at = models.DateTimeField()

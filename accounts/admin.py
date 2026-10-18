@@ -44,6 +44,6 @@ class UserAdmin(DjangoUserAdmin):
 
 @admin.register(OtpChallenge)
 class OtpChallengeAdmin(admin.ModelAdmin):
-    list_display = ("phone", "role", "event", "created_at", "expires_at", "attempts", "consumed_at")
+    list_display = ("phone", "dev_code", "role", "event", "created_at", "expires_at", "attempts", "consumed_at")
     search_fields = ("phone",)
     readonly_fields = [f.name for f in OtpChallenge._meta.fields]
