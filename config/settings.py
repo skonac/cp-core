@@ -123,6 +123,9 @@ LOGGING = {
 # --- Files ----------------------------------------------------------------------
 
 MEDIA_ROOT = Path(env("CP_MEDIA_ROOT", str(BASE_DIR / "media_root")))
+USE_X_ACCEL = env_bool("CP_X_ACCEL")         # production: nginx serves files (X-Accel-Redirect)
+X_ACCEL_PREFIX = "/protected-media/"         # nginx internal location aliased to MEDIA_ROOT
+UPLOAD_MAX_BYTES = 50 * 1024 * 1024          # per file
 
 # --- Product settings (design/core.md, "Settings") --------------------------------
 
