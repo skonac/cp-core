@@ -83,7 +83,7 @@ Every response except files and `204` is:
 | 423 | `event_access_closed` | The organizer closed access |
 | 429 | `rate_limit_exceeded`, `download_limit_reached` | |
 | 500 | `internal_error` | Bug; quote the `requestId` |
-| 501 | `payment_not_available` | Credit purchase: payment provider not connected yet |
+| 501 | `payment_not_available` | Credit purchase: no payment provider configured on this server |
 
 ## 3. Endpoints
 
@@ -426,18 +426,25 @@ processing. No phone numbers, selfies or face data are returned.
 
 ```json
 { "creditBalance": 1840, "pricingVersion": "3f9a1c0b2d4e",
-  "packages": [ { "id": "2", "name": "1000cr", "creditAmount": 1000, "price": 1800.0, "currency": "TRY",
+  "packages": [ { "id": "2", "name": "2000cr", "title": "Mini paket", "description": "Küçük düğünler için",
+                  "creditAmount": 2000, "price": 3600.0, "currency": "TRY",
                   "unitPrice": 1.8, "discountPercent": 10, "featured": true } ],
-  "purchases": [ { "id": "7", "creditAmount": 1000, "ref": "…", "purchasedAt": "2026-10-19T08:30:00+00:00" } ] }
+  "purchases": [ { "id": "7", "packageId": "2", "packageName": "2000cr", "creditAmount": 2000, "amount": 3600.0,
+                   "currency": "TRY", "status": "paid", "purchasedAt": "2026-10-19T08:30:00+00:00",
+                   "paidAt": "2026-10-19T08:30:05+00:00" } ] }
 ```
 
-Packages are managed in the admin (name, credits, price, currency, active, featured, order). `discountPercent` is
-against the package with the highest unit price. `pricingVersion` changes whenever a package or price changes.
+`packages`: the ones on sale, in display order, managed in the admin (name, title, description = subtitle,
+credits, price, active, featured, order). `discountPercent` is against the package with the highest unit price.
+`pricingVersion` changes whenever a package or price changes. `purchases`: this account's, newest first (max 50);
+`packageName`, `creditAmount` and `amount` are as they were at purchase time.
 
-**`POST /api/organizer/credit-purchases`** `{ "packageId": "2", "pricingVersion": "3f9a1c0b2d4e" }`: checks the
-package and the price version, then would start the payment. **Payment is not connected yet** (provider: iyzico):
-it answers `501 payment_not_available`; credits are added by us by hand meanwhile. Errors: `404 not_found` (package),
-`409 pricing_changed` (reload the store). The flow will be: pick a package → pay → credits arrive; no cart.
+**`POST /api/organizer/credit-purchases`** `{ "packageId": "2", "pricingVersion": "3f9a1c0b2d4e" }` →
+`201 credit_purchase_completed` `{ "purchase": {…same shape as above…}, "creditBalance": 3840 }`.
+Pick a package, pay, the credits are added; no cart. **On development servers the payment is simulated: it always
+succeeds at once** (`status: "paid"`, credits added). With the real provider (iyzico, not connected yet) this call will
+answer with a payment page to open instead, and the credits arrive after the payment; that shape will be added here.
+Errors: `404 not_found` (package not on sale), `409 pricing_changed` (reload the store), `501 payment_not_available`.
 
 ## 4. Flows
 
@@ -497,13 +504,13 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 | O8 | Photo list `{id, fileName, thumbnailUrl, status, uploadedAt, errorCode}` | Adds `faceCount`, `displayUrl`, `width`, `height`, `takenAt`, `nextCursor`; `?status=` filter, paging | — |
 | O9 | `POST …/photos/retry` | Removed: a failed photo is rare and fixed on our side | Remove the retry action |
 | O10 | Participants: `joinMethod`, `accessStatus`, `DELETE …/participants/{id}/access` (revoke) | Not in v1 (no revoke); `matchStatus` adds `consent_pending`, drops `matching_pending`; adds `hasConsent`; `counts` has no `active` | Remove revoke and those fields |
-| O11 | Credit packages `{id, creditAmount, price, currency, discountPercent, unitPrice, featured}` | Adds `name` ("1000cr"); amounts from the admin, not fixed to 500/1000/3000 | Type `creditAmount` as `number` |
-| O12 | `POST /credit-purchases` completes as `paid` (demo) | `501 payment_not_available` until iyzico is connected; `404`/`409 pricing_changed` checked first | Show "not available yet" on 501 |
+| O11 | Credit packages `{id, creditAmount, price, currency, discountPercent, unitPrice, featured}` | Adds `name` ("2000cr"), `title` ("Mini paket"), `description` (subtitle); amounts from the admin, not fixed to 500/1000/3000 | Type `creditAmount` as `number`; show title/description |
+| O12 | `POST /credit-purchases` completes as `paid` (demo); response `{purchase, availableCredits}` | `201 credit_purchase_completed` `{purchase, creditBalance}`, simulated `paid` on dev servers; purchase adds `packageName`, `paidAt`, drops nothing; `404`/`409 pricing_changed` checked first; `501` if no provider | Same flow as the mock; rename to `creditBalance` |
 | O13 | Cover: only at create, max 8 MB | Also `POST …/cover` / `DELETE …/cover` any time; cover URL is same-origin | — |
 | O14 | Plain `fetch` for POST/PUT/DELETE in `organizer-service.ts` | Every unsafe request needs `X-CSRFToken` | Use `apiMutation` for all of them (today they fail with `403 csrf_failed`) |
 
 ## 6. Not yet in this API
 
-Credit payment (iyzico), organizer activity feed, participant access revoke, choosing the cover from
+Real payment (iyzico; simulated on dev servers), account-based discounts, organizer activity feed, participant access revoke, choosing the cover from
 the event's photos, covers for participants (`coverThumbnailUrl` in `/api/me/events`), ZIP download of
 several photos, real SMS delivery, email login. Ask before building screens that need them.

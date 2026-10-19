@@ -40,6 +40,7 @@ def env_bool(name: str, default: bool = False) -> bool:
 
 SECRET_KEY = env("CP_SECRET_KEY")
 DEBUG = env_bool("CP_DEBUG")
+IS_DEV = DEBUG   # CP_DEBUG as configured; the test runner turns DEBUG off, this stays (dev-only guards use it)
 ALLOWED_HOSTS = [h.strip() for h in env("CP_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 
 INSTALLED_APPS = [
@@ -170,6 +171,9 @@ EVENT_LOOKUP_PER_MIN = 30   # public event lookups per IP
 # of any active account (accounts.backends.MasterPassBackend). Empty = off. `manage.py check` (and so
 # deploy.sh and runserver) refuses to run with it set while DEBUG is off.
 MASTER_PASS = env("CP_MASTER_PASS", "")
+# Credit purchases (credits/payments.py): "simulated" = every purchase succeeds at once, no money
+# (non-production only; `manage.py check` refuses it with DEBUG off); "iyzico" once connected.
+PAYMENT_PROVIDER = env("CP_PAYMENT_PROVIDER", "simulated")
 
 # KVKK consent document (design/core.md, "Consent"). The pair kvkk/kvkk_tr_<v>.pdf + kvkk_en_<v>.pdf;
 # a user has consent when User.kvkk_version equals this. Changing it = everyone consents again.

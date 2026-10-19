@@ -13,7 +13,7 @@ class AccountsConfig(AppConfig):
 def check_master_pass(app_configs=None, **kwargs):
     """CP_MASTER_PASS opens every account: never with DEBUG off (= production)."""
     from django.conf import settings
-    if settings.MASTER_PASS and not settings.DEBUG:
+    if settings.MASTER_PASS and not settings.IS_DEV:
         return [checks.Error("CP_MASTER_PASS is set while CP_DEBUG is off; remove it in production",
                              id="cp.E003")]
     return []

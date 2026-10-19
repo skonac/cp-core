@@ -54,6 +54,13 @@
   <td class="n">{{ e.photos.failed|default:"" }}</td><td class="n">{{ e.member_count }}</td><td>{{ e.created_at|date:"Y-m-d H:i" }}</td>
 </tr>{% endfor %}</table></div>{% else %}<p class="muted">None.</p>{% endif %}{% endif %}
 
+{% if purchases %}<h2>Purchases</h2>
+<div class="scroll"><table class="t"><tr><th>Id</th><th>Started</th><th>Package</th><th class="n">Credits</th><th class="n">Amount</th><th>Status</th><th>Provider</th><th>Payment id</th><th>Paid</th><th>Error</th></tr>
+{% for p in purchases %}<tr><td><a href="/admin/credits/purchase/{{ p.id }}/change/">{{ p.id }}</a></td><td>{{ p.created_at|date:"Y-m-d H:i" }}</td><td>{{ p.package_name }}</td><td class="n">{{ p.credits }}</td>
+  <td class="n">{{ p.amount }} {{ p.currency }}</td><td><span class="pill {% if p.status == 'paid' %}done{% elif p.status == 'failed' %}failed{% else %}pending{% endif %}">{{ p.status }}</span></td>
+  <td>{{ p.provider }}</td><td><code class="small">{{ p.provider_payment_id }}</code></td><td>{{ p.paid_at|date:"Y-m-d H:i"|default:"" }}</td><td class="wrap small">{{ p.error_code }} {{ p.error_message }}</td></tr>{% endfor %}
+</table></div>{% endif %}
+
 {% if credits %}<h2>Credit transactions</h2>
 <div class="scroll"><table class="t"><tr><th>When</th><th class="n">Delta</th><th>Kind</th><th>Ref</th><th>By</th><th>Note</th></tr>
 {% for t in credits %}<tr><td>{{ t.created_at|date:"Y-m-d H:i" }}</td><td class="n">{{ t.delta|stringformat:"+d" }}</td><td>{{ t.kind }}</td><td>{{ t.ref }}</td><td>{{ t.actor.phone|default:"" }}</td><td class="wrap">{{ t.note }}</td></tr>{% endfor %}

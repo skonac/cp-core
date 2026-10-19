@@ -146,7 +146,7 @@ class MasterPassTest(TestCase):
             verify_code(self._challenge().pk, "")
         self.assertIsNone(authenticate(username="+905550000077", password=""))
 
-    @override_settings(MASTER_PASS="12345", DEBUG=False)
+    @override_settings(MASTER_PASS="12345", IS_DEV=False)
     def test_check_refuses_production(self):
         from accounts.apps import check_master_pass
         self.assertEqual([e.id for e in check_master_pass()], ["cp.E003"])

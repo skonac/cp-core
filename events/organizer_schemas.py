@@ -145,8 +145,10 @@ class ParticipantListOut(Out):
 
 class CreditPackageOut(Out):
     id: str = Field(examples=["2"])
-    name: str = Field(examples=["1000cr"])
-    creditAmount: int = Field(examples=[1000])
+    name: str = Field(examples=["2000cr"])
+    title: str | None = Field(examples=["Mini paket"])
+    description: str | None = Field(description="Subtitle.", examples=["Küçük düğünler için"])
+    creditAmount: int = Field(examples=[2000])
     price: float = Field(examples=[1800.0])
     currency: str = Field(examples=["TRY"])
     unitPrice: float = Field(examples=[1.8])
@@ -155,10 +157,20 @@ class CreditPackageOut(Out):
 
 
 class CreditPurchaseOut(Out):
-    id: str
-    creditAmount: int
-    ref: str
-    purchasedAt: str
+    id: str = Field(examples=["7"])
+    packageId: str = Field(examples=["2"])
+    packageName: str = Field(description="As it was at purchase time.", examples=["2000cr"])
+    creditAmount: int = Field(examples=[2000])
+    amount: float = Field(description="Charged.", examples=[3600.0])
+    currency: str = Field(examples=["TRY"])
+    status: Literal["pending", "paid", "failed"]
+    purchasedAt: str = Field(description="When the purchase was started.", examples=["2026-10-19T08:30:00+00:00"])
+    paidAt: str | None = Field(examples=["2026-10-19T08:30:05+00:00"])
+
+
+class PurchaseResultOut(Out):
+    purchase: CreditPurchaseOut
+    creditBalance: int = Field(description="After the purchase.", examples=[5840])
 
 
 class CreditStoreOut(Out):
@@ -180,4 +192,5 @@ UploadBatchResponse = envelope("UploadBatchResponse", UploadBatchOut, "organizer
 PhotoListResponse = envelope("OrganizerPhotoListResponse", PhotoListOut, "organizer_photos_retrieved")
 PhotosDeletedResponse = envelope("OrganizerPhotosDeletedResponse", PhotoMutationOut, "organizer_photos_deleted")
 ParticipantListResponse = envelope("ParticipantListResponse", ParticipantListOut, "organizer_participants_retrieved")
+PurchaseResponse = envelope("CreditPurchaseResponse", PurchaseResultOut, "credit_purchase_completed")
 CreditStoreResponse = envelope("CreditStoreResponse", CreditStoreOut, "credit_store_retrieved")

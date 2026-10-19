@@ -2748,7 +2748,7 @@
             }
           }
         },
-        "description": "Balance, active credit packages (managed in the admin) and past purchases.\n\nErrors: 403 organizer_access_required.",
+        "description": "Balance, the packages on sale (managed in the admin) and this account's purchases (newest first).\n\nErrors: 403 organizer_access_required.",
         "tags": [
           "organizer"
         ],
@@ -2765,6 +2765,16 @@
         "summary": "Credit Purchase",
         "parameters": [],
         "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditPurchaseResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
             "content": {
@@ -2826,7 +2836,7 @@
             }
           }
         },
-        "description": "Buy a package: checks the package and the price version, then would start the payment.\nNot available yet (payment provider pending): answers 501 payment_not_available.\n\nErrors: 403 organizer_access_required · 404 not_found (package) · 409 pricing_changed · 501 payment_not_available.",
+        "description": "Buy one package. Checks the package (on sale) and the price version, takes the payment,\nadds the credits. Development servers simulate the payment: it always succeeds at once.\nWith the real payment provider (iyzico, not connected yet) this step will hand back a payment\npage instead; the credits then arrive after the payment.\n\nErrors: 403 organizer_access_required · 404 not_found (package not on sale) ·\n409 pricing_changed (reload the store) · 501 payment_not_available.",
         "tags": [
           "organizer"
         ],
@@ -6449,14 +6459,43 @@
           },
           "name": {
             "examples": [
-              "1000cr"
+              "2000cr"
             ],
             "title": "Name",
             "type": "string"
           },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "Mini paket"
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Subtitle.",
+            "examples": [
+              "Küçük düğünler için"
+            ],
+            "title": "Description"
+          },
           "creditAmount": {
             "examples": [
-              1000
+              2000
             ],
             "title": "Creditamount",
             "type": "integer"
@@ -6498,6 +6537,8 @@
         "required": [
           "id",
           "name",
+          "title",
+          "description",
           "creditAmount",
           "price",
           "currency",
@@ -6512,27 +6553,91 @@
         "additionalProperties": false,
         "properties": {
           "id": {
+            "examples": [
+              "7"
+            ],
             "title": "Id",
             "type": "string"
           },
+          "packageId": {
+            "examples": [
+              "2"
+            ],
+            "title": "Packageid",
+            "type": "string"
+          },
+          "packageName": {
+            "description": "As it was at purchase time.",
+            "examples": [
+              "2000cr"
+            ],
+            "title": "Packagename",
+            "type": "string"
+          },
           "creditAmount": {
+            "examples": [
+              2000
+            ],
             "title": "Creditamount",
             "type": "integer"
           },
-          "ref": {
-            "title": "Ref",
+          "amount": {
+            "description": "Charged.",
+            "examples": [
+              3600.0
+            ],
+            "title": "Amount",
+            "type": "number"
+          },
+          "currency": {
+            "examples": [
+              "TRY"
+            ],
+            "title": "Currency",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "paid",
+              "failed"
+            ],
+            "title": "Status",
             "type": "string"
           },
           "purchasedAt": {
+            "description": "When the purchase was started.",
+            "examples": [
+              "2026-10-19T08:30:00+00:00"
+            ],
             "title": "Purchasedat",
             "type": "string"
+          },
+          "paidAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "2026-10-19T08:30:05+00:00"
+            ],
+            "title": "Paidat"
           }
         },
         "required": [
           "id",
+          "packageId",
+          "packageName",
           "creditAmount",
-          "ref",
-          "purchasedAt"
+          "amount",
+          "currency",
+          "status",
+          "purchasedAt",
+          "paidAt"
         ],
         "title": "CreditPurchaseOut",
         "type": "object"
@@ -6614,6 +6719,68 @@
           "requestId"
         ],
         "title": "CreditStoreResponse",
+        "type": "object"
+      },
+      "CreditPurchaseResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "credit_purchase_completed",
+            "default": "credit_purchase_completed",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PurchaseResultOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "CreditPurchaseResponse",
+        "type": "object"
+      },
+      "PurchaseResultOut": {
+        "additionalProperties": false,
+        "properties": {
+          "purchase": {
+            "$ref": "#/components/schemas/CreditPurchaseOut"
+          },
+          "creditBalance": {
+            "description": "After the purchase.",
+            "examples": [
+              5840
+            ],
+            "title": "Creditbalance",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "purchase",
+          "creditBalance"
+        ],
+        "title": "PurchaseResultOut",
         "type": "object"
       },
       "Error501": {
