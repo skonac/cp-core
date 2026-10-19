@@ -13,7 +13,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
           }
         },
         "description": "Liveness + database check.",
@@ -29,7 +36,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CsrfResponse"
+                }
+              }
+            }
           }
         },
         "description": "Sets the csrftoken cookie. Call once on app start; send its value as X-CSRFToken.",
@@ -44,10 +58,48 @@
         "summary": "Otp Request",
         "parameters": [],
         "responses": {
-          "200": {
-            "description": "OK"
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtpSentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
           }
         },
+        "description": "Sends a sign-in code (dev: to the server log and the admin). `role` defaults to participant.\n\nErrors: 404 event_not_found · 422 invalid_phone_number, invalid_role, validation_error ·\n429 rate_limit_exceeded (3 codes per phone per 15 min; 30 s between codes).",
         "tags": [
           "auth"
         ],
@@ -70,9 +122,47 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
           }
         },
+        "description": "Checks the code; signs in, or creates the account. Sets the session cookie. Follow `nextStep`.\n\nErrors: 410 otp_expired · 422 invalid_otp, validation_error · 429 rate_limit_exceeded (5 wrong codes).",
         "tags": [
           "auth"
         ],
@@ -94,10 +184,11 @@
         "summary": "Sign Out",
         "parameters": [],
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           }
         },
+        "description": "Signs out.",
         "tags": [
           "auth"
         ]
@@ -110,9 +201,27 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
           }
         },
+        "description": "The signed-in user. 401 authentication_required when signed out (use on app start).",
         "tags": [
           "me"
         ],
@@ -128,9 +237,57 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileUpdatedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error409"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
           }
         },
+        "description": "Profile: fullName (required), email (optional, null clears).\n\nErrors: 403 csrf_failed · 409 email_already_in_use · 422 validation_error.",
         "tags": [
           "me"
         ],
@@ -157,10 +314,58 @@
         "summary": "Give Consent",
         "parameters": [],
         "responses": {
-          "200": {
-            "description": "OK"
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error409"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
           }
         },
+        "description": "KVKK explicit consent to the version the screen showed (`user.kvkk.version`); logged with\nversion, language, file hash, IP and browser.\n\nErrors: 403 csrf_failed · 409 consent_version_outdated (re-fetch /api/me, show the new text) ·\n422 explicit_consent_required (granted false), validation_error.",
         "tags": [
           "me"
         ],
@@ -188,9 +393,27 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyEventsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
           }
         },
+        "description": "Events the user has opened, newest activity first.",
         "tags": [
           "me"
         ],
@@ -208,9 +431,27 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelfiesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
           }
         },
+        "description": "The user's selfies (slots primary, secondary). Poll after an upload until status leaves processing.",
         "tags": [
           "me"
         ],
@@ -225,10 +466,48 @@
         "summary": "Upload Selfie",
         "parameters": [],
         "responses": {
-          "200": {
-            "description": "OK"
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelfieAcceptedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
           }
         },
+        "description": "multipart/form-data: file (JPEG/PNG/WebP/HEIC, ≤ 50 MB), slot. Replaces the slot's selfie.\nProcessing is asynchronous: poll GET /api/me/selfies.\n\nErrors: 403 consent_required, csrf_failed · 422 unsupported_file_type, unreadable_image,\nfile_too_large, invalid_slot, validation_error.",
         "tags": [
           "me"
         ],
@@ -281,10 +560,41 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
           }
         },
+        "description": "Deletes the selfie and its face data. Errors: 404 selfie_not_found.",
         "tags": [
           "me"
         ],
@@ -311,10 +621,39 @@
           }
         ],
         "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
           "200": {
-            "description": "OK"
+            "description": "Thumbnail (owner only)",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
           }
         },
+        "description": "Use as <img src>. Errors: 404 selfie_not_found.",
         "tags": [
           "me"
         ],
@@ -341,11 +680,71 @@
           }
         ],
         "responses": {
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
           "200": {
-            "description": "OK"
+            "description": "The PDF",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
           }
         },
-        "description": "A KVKK document PDF, current or older (what earlier consents refer to). Public.",
+        "description": "A KVKK document PDF, current or older (what earlier consents refer to). Public.\nThe current files: `user.kvkk.urls`. Errors: 404 not_found.",
+        "tags": [
+          "kvkk"
+        ]
+      },
+      "head": {
+        "operationId": "accounts_api_kvkk_document",
+        "summary": "Kvkk Document",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "filename",
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "The PDF",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "description": "A KVKK document PDF, current or older (what earlier consents refer to). Public.\nThe current files: `user.kvkk.urls`. Errors: 404 not_found.",
         "tags": [
           "kvkk"
         ]
@@ -368,9 +767,57 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicEventResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error423"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
           }
         },
+        "description": "The welcome screen: no photos, no counts. With a session, also adds the event to the user's events.\n\nErrors: 404 event_not_found · 410 event_expired · 423 event_access_closed ·\n429 rate_limit_exceeded (30 per minute per IP).",
         "tags": [
           "events"
         ]
@@ -423,9 +870,77 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error423"
+                }
+              }
+            }
           }
         },
+        "description": "Photos of me (`view=mine`, face matching) or all photos (`view=all`, when canBrowseAll).\nOrdered by capture time; `cursor` is an offset, `limit` ≤ 500. Always current: re-fetch to see new matches.\n\nErrors: 404 event_not_found · 410 event_expired · 423 event_access_closed · 403 consent_required, browse_all_not_allowed · 422 validation_error (bad view).",
         "tags": [
           "events"
         ],
@@ -472,9 +987,77 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryPhotoResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error423"
+                }
+              }
+            }
           }
         },
+        "description": "One photo with previous/next in the same view, and downloads left today.\n\nErrors: 404 event_not_found · 410 event_expired · 423 event_access_closed · 403 consent_required, browse_all_not_allowed · 404 photo_not_found (not in this view).",
         "tags": [
           "events"
         ],
@@ -510,8 +1093,66 @@
           }
         ],
         "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error423"
+                }
+              }
+            }
+          },
           "200": {
-            "description": "OK"
+            "description": "~400 px, for grids",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -549,8 +1190,66 @@
           }
         ],
         "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error423"
+                }
+              }
+            }
+          },
           "200": {
-            "description": "OK"
+            "description": "~1600 px, for viewing",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -588,10 +1287,79 @@
           }
         ],
         "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error423"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          },
           "200": {
-            "description": "OK"
+            "description": "Full size (≤ 4000 px), Content-Disposition: attachment",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
           }
         },
+        "description": "Errors: 404 photo_not_found · 429 download_limit_reached (3 per photo per 24 h).",
         "tags": [
           "events"
         ],
@@ -605,6 +1373,401 @@
   },
   "components": {
     "schemas": {
+      "HealthOut": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "database": {
+            "title": "Database",
+            "type": "string"
+          },
+          "pgvector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pgvector"
+          }
+        },
+        "required": [
+          "version",
+          "database",
+          "pgvector"
+        ],
+        "title": "HealthOut",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/HealthOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "CsrfResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "csrf_set",
+            "default": "csrf_set",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "CsrfResponse",
+        "type": "object"
+      },
+      "OtpChallengeOut": {
+        "additionalProperties": false,
+        "properties": {
+          "challengeId": {
+            "examples": [
+              "otp_WcM7QQ-RIA9d2osCR_Mx6A"
+            ],
+            "title": "Challengeid",
+            "type": "string"
+          },
+          "maskedPhone": {
+            "examples": [
+              "•••••••••4567"
+            ],
+            "title": "Maskedphone",
+            "type": "string"
+          },
+          "expiresInSeconds": {
+            "examples": [
+              120
+            ],
+            "title": "Expiresinseconds",
+            "type": "integer"
+          },
+          "resendAfterSeconds": {
+            "examples": [
+              30
+            ],
+            "title": "Resendafterseconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "challengeId",
+          "maskedPhone",
+          "expiresInSeconds",
+          "resendAfterSeconds"
+        ],
+        "title": "OtpChallengeOut",
+        "type": "object"
+      },
+      "OtpSentResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "otp_sent",
+            "default": "otp_sent",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/OtpChallengeOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "OtpSentResponse",
+        "type": "object"
+      },
+      "Error404": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "not_found"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Bulunamadı."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              null
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error404",
+        "type": "object"
+      },
+      "Error422": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "validation_error"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Invalid input."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              {
+                "phoneNumber": [
+                  "Field required"
+                ]
+              }
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error422",
+        "type": "object"
+      },
+      "Error429": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "rate_limit_exceeded"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Çok fazla istek. Biraz sonra tekrar dene."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              null
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error429",
+        "type": "object"
+      },
       "OtpRequestIn": {
         "properties": {
           "phoneNumber": {
@@ -634,6 +1797,368 @@
         "title": "OtpRequestIn",
         "type": "object"
       },
+      "KvkkDocumentsOut": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "description": "Current KVKK document version.",
+            "examples": [
+              "001"
+            ],
+            "title": "Version",
+            "type": "string"
+          },
+          "urls": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "PDF per language.",
+            "examples": [
+              {
+                "en": "/api/kvkk/kvkk_en_001.pdf",
+                "tr": "/api/kvkk/kvkk_tr_001.pdf"
+              }
+            ],
+            "propertyNames": {
+              "enum": [
+                "tr",
+                "en"
+              ]
+            },
+            "title": "Urls",
+            "type": "object"
+          }
+        },
+        "required": [
+          "version",
+          "urls"
+        ],
+        "title": "KvkkDocumentsOut",
+        "type": "object"
+      },
+      "MembershipOut": {
+        "additionalProperties": false,
+        "properties": {
+          "eventCode": {
+            "examples": [
+              "RK238"
+            ],
+            "title": "Eventcode",
+            "type": "string"
+          },
+          "role": {
+            "const": "participant",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "eventCode",
+          "role"
+        ],
+        "title": "MembershipOut",
+        "type": "object"
+      },
+      "SignInOut": {
+        "additionalProperties": false,
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserOut"
+          },
+          "nextStep": {
+            "description": "consent/selfie/gallery: signed in from an event link; organizer_home/account_home: no event.",
+            "enum": [
+              "consent",
+              "selfie",
+              "gallery",
+              "organizer_home",
+              "account_home"
+            ],
+            "title": "Nextstep",
+            "type": "string"
+          },
+          "isNewUser": {
+            "title": "Isnewuser",
+            "type": "boolean"
+          },
+          "eventCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "RK238"
+            ],
+            "title": "Eventcode"
+          },
+          "eventMembership": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MembershipOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "user",
+          "nextStep",
+          "isNewUser",
+          "eventCode",
+          "eventMembership"
+        ],
+        "title": "SignInOut",
+        "type": "object"
+      },
+      "SignInResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "phone_verified",
+            "default": "phone_verified",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SignInOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "SignInResponse",
+        "type": "object"
+      },
+      "UserOut": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "examples": [
+              "69"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "phoneNumber": {
+            "examples": [
+              "+905551234567"
+            ],
+            "title": "Phonenumber",
+            "type": "string"
+          },
+          "fullName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "Seko Konac"
+            ],
+            "title": "Fullname"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              null
+            ],
+            "title": "Email"
+          },
+          "profileCompleted": {
+            "description": "true when fullName is set.",
+            "title": "Profilecompleted",
+            "type": "boolean"
+          },
+          "accountRoles": {
+            "description": "UI visibility only; the server checks everything.",
+            "examples": [
+              [
+                "participant"
+              ]
+            ],
+            "items": {
+              "enum": [
+                "participant",
+                "organizer",
+                "photographer",
+                "admin"
+              ],
+              "type": "string"
+            },
+            "title": "Accountroles",
+            "type": "array"
+          },
+          "hasConsent": {
+            "description": "Consent given to the CURRENT KVKK version (kvkk.version).",
+            "title": "Hasconsent",
+            "type": "boolean"
+          },
+          "consentVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Version last consented to; null = never.",
+            "examples": [
+              null
+            ],
+            "title": "Consentversion"
+          },
+          "kvkk": {
+            "$ref": "#/components/schemas/KvkkDocumentsOut"
+          },
+          "selfieState": {
+            "enum": [
+              "no_selfie",
+              "selfie_processing",
+              "selfie_rejected",
+              "ready"
+            ],
+            "examples": [
+              "no_selfie"
+            ],
+            "title": "Selfiestate",
+            "type": "string"
+          },
+          "selfieThumbnailUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Primary selfie's thumbnail.",
+            "examples": [
+              null
+            ],
+            "title": "Selfiethumbnailurl"
+          }
+        },
+        "required": [
+          "id",
+          "phoneNumber",
+          "fullName",
+          "email",
+          "profileCompleted",
+          "accountRoles",
+          "hasConsent",
+          "consentVersion",
+          "kvkk",
+          "selfieState",
+          "selfieThumbnailUrl"
+        ],
+        "title": "UserOut",
+        "type": "object"
+      },
+      "Error410": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "event_expired"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Bu etkinliğin erişim süresi sona erdi."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              null
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error410",
+        "type": "object"
+      },
       "OtpVerifyIn": {
         "properties": {
           "challengeId": {
@@ -650,6 +2175,284 @@
           "code"
         ],
         "title": "OtpVerifyIn",
+        "type": "object"
+      },
+      "ProfileResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "profile_retrieved",
+            "default": "profile_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UserOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "ProfileResponse",
+        "type": "object"
+      },
+      "Error401": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "authentication_required"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Sign in required."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              null
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error401",
+        "type": "object"
+      },
+      "ProfileUpdatedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "profile_updated",
+            "default": "profile_updated",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UserOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "ProfileUpdatedResponse",
+        "type": "object"
+      },
+      "Error403": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "consent_required"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Bu etkinlik için açık rıza gerekli."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              null
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error403",
+        "type": "object"
+      },
+      "Error409": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "consent_version_outdated"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Metin güncellendi; lütfen güncel metni oku."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              null
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error409",
         "type": "object"
       },
       "MeUpdateIn": {
@@ -676,6 +2479,69 @@
         "title": "MeUpdateIn",
         "type": "object"
       },
+      "ConsentOut": {
+        "additionalProperties": false,
+        "properties": {
+          "hasConsent": {
+            "const": true,
+            "title": "Hasconsent",
+            "type": "boolean"
+          },
+          "version": {
+            "examples": [
+              "001"
+            ],
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hasConsent",
+          "version"
+        ],
+        "title": "ConsentOut",
+        "type": "object"
+      },
+      "ConsentResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "consent_recorded",
+            "default": "consent_recorded",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConsentOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "ConsentResponse",
+        "type": "object"
+      },
       "ConsentIn": {
         "properties": {
           "granted": {
@@ -697,6 +2563,911 @@
           "version"
         ],
         "title": "ConsentIn",
+        "type": "object"
+      },
+      "MyEventOut": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "examples": [
+              "RK238"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "examples": [
+              "Derya & Can"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "wedding",
+              "sports",
+              "other"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "date": {
+            "examples": [
+              "2026-06-12"
+            ],
+            "title": "Date",
+            "type": "string"
+          },
+          "locationLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "İstanbul"
+            ],
+            "title": "Locationlabel"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "access_closed",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "matchedPhotoCount": {
+            "examples": [
+              24
+            ],
+            "title": "Matchedphotocount",
+            "type": "integer"
+          },
+          "matching": {
+            "anyOf": [
+              {
+                "enum": [
+                  "consent_required",
+                  "matching_off",
+                  "no_selfie",
+                  "selfie_processing",
+                  "selfie_rejected",
+                  "ready"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "ready"
+            ],
+            "title": "Matching"
+          },
+          "coverThumbnailUrl": {
+            "description": "Always null for now.",
+            "title": "Coverthumbnailurl",
+            "type": "null"
+          },
+          "lastActivityAt": {
+            "examples": [
+              "2026-10-11T08:30:00+00:00"
+            ],
+            "title": "Lastactivityat",
+            "type": "string"
+          },
+          "membershipRole": {
+            "const": "participant",
+            "title": "Membershiprole",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "type",
+          "date",
+          "locationLabel",
+          "status",
+          "matchedPhotoCount",
+          "matching",
+          "coverThumbnailUrl",
+          "lastActivityAt",
+          "membershipRole"
+        ],
+        "title": "MyEventOut",
+        "type": "object"
+      },
+      "MyEventsOut": {
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/MyEventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "events",
+          "total"
+        ],
+        "title": "MyEventsOut",
+        "type": "object"
+      },
+      "MyEventsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "user_events_retrieved",
+            "default": "user_events_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MyEventsOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "MyEventsResponse",
+        "type": "object"
+      },
+      "SelfieOut": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "examples": [
+              "68"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "slot": {
+            "enum": [
+              "primary",
+              "secondary"
+            ],
+            "title": "Slot",
+            "type": "string"
+          },
+          "status": {
+            "description": "Poll GET /api/me/selfies until not processing.",
+            "enum": [
+              "processing",
+              "ready",
+              "rejected"
+            ],
+            "examples": [
+              "ready"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_face",
+                  "multiple_faces",
+                  "unreadable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when rejected.",
+            "examples": [
+              null
+            ],
+            "title": "Reason"
+          },
+          "thumbnailUrl": {
+            "examples": [
+              "/api/me/selfies/68/thumb.jpg"
+            ],
+            "title": "Thumbnailurl",
+            "type": "string"
+          },
+          "createdAt": {
+            "examples": [
+              "2026-10-19T08:30:00+00:00"
+            ],
+            "title": "Createdat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slot",
+          "status",
+          "reason",
+          "thumbnailUrl",
+          "createdAt"
+        ],
+        "title": "SelfieOut",
+        "type": "object"
+      },
+      "SelfiesOut": {
+        "additionalProperties": false,
+        "properties": {
+          "selfies": {
+            "items": {
+              "$ref": "#/components/schemas/SelfieOut"
+            },
+            "title": "Selfies",
+            "type": "array"
+          },
+          "selfieState": {
+            "enum": [
+              "no_selfie",
+              "selfie_processing",
+              "selfie_rejected",
+              "ready"
+            ],
+            "examples": [
+              "ready"
+            ],
+            "title": "Selfiestate",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selfies",
+          "selfieState"
+        ],
+        "title": "SelfiesOut",
+        "type": "object"
+      },
+      "SelfiesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "selfies_retrieved",
+            "default": "selfies_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SelfiesOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "SelfiesResponse",
+        "type": "object"
+      },
+      "SelfieAcceptedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "selfie_accepted",
+            "default": "selfie_accepted",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SelfieOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "SelfieAcceptedResponse",
+        "type": "object"
+      },
+      "PublicEventOut": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "examples": [
+              "RK238"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "examples": [
+              "Derya & Can"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "wedding",
+              "sports",
+              "other"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "date": {
+            "examples": [
+              "2026-06-12"
+            ],
+            "title": "Date",
+            "type": "string"
+          },
+          "locationLabel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "İstanbul"
+            ],
+            "title": "Locationlabel"
+          },
+          "status": {
+            "const": "active",
+            "description": "Closed/expired events answer 423/410 instead.",
+            "title": "Status",
+            "type": "string"
+          },
+          "hasFaceSearch": {
+            "title": "Hasfacesearch",
+            "type": "boolean"
+          },
+          "allowsBrowseAll": {
+            "title": "Allowsbrowseall",
+            "type": "boolean"
+          },
+          "requiresConsent": {
+            "title": "Requiresconsent",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "type",
+          "date",
+          "locationLabel",
+          "status",
+          "hasFaceSearch",
+          "allowsBrowseAll",
+          "requiresConsent"
+        ],
+        "title": "PublicEventOut",
+        "type": "object"
+      },
+      "PublicEventResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "event_retrieved",
+            "default": "event_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PublicEventOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "PublicEventResponse",
+        "type": "object"
+      },
+      "Error423": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "event_access_closed"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Bu etkinliğe erişim kapatıldı."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              null
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error423",
+        "type": "object"
+      },
+      "GalleryOut": {
+        "additionalProperties": false,
+        "properties": {
+          "eventCode": {
+            "examples": [
+              "RK238"
+            ],
+            "title": "Eventcode",
+            "type": "string"
+          },
+          "view": {
+            "enum": [
+              "mine",
+              "all"
+            ],
+            "title": "View",
+            "type": "string"
+          },
+          "matching": {
+            "anyOf": [
+              {
+                "enum": [
+                  "consent_required",
+                  "matching_off",
+                  "no_selfie",
+                  "selfie_processing",
+                  "selfie_rejected",
+                  "ready"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "State of 'photos of me'; explains an empty mine list.",
+            "examples": [
+              "ready"
+            ],
+            "title": "Matching"
+          },
+          "canBrowseAll": {
+            "description": "Show the 'All photos' tab.",
+            "examples": [
+              false
+            ],
+            "title": "Canbrowseall",
+            "type": "boolean"
+          },
+          "photosTotal": {
+            "description": "All photos of the event.",
+            "examples": [
+              3000
+            ],
+            "title": "Photostotal",
+            "type": "integer"
+          },
+          "photosPending": {
+            "description": "Still being processed; re-fetch later when > 0.",
+            "examples": [
+              120
+            ],
+            "title": "Photospending",
+            "type": "integer"
+          },
+          "total": {
+            "description": "Photos in this view.",
+            "examples": [
+              24
+            ],
+            "title": "Total",
+            "type": "integer"
+          },
+          "photos": {
+            "items": {
+              "$ref": "#/components/schemas/PhotoOut"
+            },
+            "title": "Photos",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Offset of the next page; null on the last page.",
+            "examples": [
+              null
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "eventCode",
+          "view",
+          "matching",
+          "canBrowseAll",
+          "photosTotal",
+          "photosPending",
+          "total",
+          "photos",
+          "nextCursor"
+        ],
+        "title": "GalleryOut",
+        "type": "object"
+      },
+      "GalleryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "gallery_retrieved",
+            "default": "gallery_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/GalleryOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "GalleryResponse",
+        "type": "object"
+      },
+      "PhotoOut": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Photo number in its event; unique only within the event.",
+            "examples": [
+              "00017"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "width": {
+            "description": "Display image pixels.",
+            "examples": [
+              1600
+            ],
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "examples": [
+              1200
+            ],
+            "title": "Height",
+            "type": "integer"
+          },
+          "takenAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "2026-06-12T18:14:00+00:00"
+            ],
+            "title": "Takenat"
+          },
+          "thumbnailUrl": {
+            "examples": [
+              "/api/events/rk238/photos/00017/thumb.jpg"
+            ],
+            "title": "Thumbnailurl",
+            "type": "string"
+          },
+          "displayUrl": {
+            "examples": [
+              "/api/events/rk238/photos/00017/display.jpg"
+            ],
+            "title": "Displayurl",
+            "type": "string"
+          },
+          "downloadUrl": {
+            "examples": [
+              "/api/events/rk238/photos/00017/download"
+            ],
+            "title": "Downloadurl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "width",
+          "height",
+          "takenAt",
+          "thumbnailUrl",
+          "displayUrl",
+          "downloadUrl"
+        ],
+        "title": "PhotoOut",
+        "type": "object"
+      },
+      "GalleryPhotoOut": {
+        "additionalProperties": false,
+        "properties": {
+          "eventCode": {
+            "examples": [
+              "RK238"
+            ],
+            "title": "Eventcode",
+            "type": "string"
+          },
+          "view": {
+            "enum": [
+              "mine",
+              "all"
+            ],
+            "title": "View",
+            "type": "string"
+          },
+          "photo": {
+            "$ref": "#/components/schemas/PhotoOut"
+          },
+          "position": {
+            "description": "1-based, within the view.",
+            "examples": [
+              4
+            ],
+            "title": "Position",
+            "type": "integer"
+          },
+          "total": {
+            "examples": [
+              24
+            ],
+            "title": "Total",
+            "type": "integer"
+          },
+          "previousPhotoId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "00012"
+            ],
+            "title": "Previousphotoid"
+          },
+          "nextPhotoId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "00031"
+            ],
+            "title": "Nextphotoid"
+          },
+          "downloadsLeftToday": {
+            "description": "Hide the download button at 0.",
+            "examples": [
+              3
+            ],
+            "title": "Downloadslefttoday",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "eventCode",
+          "view",
+          "photo",
+          "position",
+          "total",
+          "previousPhotoId",
+          "nextPhotoId",
+          "downloadsLeftToday"
+        ],
+        "title": "GalleryPhotoOut",
+        "type": "object"
+      },
+      "GalleryPhotoResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "gallery_photo_retrieved",
+            "default": "gallery_photo_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/GalleryPhotoOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "GalleryPhotoResponse",
         "type": "object"
       }
     },

@@ -2,7 +2,11 @@
 
 The JSON API that cp-web (React) uses. Served by cp-core (Django) on the same domain as the
 frontend, under `/api/`. This document is the contract; the machine-readable companion is
-[`openapi.json`](openapi.json) (request shapes; live at `/api/openapi.json`, interactive at `/api/docs`).
+[`openapi.json`](openapi.json) (live at `/api/openapi.json`, interactive at `/api/docs`). It describes
+every request and every response: each status with its schema and an example, each endpoint's error
+codes in its description. A test checks every real response against it, so it does not drift.
+TypeScript types can be generated from it: `npx openapi-typescript https://cp.futuruniq.com/api/openapi.json -o src/api/schema.d.ts`
+(behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
 Last updated: 2026-10-19 · API version 0.1 (KVKK documents: versioned PDFs)
 

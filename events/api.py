@@ -7,12 +7,13 @@ from django.utils import timezone
 from ninja import Router
 from ninja.security import django_auth
 
-from common.api import ApiError, respond
+from common.api import ApiError, errors, file_doc, respond
 from common.ratelimit import allow
 from media.matching import my_photos
 from media.models import DownloadLog, Image
 from media.storage import file_response
 
+from . import schemas as S
 from .codes import normalize_code
 from .models import Event
 from .participant import Access, access_for, may_see_photo, public_status, touch_membership
@@ -84,8 +85,12 @@ def _seq(photo_id: str) -> int:
 
 # ---------------------------------------------------------------------------- public
 
-@public_router.get("/events/{code}", auth=None)
+@public_router.get("/events/{code}", auth=None, response={200: S.PublicEventResponse, **errors(404, 410, 423, 429)})
 def public_event(request, code: str):
+    """The welcome screen: no photos, no counts. With a session, also adds the event to the user's events.
+
+    Errors: 404 event_not_found · 410 event_expired · 423 event_access_closed ·
+    429 rate_limit_exceeded (30 per minute per IP)."""
     ip = request.META.get("REMOTE_ADDR", "")
     if not allow(f"event-lookup:{ip}", settings.EVENT_LOOKUP_PER_MIN, 60):
         raise ApiError(429, "rate_limit_exceeded", "Çok fazla istek. Biraz sonra tekrar dene.")
@@ -106,8 +111,12 @@ def public_event(request, code: str):
 
 # ---------------------------------------------------------------------------- gallery
 
-@events_router.get("/{code}/gallery")
+@events_router.get("/{code}/gallery", response={200: S.GalleryResponse, **errors(401, 403, 404, 410, 422, 423)})
 def gallery(request, code: str, view: str = "mine", cursor: int = 0, limit: int = 100):
+    """Photos of me (`view=mine`, face matching) or all photos (`view=all`, when canBrowseAll).
+    Ordered by capture time; `cursor` is an offset, `limit` ≤ 500. Always current: re-fetch to see new matches.
+
+    Errors: 404 event_not_found · 410 event_expired · 423 event_access_closed · 403 consent_required, browse_all_not_allowed · 422 validation_error (bad view)."""
     event, access = _member_access(request, code)
     photos = _view_photos(request, event, access, view)
     limit = max(1, min(limit, 500))
@@ -125,8 +134,11 @@ def gallery(request, code: str, view: str = "mine", cursor: int = 0, limit: int 
     })
 
 
-@events_router.get("/{code}/gallery/photos/{photo_id}")
+@events_router.get("/{code}/gallery/photos/{photo_id}", response={200: S.GalleryPhotoResponse, **errors(401, 403, 404, 410, 422, 423)})
 def gallery_photo(request, code: str, photo_id: str, view: str = "mine"):
+    """One photo with previous/next in the same view, and downloads left today.
+
+    Errors: 404 event_not_found · 410 event_expired · 423 event_access_closed · 403 consent_required, browse_all_not_allowed · 404 photo_not_found (not in this view)."""
     event, access = _member_access(request, code)
     photos = _view_photos(request, event, access, view)
     seq = _seq(photo_id)
@@ -154,18 +166,22 @@ def _visible_photo(request, code: str, photo_id: str) -> tuple[Event, Image]:
     return event, image
 
 
-@events_router.get("/{code}/photos/{photo_id}/thumb.jpg")
+@events_router.get("/{code}/photos/{photo_id}/thumb.jpg", response=errors(401, 403, 404, 410, 423),
+                   openapi_extra=file_doc("image/jpeg", "~400 px, for grids"))
 def photo_thumb(request, code: str, photo_id: str):
     return file_response(_visible_photo(request, code, photo_id)[1].relpath("t"))
 
 
-@events_router.get("/{code}/photos/{photo_id}/display.jpg")
+@events_router.get("/{code}/photos/{photo_id}/display.jpg", response=errors(401, 403, 404, 410, 423),
+                   openapi_extra=file_doc("image/jpeg", "~1600 px, for viewing"))
 def photo_display(request, code: str, photo_id: str):
     return file_response(_visible_photo(request, code, photo_id)[1].relpath("d"))
 
 
-@events_router.get("/{code}/photos/{photo_id}/download")
+@events_router.get("/{code}/photos/{photo_id}/download", response=errors(401, 403, 404, 410, 423, 429),
+                   openapi_extra=file_doc("image/jpeg", "Full size (≤ 4000 px), Content-Disposition: attachment"))
 def photo_download(request, code: str, photo_id: str):
+    """Errors: 404 photo_not_found · 429 download_limit_reached (3 per photo per 24 h)."""
     event, image = _visible_photo(request, code, photo_id)
     since = timezone.now() - timedelta(days=1)
     if DownloadLog.objects.filter(user=request.user, image=image, downloaded_at__gte=since).count() \

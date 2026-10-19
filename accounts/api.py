@@ -11,7 +11,7 @@ from ninja import File, Form, Router
 from ninja.files import UploadedFile
 from ninja.security import django_auth
 
-from common.api import ApiError, CamelSchema, respond
+from common.api import ApiError, CamelSchema, errors, file_doc, respond
 from events.codes import normalize_code
 from events.models import Event, EventMember
 from events.participant import access_for, public_status
@@ -21,6 +21,7 @@ from media.models import Image
 from media.storage import file_response, soft_delete
 
 from . import kvkk
+from . import schemas as S
 from .models import User
 from .otp import mask_phone, request_code, verify_code
 
@@ -79,15 +80,19 @@ class OtpVerifyIn(CamelSchema):
     code: str
 
 
-@auth_router.get("/csrf", auth=None)
+@auth_router.get("/csrf", auth=None, response=S.CsrfResponse)
 def csrf(request):
     """Sets the csrftoken cookie. Call once on app start; send its value as X-CSRFToken."""
     get_token(request)
     return respond(request, "csrf_set")
 
 
-@auth_router.post("/otp-requests", auth=None)
+@auth_router.post("/otp-requests", auth=None, response={201: S.OtpSentResponse, **errors(404, 422, 429)})
 def otp_request(request, body: OtpRequestIn):
+    """Sends a sign-in code (dev: to the server log and the admin). `role` defaults to participant.
+
+    Errors: 404 event_not_found · 422 invalid_phone_number, invalid_role, validation_error ·
+    429 rate_limit_exceeded (3 codes per phone per 15 min; 30 s between codes)."""
     event = None
     if body.event_code:
         event = Event.objects.filter(code=normalize_code(body.event_code)).first()
@@ -100,8 +105,11 @@ def otp_request(request, body: OtpRequestIn):
     }, status=201, message="Doğrulama kodu gönderildi.")
 
 
-@auth_router.post("/otp-verifications", auth=None)
+@auth_router.post("/otp-verifications", auth=None, response={200: S.SignInResponse, **errors(410, 422, 429)})
 def otp_verify(request, body: OtpVerifyIn):
+    """Checks the code; signs in, or creates the account. Sets the session cookie. Follow `nextStep`.
+
+    Errors: 410 otp_expired · 422 invalid_otp, validation_error · 429 rate_limit_exceeded (5 wrong codes)."""
     user, is_new, event = verify_code(body.challenge_id, body.code)
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")   # sets sessionid, rotates csrftoken
     return respond(request, "phone_verified", {
@@ -111,17 +119,20 @@ def otp_verify(request, body: OtpVerifyIn):
     }, message="Telefon numarası doğrulandı.")
 
 
-@auth_router.delete("/session", auth=None)
+@auth_router.delete("/session", auth=None, response={204: None})
 def sign_out(request):
+    """Signs out."""
     logout(request)
     return HttpResponse(status=204)
 
 
 # ---------------------------------------------------------------------------- kvkk
 
-@kvkk_router.api_operation(["GET", "HEAD"], "/{filename}", auth=None)
+@kvkk_router.api_operation(["GET", "HEAD"], "/{filename}", auth=None, response=errors(404),
+                           openapi_extra=file_doc("application/pdf", "The PDF"))
 def kvkk_document(request, filename: str):
-    """A KVKK document PDF, current or older (what earlier consents refer to). Public."""
+    """A KVKK document PDF, current or older (what earlier consents refer to). Public.
+    The current files: `user.kvkk.urls`. Errors: 404 not_found."""
     path = settings.KVKK_DIR / filename
     if not kvkk.FILENAME_RE.match(filename) or not path.is_file():
         raise ApiError(404, "not_found", "Belge bulunamadı.")
@@ -141,13 +152,17 @@ class ConsentIn(CamelSchema):
     locale: str = "tr"    # the language shown: tr | en
 
 
-@me_router.get("")
+@me_router.get("", response={200: S.ProfileResponse, **errors(401)})
 def me(request):
+    """The signed-in user. 401 authentication_required when signed out (use on app start)."""
     return respond(request, "profile_retrieved", user_json(request.user))
 
 
-@me_router.patch("")
+@me_router.patch("", response={200: S.ProfileUpdatedResponse, **errors(401, 403, 409, 422)})
 def me_update(request, body: MeUpdateIn):
+    """Profile: fullName (required), email (optional, null clears).
+
+    Errors: 403 csrf_failed · 409 email_already_in_use · 422 validation_error."""
     user = request.user
     name = body.full_name.strip()
     if not name or len(name) > 150:
@@ -167,8 +182,13 @@ def me_update(request, body: MeUpdateIn):
     return respond(request, "profile_updated", user_json(user), message="Profil güncellendi.")
 
 
-@me_router.post("/consent")
+@me_router.post("/consent", response={201: S.ConsentResponse, **errors(401, 403, 409, 422)})
 def give_consent(request, body: ConsentIn):
+    """KVKK explicit consent to the version the screen showed (`user.kvkk.version`); logged with
+    version, language, file hash, IP and browser.
+
+    Errors: 403 csrf_failed · 409 consent_version_outdated (re-fetch /api/me, show the new text) ·
+    422 explicit_consent_required (granted false), validation_error."""
     if not body.granted:
         raise ApiError(422, "explicit_consent_required", "Açık rıza olmadan devam edilemez.")
     if body.locale not in settings.KVKK_LOCALES:
@@ -181,8 +201,9 @@ def give_consent(request, body: ConsentIn):
                    status=201, message="Açık rıza kaydedildi.")
 
 
-@me_router.get("/events")
+@me_router.get("/events", response={200: S.MyEventsResponse, **errors(401)})
 def my_events(request):
+    """Events the user has opened, newest activity first."""
     events = []
     for m in EventMember.objects.filter(user=request.user).select_related("event").order_by("-last_activity_at"):
         e, access = m.event, access_for(request.user, m.event)
@@ -197,15 +218,21 @@ def my_events(request):
     return respond(request, "user_events_retrieved", {"events": events, "total": len(events)})
 
 
-@me_router.get("/selfies")
+@me_router.get("/selfies", response={200: S.SelfiesResponse, **errors(401)})
 def selfies(request):
+    """The user's selfies (slots primary, secondary). Poll after an upload until status leaves processing."""
     rows = Image.objects.filter(owner=request.user, is_selfie=True, deleted_at__isnull=True).order_by("slot")
     return respond(request, "selfies_retrieved", {"selfies": [selfie_json(s) for s in rows],
                                                   "selfieState": selfie_state(request.user)})
 
 
-@me_router.post("/selfies")
+@me_router.post("/selfies", response={201: S.SelfieAcceptedResponse, **errors(401, 403, 422)})
 def upload_selfie(request, file: File[UploadedFile], slot: Form[str] = "primary"):
+    """multipart/form-data: file (JPEG/PNG/WebP/HEIC, ≤ 50 MB), slot. Replaces the slot's selfie.
+    Processing is asynchronous: poll GET /api/me/selfies.
+
+    Errors: 403 consent_required, csrf_failed · 422 unsupported_file_type, unreadable_image,
+    file_too_large, invalid_slot, validation_error."""
     try:
         image = ingest_selfie(request.user, file.read(), slot)
     except IngestError as e:
@@ -219,8 +246,9 @@ def upload_selfie(request, file: File[UploadedFile], slot: Form[str] = "primary"
     return respond(request, "selfie_accepted", selfie_json(image), status=201)
 
 
-@me_router.delete("/selfies/{selfie_id}")
+@me_router.delete("/selfies/{selfie_id}", response={204: None, **errors(401, 403, 404)})
 def delete_selfie(request, selfie_id: int):
+    """Deletes the selfie and its face data. Errors: 404 selfie_not_found."""
     image = Image.objects.filter(pk=selfie_id, owner=request.user, is_selfie=True, deleted_at__isnull=True).first()
     if image is None:
         raise ApiError(404, "selfie_not_found", "Selfie bulunamadı.")
@@ -229,8 +257,10 @@ def delete_selfie(request, selfie_id: int):
     return HttpResponse(status=204)
 
 
-@me_router.get("/selfies/{selfie_id}/thumb.jpg")
+@me_router.get("/selfies/{selfie_id}/thumb.jpg", response=errors(401, 404),
+               openapi_extra=file_doc("image/jpeg", "Thumbnail (owner only)"))
 def selfie_thumb(request, selfie_id: int):
+    """Use as <img src>. Errors: 404 selfie_not_found."""
     image = Image.objects.filter(pk=selfie_id, owner=request.user, is_selfie=True, deleted_at__isnull=True).first()
     if image is None:
         raise ApiError(404, "selfie_not_found", "Selfie bulunamadı.")

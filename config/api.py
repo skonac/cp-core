@@ -6,7 +6,7 @@ Reference for the frontend: docs/api.md. Interactive: /api/docs, machine-readabl
 from django.db import connection
 
 from accounts.api import auth_router, kvkk_router, me_router
-from common.api import make_api, respond
+from common.api import Out, envelope, make_api, respond
 from config import __version__
 from events.api import events_router, public_router
 
@@ -20,7 +20,13 @@ api.add_router("/public", public_router)
 api.add_router("/events", events_router)
 
 
-@api.get("/health", auth=None, tags=["system"])
+class HealthOut(Out):
+    version: str
+    database: str
+    pgvector: str | None
+
+
+@api.get("/health", auth=None, tags=["system"], response=envelope("HealthResponse", HealthOut, "ok"))
 def health(request):
     """Liveness + database check."""
     with connection.cursor() as cur:

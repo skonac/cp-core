@@ -7,11 +7,12 @@ Endpoints return respond(...) and raise ApiError(...); the handlers below turn e
 else (404, validation, crashes) into the same shape. JSON field names are camelCase.
 """
 import logging
+from typing import Any, Literal
 
 from django.http import Http404, JsonResponse
 from ninja import NinjaAPI, Schema
 from ninja.errors import AuthenticationError, HttpError, ValidationError as SchemaValidationError
-from pydantic import ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, create_model
 from pydantic.alias_generators import to_camel
 
 log = logging.getLogger("cp.api")
@@ -20,6 +21,73 @@ log = logging.getLogger("cp.api")
 class CamelSchema(Schema):
     """Request bodies: snake_case in Python, camelCase on the wire (phone_number <-> phoneNumber)."""
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+class Out(BaseModel):
+    """Response shapes, for the docs (/api/docs) and the contract test (common/tests.py).
+    Endpoints still build their JSON by hand and return respond(...); Ninja passes that through
+    untouched. Field names are the wire names (camelCase), since nothing converts them.
+    extra="forbid": the contract test fails on any field the docs don't list."""
+    model_config = ConfigDict(extra="forbid")
+
+
+REQUEST_ID = Field(description="Also in the X-Request-ID header; quote it in bug reports.",
+                   examples=["req_3dc994887c3ed300"])
+
+
+def envelope(name: str, data: Any, code: str) -> type[Out]:
+    """The success envelope around one data shape: envelope("UserResponse", UserOut, "profile_retrieved")."""
+    return create_model(name, __base__=Out,
+                        success=(Literal[True], True),
+                        code=(Literal[code], code),   # type: ignore[valid-type]
+                        message=(str, Field("", description="Turkish text; never toast it on success.")),
+                        data=(data, ...),
+                        requestId=(str, REQUEST_ID))
+
+
+class ErrorOut(Out):
+    """Every error. `code` is the stable reason (docs/api.md §2); the endpoint description lists its codes."""
+    success: Literal[False] = False
+    code: str = Field(examples=["event_not_found"])
+    message: str = Field(description="Turkish, safe to show.", examples=["Etkinlik bulunamadı."])
+    data: None = None
+    requestId: str = REQUEST_ID
+    errors: dict[str, list[str]] | None = Field(None, description="422 validation_error only: field -> messages.",
+                                                examples=[None])
+
+
+# One model per status, so each status in /api/docs shows a typical code of its own.
+_ERROR_EXAMPLES = {
+    400: ("bad_request", "Invalid JSON.", None),
+    401: ("authentication_required", "Sign in required.", None),
+    403: ("consent_required", "Bu etkinlik için açık rıza gerekli.", None),
+    404: ("not_found", "Bulunamadı.", None),
+    409: ("consent_version_outdated", "Metin güncellendi; lütfen güncel metni oku.", None),
+    410: ("event_expired", "Bu etkinliğin erişim süresi sona erdi.", None),
+    422: ("validation_error", "Invalid input.", {"phoneNumber": ["Field required"]}),
+    423: ("event_access_closed", "Bu etkinliğe erişim kapatıldı.", None),
+    429: ("rate_limit_exceeded", "Çok fazla istek. Biraz sonra tekrar dene.", None),
+}
+_ERROR_MODELS = {
+    status: create_model(f"Error{status}", __base__=ErrorOut,
+                         code=(str, Field(examples=[code])),
+                         message=(str, Field(description="Turkish, safe to show.", examples=[message])),
+                         errors=(dict[str, list[str]] | None,
+                                 Field(None, description="422 validation_error only: field -> messages.",
+                                       examples=[errs])))
+    for status, (code, message, errs) in _ERROR_EXAMPLES.items()
+}
+
+
+def errors(*statuses: int) -> dict:
+    """response={200: X, **errors(401, 404)}"""
+    return {s: _ERROR_MODELS[s] for s in statuses}
+
+
+def file_doc(content_type: str, description: str) -> dict:
+    """openapi_extra for endpoints that send a file instead of JSON."""
+    return {"responses": {200: {"description": description,
+                                "content": {content_type: {"schema": {"type": "string", "format": "binary"}}}}}}
 
 
 class ApiError(Exception):
