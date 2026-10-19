@@ -14,7 +14,7 @@ Last updated: 2026-10-19 · API version 0.2 (organizer API §3.6; event types, c
 > "Changes from cp-web's draft contract" section, which lists every place where this API
 > differs from `cp-web/docs/api/*.md` and the current MSW mocks. Update `src/features/*/api/*`
 > and `src/mocks/handlers.ts` to match. Do not keep `accessToken`, `match-jobs`, or the
-> event-scoped selfie/consent paths. For the organizer screens: §3.6 and §5b.
+> event-scoped selfie/consent paths. For the organizer screens: §3.6, §3.7 and §5b.
 
 ## 1. Basics
 
@@ -73,17 +73,17 @@ Every response except files and `204` is:
 | 403 | `csrf_failed` | Missing/wrong `X-CSRFToken` on POST/PATCH/DELETE |
 | 403 | `consent_required` | Event needs consent and the user has not given it; selfie upload without consent |
 | 403 | `browse_all_not_allowed` | `view=all` on an event that doesn't allow it |
-| 403 | `organizer_access_required` | Organizer endpoint, account without the organizer role |
+| 403 | `organizer_access_required` | Organizer or shop endpoint, account without the organizer role |
 | 404 | `event_not_found`, `photo_not_found`, `selfie_not_found`, `not_found` | Missing, or not visible to this user (never revealed which) |
 | 409 | `email_already_in_use` | `PATCH /me` with another account's email |
 | 409 | `consent_version_outdated` | Consent sent for a KVKK version that is no longer current |
-| 409 | `pricing_changed` | Credit purchase with an old `pricingVersion` |
+| 409 | `pricing_changed` | Purchase with an old `pricingVersion` |
 | 410 | `event_expired`, `otp_expired` | |
 | 422 | `validation_error`, `invalid_phone_number`, `invalid_role`, `invalid_otp`, `explicit_consent_required`, `unsupported_file_type`, `unreadable_image`, `file_too_large`, `file_required`, `invalid_slot`, `invalid_event_settings`, `too_many_files` | |
 | 423 | `event_access_closed` | The organizer closed access |
 | 429 | `rate_limit_exceeded`, `download_limit_reached` | |
 | 500 | `internal_error` | Bug; quote the `requestId` |
-| 501 | `payment_not_available` | Credit purchase: no payment provider configured on this server |
+| 501 | `payment_not_available` | Purchase: no payment provider configured on this server |
 
 ## 3. Endpoints
 
@@ -422,29 +422,43 @@ Most recently active first. `matchStatus`: `consent_pending` (no KVKK consent ye
 `failed` (selfie rejected; they need to upload a new one). `counts.pending` = consent_pending + selfie_pending +
 processing. No phone numbers, selfies or face data are returned.
 
-**`GET /api/organizer/credits`** → `200 credit_store_retrieved`:
+### 3.7 Shop
+
+What organizers buy: today every product adds credits to the account (`2000cr` = 2000 credits). One product per
+purchase, no cart. For organizer accounts (`403 organizer_access_required` otherwise). Products are managed in the
+admin: name, title, description (subtitle), credits, price, currency, on sale, featured, order.
+
+**`GET /api/shop/products`** → `200 products_retrieved`:
 
 ```json
 { "creditBalance": 1840, "pricingVersion": "3f9a1c0b2d4e",
-  "packages": [ { "id": "2", "name": "2000cr", "title": "Mini paket", "description": "Küçük düğünler için",
+  "products": [ { "id": "2", "name": "2000cr", "title": "Mini paket", "description": "Küçük düğünler için",
                   "creditAmount": 2000, "price": 3600.0, "currency": "TRY",
-                  "unitPrice": 1.8, "discountPercent": 10, "featured": true } ],
-  "purchases": [ { "id": "7", "packageId": "2", "packageName": "2000cr", "creditAmount": 2000, "amount": 3600.0,
-                   "currency": "TRY", "status": "paid", "purchasedAt": "2026-10-19T08:30:00+00:00",
-                   "paidAt": "2026-10-19T08:30:05+00:00" } ] }
+                  "unitPrice": 1.8, "discountPercent": 10, "featured": true } ] }
 ```
 
-`packages`: the ones on sale, in display order, managed in the admin (name, title, description = subtitle,
-credits, price, active, featured, order). `discountPercent` is against the package with the highest unit price.
-`pricingVersion` changes whenever a package or price changes. `purchases`: this account's, newest first (max 50);
-`packageName`, `creditAmount` and `amount` are as they were at purchase time.
+`products`: the ones on sale, in display order. `discountPercent` is against the product with the highest unit price.
+`pricingVersion` changes whenever a product or price changes; send it back with a purchase.
 
-**`POST /api/organizer/credit-purchases`** `{ "packageId": "2", "pricingVersion": "3f9a1c0b2d4e" }` →
-`201 credit_purchase_completed` `{ "purchase": {…same shape as above…}, "creditBalance": 3840 }`.
-Pick a package, pay, the credits are added; no cart. **On development servers the payment is simulated: it always
-succeeds at once** (`status: "paid"`, credits added). With the real provider (iyzico, not connected yet) this call will
-answer with a payment page to open instead, and the credits arrive after the payment; that shape will be added here.
-Errors: `404 not_found` (package not on sale), `409 pricing_changed` (reload the store), `501 payment_not_available`.
+**`GET /api/shop/purchases`** → `200 purchases_retrieved`:
+
+```json
+{ "purchases": [ { "id": "7", "productId": "2", "productName": "2000cr", "creditAmount": 2000, "amount": 3600.0,
+                   "currency": "TRY", "status": "paid", "purchasedAt": "2026-10-19T08:30:00+00:00",
+                   "paidAt": "2026-10-19T08:30:05+00:00" } ],
+  "total": 1 }
+```
+
+This account's purchases, newest first (max 100). `productName`, `creditAmount` and `amount` are as they were at
+purchase time. `status`: `pending` (payment not finished), `paid` (credits added), `failed`.
+
+**`POST /api/shop/purchases`** `{ "productId": "2", "pricingVersion": "3f9a1c0b2d4e" }` →
+`201 purchase_completed` `{ "purchase": {…same shape as above…}, "creditBalance": 3840 }`.
+Pick a product, pay, the credits are added. **On development servers the payment is simulated: it always succeeds at
+once** (`status: "paid"`, credits added). With the real provider (iyzico, not connected yet) this call will answer with
+a payment page to open instead, and the credits arrive after the payment; that shape will be added here.
+Errors: `404 not_found` (product not on sale), `409 pricing_changed` (reload the products), `422 validation_error`,
+`501 payment_not_available`.
 
 ## 4. Flows
 
@@ -504,8 +518,8 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 | O8 | Photo list `{id, fileName, thumbnailUrl, status, uploadedAt, errorCode}` | Adds `faceCount`, `displayUrl`, `width`, `height`, `takenAt`, `nextCursor`; `?status=` filter, paging | — |
 | O9 | `POST …/photos/retry` | Removed: a failed photo is rare and fixed on our side | Remove the retry action |
 | O10 | Participants: `joinMethod`, `accessStatus`, `DELETE …/participants/{id}/access` (revoke) | Not in v1 (no revoke); `matchStatus` adds `consent_pending`, drops `matching_pending`; adds `hasConsent`; `counts` has no `active` | Remove revoke and those fields |
-| O11 | Credit packages `{id, creditAmount, price, currency, discountPercent, unitPrice, featured}` | Adds `name` ("2000cr"), `title` ("Mini paket"), `description` (subtitle); amounts from the admin, not fixed to 500/1000/3000 | Type `creditAmount` as `number`; show title/description |
-| O12 | `POST /credit-purchases` completes as `paid` (demo); response `{purchase, availableCredits}` | `201 credit_purchase_completed` `{purchase, creditBalance}`, simulated `paid` on dev servers; purchase adds `packageName`, `paidAt`, drops nothing; `404`/`409 pricing_changed` checked first; `501` if no provider | Same flow as the mock; rename to `creditBalance` |
+| O11 | `GET /api/organizer/credits` → `{availableCredits, pricingVersion, packages, purchases}` | Split (§3.7): `GET /api/shop/products` → `{creditBalance, pricingVersion, products}` and `GET /api/shop/purchases` → `{purchases, total}`. A product adds `name` ("2000cr"), `title` ("Mini paket"), `description`; amounts from the admin, not fixed to 500/1000/3000 | Change the URLs; `packages` → `products`; type `creditAmount` as `number`; show title/description |
+| O12 | `POST /api/organizer/credit-purchases {packageId, pricingVersion}` → `{purchase, availableCredits}` | `POST /api/shop/purchases {productId, pricingVersion}` → `201 purchase_completed` `{purchase, creditBalance}`; simulated `paid` on dev servers; purchase has `productId`, `productName`, `paidAt`; `404`/`409 pricing_changed` checked first; `501` if no provider | Change the URL; `packageId` → `productId`; `creditBalance` |
 | O13 | Cover: only at create, max 8 MB | Also `POST …/cover` / `DELETE …/cover` any time; cover URL is same-origin | — |
 | O14 | Plain `fetch` for POST/PUT/DELETE in `organizer-service.ts` | Every unsafe request needs `X-CSRFToken` | Use `apiMutation` for all of them (today they fail with `403 csrf_failed`) |
 

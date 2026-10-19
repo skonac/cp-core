@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "media",      # Image (also the worker queue), Face, DownloadLog
     "credits",    # CreditTransaction
     "worker",     # face worker API, Worker (monitoring)
+    "shop",       # Product, Purchase, payments (simulated until iyzico)
     "staff",      # staff data browser pages (/dj/staff/): no models
 ]
 

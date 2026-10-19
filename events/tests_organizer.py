@@ -11,7 +11,6 @@ from django.test import TestCase
 from accounts.models import User
 from common.testing import ApiClient, TempMedia, add_selfie, face_of, jpeg, person, process
 from config.api import api
-from credits.models import CreditPackage, CreditTransaction
 from events.models import Event, EventMember
 from media.models import Image
 
@@ -160,36 +159,6 @@ class OrganizerApiTests(TempMedia, TestCase):
         self.assertCode(r, 200, "organizer_photos_deleted")
         self.assertEqual(r.json()["data"]["affectedCount"], 1)
         self.assertEqual(c.get(base).json()["data"]["event"]["photoCount"], 2)
-
-        # --- credit store and purchase (simulated payment: always succeeds)
-        CreditPackage.objects.create(name="2000cr", title="Mini paket", description="Küçük etkinlikler",
-                                     credits=2000, price=4000, sort_order=1)
-        CreditPackage.objects.create(name="5000cr", credits=5000, price=7500, sort_order=2, is_featured=True)
-        CreditPackage.objects.create(name="old", credits=10, price=1, is_active=False)
-        r = c.get("/api/organizer/credits")
-        self.assertCode(r, 200, "credit_store_retrieved")
-        store = r.json()["data"]
-        self.assertEqual([(p["name"], p["title"], p["unitPrice"], p["discountPercent"]) for p in store["packages"]],
-                         [("2000cr", "Mini paket", 2.0, 0), ("5000cr", None, 1.5, 25)])
-        self.assertEqual(store["purchases"], [])
-        pid = store["packages"][0]["id"]
-        self.assertCode(c.post_json("/api/organizer/credit-purchases", {"packageId": pid, "pricingVersion": "old"}),
-                        409, "pricing_changed")
-        old_id = str(CreditPackage.objects.get(name="old").pk)
-        self.assertCode(c.post_json("/api/organizer/credit-purchases",
-                                    {"packageId": old_id, "pricingVersion": store["pricingVersion"]}), 404, "not_found")
-        balance = User.objects.get(pk=org.pk).credit_balance
-        r = c.post_json("/api/organizer/credit-purchases", {"packageId": pid, "pricingVersion": store["pricingVersion"]})
-        self.assertCode(r, 201, "credit_purchase_completed")
-        data = r.json()["data"]
-        self.assertEqual((data["purchase"]["status"], data["purchase"]["creditAmount"], data["purchase"]["amount"],
-                          data["creditBalance"]), ("paid", 2000, 4000.0, balance + 2000))
-        self.assertEqual(CreditTransaction.objects.get(user=org, kind="purchase").delta, 2000)
-        self.assertEqual(len(c.get("/api/organizer/credits").json()["data"]["purchases"]), 1)
-        with self.settings(PAYMENT_PROVIDER="iyzico"):
-            self.assertCode(c.post_json("/api/organizer/credit-purchases",
-                                        {"packageId": pid, "pricingVersion": store["pricingVersion"]}),
-                            501, "payment_not_available")
 
         # --- another organizer cannot see this event; expired events refuse changes
         c.delete_("/api/auth/session")

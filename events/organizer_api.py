@@ -1,10 +1,9 @@
-"""Organizer API (/api/organizer/…): events, cover, uploads, photos, participants, credit store.
+"""Organizer API (/api/organizer/…): events, cover, uploads, photos, participants. Buying credits: shop/api.py.
 For accounts with the organizer role (staff may open any event). Shapes and codes: docs/api.md §3.6.
 
 Events are addressed by their code. Credits: one per accepted photo, charged at upload
-(media.ingest); no refunds. Purchases: credits/payments.py (simulated until iyzico is connected).
+(media.ingest); no refunds.
 """
-import hashlib
 from datetime import date as Date
 
 from django.conf import settings
@@ -18,8 +17,6 @@ from pydantic import Field
 from accounts.models import User
 from accounts.otp import mask_phone
 from common.api import ApiError, CamelSchema, errors, file_doc, respond
-from credits.models import CreditPackage, Purchase
-from credits.payments import PaymentError, buy
 from media.ingest import IngestError, event_cover, ingest_cover, ingest_photo
 from media.matching import my_photos, selfie_states
 from media.models import Image
@@ -465,72 +462,3 @@ def participants(request, code: str):
                      "matchStatus": status, "matchedPhotoCount": matched})
     return respond(request, "organizer_participants_retrieved",
                    {"participants": rows, "total": len(rows), "counts": counts})
-
-
-# ---------------------------------------------------------------------------- credits
-
-def _packages():
-    return list(CreditPackage.objects.filter(is_active=True))
-
-
-def _pricing_version(packages) -> str:
-    text = ";".join(f"{p.pk}:{p.credits}:{p.price}:{p.currency}" for p in packages)
-    return hashlib.sha256(text.encode()).hexdigest()[:12]
-
-
-def purchase_json(p: Purchase) -> dict:
-    return {"id": str(p.pk), "packageId": str(p.package_id), "packageName": p.package_name,
-            "creditAmount": p.credits, "amount": float(p.amount), "currency": p.currency, "status": p.status,
-            "purchasedAt": p.created_at.isoformat(), "paidAt": p.paid_at.isoformat() if p.paid_at else None}
-
-
-@organizer_router.get("/credits", response={200: S.CreditStoreResponse, **errors(401, 403)})
-def credit_store(request):
-    """Balance, the packages on sale (managed in the admin) and this account's purchases (newest first).
-
-    Errors: 403 organizer_access_required."""
-    user = _organizer(request)
-    packages = _packages()
-    top_unit = max((float(p.price) / p.credits for p in packages if p.credits), default=0)
-    out = []
-    for p in packages:
-        unit = float(p.price) / p.credits if p.credits else 0
-        out.append({"id": str(p.pk), "name": p.name, "title": p.title or None, "description": p.description or None,
-                    "creditAmount": p.credits, "price": float(p.price), "currency": p.currency,
-                    "unitPrice": round(unit, 4),
-                    "discountPercent": round((1 - unit / top_unit) * 100) if top_unit else 0,
-                    "featured": p.is_featured})
-    purchases = Purchase.objects.filter(user=user).order_by("-created_at")[:50]
-    return respond(request, "credit_store_retrieved", {
-        "creditBalance": _balance(user), "pricingVersion": _pricing_version(packages), "packages": out,
-        "purchases": [purchase_json(p) for p in purchases],
-    })
-
-
-class PurchaseIn(CamelSchema):
-    package_id: str
-    pricing_version: str
-
-
-@organizer_router.post("/credit-purchases", response={201: S.PurchaseResponse, **errors(401, 403, 404, 409, 422, 501)})
-def credit_purchase(request, data: PurchaseIn):
-    """Buy one package. Checks the package (on sale) and the price version, takes the payment,
-    adds the credits. Development servers simulate the payment: it always succeeds at once.
-    With the real payment provider (iyzico, not connected yet) this step will hand back a payment
-    page instead; the credits then arrive after the payment.
-
-    Errors: 403 organizer_access_required · 404 not_found (package not on sale) ·
-    409 pricing_changed (reload the store) · 501 payment_not_available."""
-    user = _organizer(request)
-    packages = _packages()
-    package = next((p for p in packages if str(p.pk) == data.package_id), None)
-    if package is None:
-        raise ApiError(404, "not_found", "Paket bulunamadı.")
-    if data.pricing_version != _pricing_version(packages):
-        raise ApiError(409, "pricing_changed", "Fiyatlar güncellendi; paketleri yeniden yükle.")
-    try:
-        purchase = buy(user, package, request.META.get("REMOTE_ADDR"))
-    except PaymentError as e:
-        raise ApiError(501, e.code, e.message) from None
-    return respond(request, "credit_purchase_completed",
-                   {"purchase": purchase_json(purchase), "creditBalance": _balance(user)}, status=201)

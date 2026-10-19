@@ -2711,10 +2711,10 @@
         ]
       }
     },
-    "/api/organizer/credits": {
+    "/api/shop/products": {
       "get": {
-        "operationId": "events_organizer_api_credit_store",
-        "summary": "Credit Store",
+        "operationId": "shop_api_products",
+        "summary": "Products",
         "parameters": [],
         "responses": {
           "200": {
@@ -2722,7 +2722,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreditStoreResponse"
+                  "$ref": "#/components/schemas/ShopCatalogResponse"
                 }
               }
             }
@@ -2748,9 +2748,9 @@
             }
           }
         },
-        "description": "Balance, the packages on sale (managed in the admin) and this account's purchases (newest first).\n\nErrors: 403 organizer_access_required.",
+        "description": "The products on sale (managed in the admin), the balance and the price version to buy with.\n\nErrors: 403 organizer_access_required.",
         "tags": [
-          "organizer"
+          "shop"
         ],
         "security": [
           {
@@ -2759,10 +2759,56 @@
         ]
       }
     },
-    "/api/organizer/credit-purchases": {
+    "/api/shop/purchases": {
+      "get": {
+        "operationId": "shop_api_purchases",
+        "summary": "Purchases",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          }
+        },
+        "description": "This account's purchases, newest first (max 100).\n\nErrors: 403 organizer_access_required.",
+        "tags": [
+          "shop"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      },
       "post": {
-        "operationId": "events_organizer_api_credit_purchase",
-        "summary": "Credit Purchase",
+        "operationId": "shop_api_create_purchase",
+        "summary": "Create Purchase",
         "parameters": [],
         "responses": {
           "201": {
@@ -2770,7 +2816,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreditPurchaseResponse"
+                  "$ref": "#/components/schemas/PurchaseResponse"
                 }
               }
             }
@@ -2836,9 +2882,9 @@
             }
           }
         },
-        "description": "Buy one package. Checks the package (on sale) and the price version, takes the payment,\nadds the credits. Development servers simulate the payment: it always succeeds at once.\nWith the real payment provider (iyzico, not connected yet) this step will hand back a payment\npage instead; the credits then arrive after the payment.\n\nErrors: 403 organizer_access_required · 404 not_found (package not on sale) ·\n409 pricing_changed (reload the store) · 501 payment_not_available.",
+        "description": "Buy one product: checks it is on sale and the price version, takes the payment, adds the\ncredits. Development servers simulate the payment: it always succeeds at once. With the real\npayment provider (iyzico, not connected yet) this step will hand back a payment page instead;\nthe credits then arrive after the payment.\n\nErrors: 403 organizer_access_required · 404 not_found (product not on sale) ·\n409 pricing_changed (reload the products) · 501 payment_not_available.",
         "tags": [
-          "organizer"
+          "shop"
         ],
         "requestBody": {
           "content": {
@@ -6447,7 +6493,43 @@
         "title": "ParticipantOut",
         "type": "object"
       },
-      "CreditPackageOut": {
+      "CatalogOut": {
+        "additionalProperties": false,
+        "properties": {
+          "creditBalance": {
+            "description": "May be negative (overdraft).",
+            "examples": [
+              1840
+            ],
+            "title": "Creditbalance",
+            "type": "integer"
+          },
+          "pricingVersion": {
+            "description": "Send back with a purchase; changes with any product or price change.",
+            "examples": [
+              "3f9a1c0b2d4e"
+            ],
+            "title": "Pricingversion",
+            "type": "string"
+          },
+          "products": {
+            "description": "On sale, in display order.",
+            "items": {
+              "$ref": "#/components/schemas/ProductOut"
+            },
+            "title": "Products",
+            "type": "array"
+          }
+        },
+        "required": [
+          "creditBalance",
+          "pricingVersion",
+          "products"
+        ],
+        "title": "CatalogOut",
+        "type": "object"
+      },
+      "ProductOut": {
         "additionalProperties": false,
         "properties": {
           "id": {
@@ -6494,6 +6576,7 @@
             "title": "Description"
           },
           "creditAmount": {
+            "description": "Credits the product adds to the account.",
             "examples": [
               2000
             ],
@@ -6502,7 +6585,7 @@
           },
           "price": {
             "examples": [
-              1800.0
+              3600.0
             ],
             "title": "Price",
             "type": "number"
@@ -6515,6 +6598,7 @@
             "type": "string"
           },
           "unitPrice": {
+            "description": "Price per credit.",
             "examples": [
               1.8
             ],
@@ -6522,7 +6606,7 @@
             "type": "number"
           },
           "discountPercent": {
-            "description": "Against the package with the highest unit price.",
+            "description": "Against the product with the highest unit price.",
             "examples": [
               10
             ],
@@ -6546,10 +6630,113 @@
           "discountPercent",
           "featured"
         ],
-        "title": "CreditPackageOut",
+        "title": "ProductOut",
         "type": "object"
       },
-      "CreditPurchaseOut": {
+      "ShopCatalogResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "products_retrieved",
+            "default": "products_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CatalogOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "ShopCatalogResponse",
+        "type": "object"
+      },
+      "PurchaseListOut": {
+        "additionalProperties": false,
+        "properties": {
+          "purchases": {
+            "description": "Newest first, max 100.",
+            "items": {
+              "$ref": "#/components/schemas/PurchaseOut"
+            },
+            "title": "Purchases",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "purchases",
+          "total"
+        ],
+        "title": "PurchaseListOut",
+        "type": "object"
+      },
+      "PurchaseListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "purchases_retrieved",
+            "default": "purchases_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PurchaseListOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "PurchaseListResponse",
+        "type": "object"
+      },
+      "PurchaseOut": {
         "additionalProperties": false,
         "properties": {
           "id": {
@@ -6559,19 +6746,19 @@
             "title": "Id",
             "type": "string"
           },
-          "packageId": {
+          "productId": {
             "examples": [
               "2"
             ],
-            "title": "Packageid",
+            "title": "Productid",
             "type": "string"
           },
-          "packageName": {
+          "productName": {
             "description": "As it was at purchase time.",
             "examples": [
               "2000cr"
             ],
-            "title": "Packagename",
+            "title": "Productname",
             "type": "string"
           },
           "creditAmount": {
@@ -6630,8 +6817,8 @@
         },
         "required": [
           "id",
-          "packageId",
-          "packageName",
+          "productId",
+          "productName",
           "creditAmount",
           "amount",
           "currency",
@@ -6639,49 +6826,10 @@
           "purchasedAt",
           "paidAt"
         ],
-        "title": "CreditPurchaseOut",
+        "title": "PurchaseOut",
         "type": "object"
       },
-      "CreditStoreOut": {
-        "additionalProperties": false,
-        "properties": {
-          "creditBalance": {
-            "title": "Creditbalance",
-            "type": "integer"
-          },
-          "pricingVersion": {
-            "description": "Send back with a purchase; changes with any price change.",
-            "examples": [
-              "3f9a1c0b2d4e"
-            ],
-            "title": "Pricingversion",
-            "type": "string"
-          },
-          "packages": {
-            "items": {
-              "$ref": "#/components/schemas/CreditPackageOut"
-            },
-            "title": "Packages",
-            "type": "array"
-          },
-          "purchases": {
-            "items": {
-              "$ref": "#/components/schemas/CreditPurchaseOut"
-            },
-            "title": "Purchases",
-            "type": "array"
-          }
-        },
-        "required": [
-          "creditBalance",
-          "pricingVersion",
-          "packages",
-          "purchases"
-        ],
-        "title": "CreditStoreOut",
-        "type": "object"
-      },
-      "CreditStoreResponse": {
+      "PurchaseResponse": {
         "additionalProperties": false,
         "properties": {
           "success": {
@@ -6691,48 +6839,8 @@
             "type": "boolean"
           },
           "code": {
-            "const": "credit_store_retrieved",
-            "default": "credit_store_retrieved",
-            "title": "Code",
-            "type": "string"
-          },
-          "message": {
-            "default": "",
-            "description": "Turkish text; never toast it on success.",
-            "title": "Message",
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/CreditStoreOut"
-          },
-          "requestId": {
-            "description": "Also in the X-Request-ID header; quote it in bug reports.",
-            "examples": [
-              "req_3dc994887c3ed300"
-            ],
-            "title": "Requestid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "data",
-          "requestId"
-        ],
-        "title": "CreditStoreResponse",
-        "type": "object"
-      },
-      "CreditPurchaseResponse": {
-        "additionalProperties": false,
-        "properties": {
-          "success": {
-            "const": true,
-            "default": true,
-            "title": "Success",
-            "type": "boolean"
-          },
-          "code": {
-            "const": "credit_purchase_completed",
-            "default": "credit_purchase_completed",
+            "const": "purchase_completed",
+            "default": "purchase_completed",
             "title": "Code",
             "type": "string"
           },
@@ -6758,14 +6866,14 @@
           "data",
           "requestId"
         ],
-        "title": "CreditPurchaseResponse",
+        "title": "PurchaseResponse",
         "type": "object"
       },
       "PurchaseResultOut": {
         "additionalProperties": false,
         "properties": {
           "purchase": {
-            "$ref": "#/components/schemas/CreditPurchaseOut"
+            "$ref": "#/components/schemas/PurchaseOut"
           },
           "creditBalance": {
             "description": "After the purchase.",
@@ -6851,8 +6959,8 @@
       },
       "PurchaseIn": {
         "properties": {
-          "packageId": {
-            "title": "Packageid",
+          "productId": {
+            "title": "Productid",
             "type": "string"
           },
           "pricingVersion": {
@@ -6861,7 +6969,7 @@
           }
         },
         "required": [
-          "packageId",
+          "productId",
           "pricingVersion"
         ],
         "title": "PurchaseIn",

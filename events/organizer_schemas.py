@@ -143,44 +143,6 @@ class ParticipantListOut(Out):
     counts: ParticipantCountsOut
 
 
-class CreditPackageOut(Out):
-    id: str = Field(examples=["2"])
-    name: str = Field(examples=["2000cr"])
-    title: str | None = Field(examples=["Mini paket"])
-    description: str | None = Field(description="Subtitle.", examples=["Küçük düğünler için"])
-    creditAmount: int = Field(examples=[2000])
-    price: float = Field(examples=[1800.0])
-    currency: str = Field(examples=["TRY"])
-    unitPrice: float = Field(examples=[1.8])
-    discountPercent: int = Field(description="Against the package with the highest unit price.", examples=[10])
-    featured: bool
-
-
-class CreditPurchaseOut(Out):
-    id: str = Field(examples=["7"])
-    packageId: str = Field(examples=["2"])
-    packageName: str = Field(description="As it was at purchase time.", examples=["2000cr"])
-    creditAmount: int = Field(examples=[2000])
-    amount: float = Field(description="Charged.", examples=[3600.0])
-    currency: str = Field(examples=["TRY"])
-    status: Literal["pending", "paid", "failed"]
-    purchasedAt: str = Field(description="When the purchase was started.", examples=["2026-10-19T08:30:00+00:00"])
-    paidAt: str | None = Field(examples=["2026-10-19T08:30:05+00:00"])
-
-
-class PurchaseResultOut(Out):
-    purchase: CreditPurchaseOut
-    creditBalance: int = Field(description="After the purchase.", examples=[5840])
-
-
-class CreditStoreOut(Out):
-    creditBalance: int
-    pricingVersion: str = Field(description="Send back with a purchase; changes with any price change.",
-                                examples=["3f9a1c0b2d4e"])
-    packages: list[CreditPackageOut]
-    purchases: list[CreditPurchaseOut]
-
-
 DashboardResponse = envelope("OrganizerDashboardResponse", DashboardOut, "organizer_dashboard_retrieved")
 EventListResponse = envelope("OrganizerEventListResponse", EventListOut, "organizer_events_retrieved")
 EventCreatedResponse = envelope("OrganizerEventCreatedResponse", EventDataOut, "organizer_event_created")
@@ -192,5 +154,3 @@ UploadBatchResponse = envelope("UploadBatchResponse", UploadBatchOut, "organizer
 PhotoListResponse = envelope("OrganizerPhotoListResponse", PhotoListOut, "organizer_photos_retrieved")
 PhotosDeletedResponse = envelope("OrganizerPhotosDeletedResponse", PhotoMutationOut, "organizer_photos_deleted")
 ParticipantListResponse = envelope("ParticipantListResponse", ParticipantListOut, "organizer_participants_retrieved")
-PurchaseResponse = envelope("CreditPurchaseResponse", PurchaseResultOut, "credit_purchase_completed")
-CreditStoreResponse = envelope("CreditStoreResponse", CreditStoreOut, "credit_store_retrieved")

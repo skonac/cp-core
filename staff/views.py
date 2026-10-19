@@ -28,7 +28,8 @@ from django.utils import timezone
 from PIL import Image as PILImage
 
 from accounts.models import ConsentLog, OtpChallenge, User
-from credits.models import CreditTransaction, Purchase
+from credits.models import CreditTransaction
+from shop.models import Purchase
 from events.codes import normalize_code
 from events.models import Event, EventMember
 from media.ingest import event_cover

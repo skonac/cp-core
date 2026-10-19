@@ -31,7 +31,8 @@ Test data: `cp-core-manage import_photos`, `import_selfie`, `show_matches` (see 
 | `accounts/` | User, OTP sign-in, profile API |
 | `events/` | events, memberships, organizer and participant pages, event API |
 | `media/` | images (photos + selfies, also the worker queue), faces, downloads, upload pipeline, matching |
-| `credits/` | credit transactions |
+| `credits/` | credit transactions (the ledger beside the balance) |
+| `shop/` | products, purchases, payments (simulated until iyzico) |
 | `worker/` | face worker protocol and queue |
 | `staff/` | staff data browser at `/dj/staff/` (read-only; edits in `/admin/`) |
 | `deploy/` | deploy script and server commands |

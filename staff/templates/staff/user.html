@@ -55,8 +55,8 @@
 </tr>{% endfor %}</table></div>{% else %}<p class="muted">None.</p>{% endif %}{% endif %}
 
 {% if purchases %}<h2>Purchases</h2>
-<div class="scroll"><table class="t"><tr><th>Id</th><th>Started</th><th>Package</th><th class="n">Credits</th><th class="n">Amount</th><th>Status</th><th>Provider</th><th>Payment id</th><th>Paid</th><th>Error</th></tr>
-{% for p in purchases %}<tr><td><a href="/admin/credits/purchase/{{ p.id }}/change/">{{ p.id }}</a></td><td>{{ p.created_at|date:"Y-m-d H:i" }}</td><td>{{ p.package_name }}</td><td class="n">{{ p.credits }}</td>
+<div class="scroll"><table class="t"><tr><th>Id</th><th>Started</th><th>Product</th><th class="n">Credits</th><th class="n">Amount</th><th>Status</th><th>Provider</th><th>Payment id</th><th>Paid</th><th>Error</th></tr>
+{% for p in purchases %}<tr><td><a href="/admin/shop/purchase/{{ p.id }}/change/">{{ p.id }}</a></td><td>{{ p.created_at|date:"Y-m-d H:i" }}</td><td>{{ p.product_name }}</td><td class="n">{{ p.credits }}</td>
   <td class="n">{{ p.amount }} {{ p.currency }}</td><td><span class="pill {% if p.status == 'paid' %}done{% elif p.status == 'failed' %}failed{% else %}pending{% endif %}">{{ p.status }}</span></td>
   <td>{{ p.provider }}</td><td><code class="small">{{ p.provider_payment_id }}</code></td><td>{{ p.paid_at|date:"Y-m-d H:i"|default:"" }}</td><td class="wrap small">{{ p.error_code }} {{ p.error_message }}</td></tr>{% endfor %}
 </table></div>{% endif %}

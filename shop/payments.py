@@ -1,6 +1,6 @@
-"""Buying a credit package (design/core.md, "Credit packages").
+"""Buying a product (design/core.md, "Shop").
 
-    buy(user, package, ip) -> Purchase     the one place where a purchase adds credits
+    buy(user, product, ip) -> Purchase     the one place where a purchase adds credits
 
 PAYMENT_PROVIDER = "simulated" (non-production only; `manage.py check` refuses it with DEBUG off):
 every purchase succeeds at once, as if the provider had answered "paid". "iyzico" is not connected
@@ -17,8 +17,9 @@ from django.db.models import F
 from django.utils import timezone
 
 from accounts.models import User
+from credits.models import CreditTransaction
 
-from .models import CreditPackage, CreditTransaction, Purchase
+from .models import Product, Purchase
 
 log = logging.getLogger("cp.payments")
 
@@ -29,10 +30,10 @@ class PaymentError(Exception):
         self.code, self.message = code, message
 
 
-def _new(user, package: CreditPackage, ip: str | None) -> Purchase:
+def _new(user, product: Product, ip: str | None) -> Purchase:
     return Purchase.objects.create(
-        user=user, package=package, package_name=package.name, credits=package.credits,
-        list_price=package.price, amount=package.price, currency=package.currency,
+        user=user, product=product, product_name=product.name, credits=product.credits,
+        list_price=product.price, amount=product.price, currency=product.currency,
         provider=settings.PAYMENT_PROVIDER, conversation_id="cp_" + secrets.token_hex(12), ip=ip or None)
 
 
@@ -49,7 +50,7 @@ def complete(purchase: Purchase, payment_id: str, response: dict | None = None) 
         purchase.save()
         CreditTransaction.objects.create(user_id=purchase.user_id, delta=purchase.credits,
                                          kind=CreditTransaction.Kind.PURCHASE, ref=f"purchase:{purchase.pk}",
-                                         note=f"{purchase.package_name} {purchase.amount} {purchase.currency}")
+                                         note=f"{purchase.product_name} {purchase.amount} {purchase.currency}")
         User.objects.filter(pk=purchase.user_id).update(credit_balance=F("credit_balance") + purchase.credits)
     log.info("purchase %s paid: +%s credits for user %s", purchase.pk, purchase.credits, purchase.user_id)
     return purchase
@@ -62,8 +63,8 @@ def fail(purchase: Purchase, code: str, message: str = "", response: dict | None
     return purchase
 
 
-def buy(user, package: CreditPackage, ip: str | None = None) -> Purchase:
+def buy(user, product: Product, ip: str | None = None) -> Purchase:
     if settings.PAYMENT_PROVIDER == "simulated":
-        purchase = _new(user, package, ip)
+        purchase = _new(user, product, ip)
         return complete(purchase, payment_id=f"SIM-{purchase.pk}", response={"simulated": True, "status": "success"})
     raise PaymentError("payment_not_available", "Ödeme henüz kullanılamıyor.")

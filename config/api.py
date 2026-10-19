@@ -10,6 +10,7 @@ from common.api import Out, envelope, make_api, respond
 from config import __version__
 from events.api import events_router, public_router
 from events.organizer_api import organizer_router
+from shop.api import shop_router
 
 api = make_api(title="cp-core API", version=__version__,
                description="Cleverphotos core API for cp-web. Session cookie + X-CSRFToken. See docs/api.md.")
@@ -20,6 +21,7 @@ api.add_router("/kvkk", kvkk_router)
 api.add_router("/public", public_router)
 api.add_router("/events", events_router)
 api.add_router("/organizer", organizer_router)
+api.add_router("/shop", shop_router)
 
 
 class HealthOut(Out):
