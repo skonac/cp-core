@@ -5,9 +5,9 @@ from .models import DownloadLog, Face, Image
 
 @admin.register(Image)
 class ImageAdmin(admin.ModelAdmin):
-    list_display = ("id", "is_selfie", "event", "seq_str", "owner", "status", "num_faces", "attempts",
+    list_display = ("id", "kind", "event", "seq_str", "owner", "status", "num_faces", "attempts",
                     "error", "created_at", "deleted_at")
-    list_filter = ("is_selfie", "status", "error")
+    list_filter = ("kind", "status", "error")
     search_fields = ("event__code", "owner__phone", "sha256")
     raw_id_fields = ("event", "owner")
     readonly_fields = ("sha256", "width", "height", "bytes", "taken_at", "exif", "engine", "processed_at",
@@ -24,6 +24,6 @@ class FaceAdmin(admin.ModelAdmin):
 
 @admin.register(DownloadLog)
 class DownloadLogAdmin(admin.ModelAdmin):
-    list_display = ("user", "image", "downloaded_at", "ip")
+    list_display = ("id", "user", "image", "downloaded_at", "ip")
     search_fields = ("user__phone",)
     raw_id_fields = ("user", "image")

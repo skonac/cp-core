@@ -57,7 +57,7 @@ class StaffPagesTest(TestCase):
             if "error" not in body:
                 body = {"engine": ENGINE, "width": 800, "height": 600, "ms": 1, **body}
             queue.store_result(image.id, body)
-        cls.selfie_id = cls.guest.images.get(is_selfie=True).id
+        cls.selfie_id = cls.guest.images.get(kind="selfie").id
 
     def setUp(self):
         self.client.login(phone="+905550000009", password="pw")
@@ -72,6 +72,12 @@ class StaffPagesTest(TestCase):
                     "/dj/staff/worker/", "/admin/", f"/admin/accounts/user/{self.guest.id}/change/"]:
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_cover_page(self):
+        from media.ingest import ingest_cover
+        cover = ingest_cover(self.event, self.org, _jpeg("yellow"))
+        self.assertEqual(self.client.get(f"/dj/staff/images/{cover.id}/").status_code, 200)
+        self.assertContains(self.client.get(f"/dj/staff/events/{self.event.code}/"), "uploaded cover")
 
     def test_files(self):
         photo = self.event.images.order_by("seq").first()

@@ -3,6 +3,7 @@ photos the single place where a credit is spent (design/core.md, "Photo upload a
 
     ingest_photo(event, uploader, data) -> Image     raises IngestError(code)
     ingest_selfie(user, data, slot)     -> Image     raises IngestError(code)
+    ingest_cover(event, uploader, data) -> Image     raises IngestError(code); free, never processed
 """
 import hashlib
 import io
@@ -146,7 +147,7 @@ def ingest_photo(event: Event, uploader: User, data: bytes) -> Image:
     if event.status == Event.Status.EXPIRED:
         raise IngestError("event_expired")
     sha = hashlib.sha256(data).hexdigest()
-    if Image.objects.filter(event=event, is_selfie=False, sha256=sha, deleted_at__isnull=True).exists():
+    if Image.objects.filter(event=event, kind=Image.Kind.PHOTO, sha256=sha, deleted_at__isnull=True).exists():
         raise IngestError("duplicate_photo")
 
     im, exif, taken_at, icc = _decode(data)
@@ -200,10 +201,10 @@ def ingest_selfie(user: User, data: bytes, slot: str = Image.Slot.PRIMARY) -> Im
     written = []
     try:
         with transaction.atomic():
-            for old in Image.objects.select_for_update().filter(owner=user, is_selfie=True, slot=slot,
+            for old in Image.objects.select_for_update().filter(owner=user, kind=Image.Kind.SELFIE, slot=slot,
                                                                 deleted_at__isnull=True):
                 soft_delete(old)
-            image = Image.objects.create(is_selfie=True, owner=user, slot=slot, sha256=sha,
+            image = Image.objects.create(kind=Image.Kind.SELFIE, owner=user, slot=slot, sha256=sha,
                                          width=width, height=height, bytes=len(display))
             for rendition, blob in (("d", display), ("t", thumb)):
                 written.append(write_file(image.relpath(rendition), blob))
@@ -212,3 +213,44 @@ def ingest_selfie(user: User, data: bytes, slot: str = Image.Slot.PRIMARY) -> Im
         raise
     log.info("selfie %s accepted for %s (%s)", image.pk, user, slot)
     return image
+
+
+# ---------------------------------------------------------------------------- covers
+
+def ingest_cover(event: Event, uploader: User, data: bytes) -> Image:
+    """The event's cover picture, uploaded by the organizer: free (no credit), never sent to the
+    worker, not in the gallery. Replaces the previous uploaded cover and becomes event.cover_image."""
+    _check_size(data)
+    if event.status == Event.Status.EXPIRED:
+        raise IngestError("event_expired")
+    sha = hashlib.sha256(data).hexdigest()
+    im, _, _, icc = _decode(data)           # cover EXIF is not kept
+    display, width, height = _encode(im, settings.DISPLAY_SIDE, settings.DISPLAY_QUALITY, icc)
+    thumb, _, _ = _encode(im, settings.THUMB_SIDE, settings.THUMB_QUALITY, icc)
+
+    written = []
+    try:
+        with transaction.atomic():
+            for old in Image.objects.select_for_update().filter(event=event, kind=Image.Kind.COVER,
+                                                                deleted_at__isnull=True):
+                soft_delete(old)
+            image = Image.objects.create(kind=Image.Kind.COVER, event_id=event.pk, owner=uploader, sha256=sha,
+                                         status=Image.Status.DONE, width=width, height=height, bytes=len(display))
+            for rendition, blob in (("d", display), ("t", thumb)):
+                written.append(write_file(image.relpath(rendition), blob))
+            Event.objects.filter(pk=event.pk).update(cover_image=image)
+            event.cover_image = image
+    except BaseException:
+        _remove(written)
+        raise
+    log.info("cover %s accepted for event %s", image.pk, event.code)
+    return image
+
+
+def event_cover(event: Event) -> Image | None:
+    """What to show as the event's picture: the chosen cover, else the first photo."""
+    cover = event.cover_image
+    if cover is not None and cover.deleted_at is None:
+        return cover
+    return (Image.objects.filter(event=event, kind=Image.Kind.PHOTO, deleted_at__isnull=True)
+            .order_by("seq").first())

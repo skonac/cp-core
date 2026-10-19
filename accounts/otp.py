@@ -66,6 +66,15 @@ def request_code(phone: str, role: str, event, ip: str | None) -> OtpChallenge:
     return challenge
 
 
+def is_master_pass(value) -> bool:
+    """settings.MASTER_PASS (non-production only; see settings). Logged when used."""
+    master = settings.MASTER_PASS
+    if master and value and hmac.compare_digest(str(value).strip(), master):
+        log.warning("master pass used")
+        return True
+    return False
+
+
 def verify_code(challenge_id: str, code: str):
     """-> (user, is_new_user, event or None). Raises ApiError on any failure."""
     now = timezone.now()
@@ -78,7 +87,8 @@ def verify_code(challenge_id: str, code: str):
             failure = ApiError(410, "otp_expired", "Kodun süresi doldu. Yeni kod iste.")
         elif challenge.attempts >= settings.OTP_MAX_ATTEMPTS:
             failure = ApiError(429, "rate_limit_exceeded", "Çok fazla hatalı deneme. Yeni kod iste.")
-        elif not hmac.compare_digest(challenge.code_hash, _hash(challenge.pk, (code or "").strip())):
+        elif not (hmac.compare_digest(challenge.code_hash, _hash(challenge.pk, (code or "").strip()))
+                  or is_master_pass(code)):
             challenge.attempts += 1                       # saved: the failure is raised after the commit
             challenge.save(update_fields=["attempts"])
             failure = ApiError(422, "invalid_otp", "Doğrulama kodu hatalı.")

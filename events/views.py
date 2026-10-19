@@ -54,7 +54,7 @@ def _credits(user) -> dict:
 
 
 def _photos(event):
-    return Image.objects.filter(event=event, is_selfie=False, deleted_at__isnull=True)
+    return Image.objects.filter(event=event, kind=Image.Kind.PHOTO, deleted_at__isnull=True)
 
 
 def _counts(event) -> dict:
@@ -69,7 +69,7 @@ def _counts(event) -> dict:
 def home(request):
     show_expired = request.GET.get("expired") == "1"
     events = (Event.objects.filter(owner=request.user)
-              .annotate(photo_count=Count("images", filter=Q(images__is_selfie=False, images__deleted_at__isnull=True)))
+              .annotate(photo_count=Count("images", filter=Q(images__kind="photo", images__deleted_at__isnull=True)))
               .order_by("-date", "-created_at"))
     events = events.filter(status=Event.Status.EXPIRED) if show_expired else events.exclude(status=Event.Status.EXPIRED)
     return render(request, "events/home.html", {"events": events, "show_expired": show_expired,

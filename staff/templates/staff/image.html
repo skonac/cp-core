@@ -1,12 +1,12 @@
 {% extends "staff/_base.html" %}
-{% block title %}{% if image.is_selfie %}Selfie {{ image.id }}{% else %}{{ image.event.display_code }} {{ image.seq_str }}{% endif %} · staff{% endblock %}
+{% block title %}{% if image.is_selfie %}Selfie {{ image.id }}{% elif image.is_cover %}Cover {{ image.id }}{% else %}{{ image.event.display_code }} {{ image.seq_str }}{% endif %} · staff{% endblock %}
 {% block staff %}
 <p class="small">
 {% if image.is_selfie %}<a href="{% url 'staff:user' image.owner_id %}">← {{ image.owner.phone }}</a>
 {% else %}<a href="{% url 'staff:event' image.event.code %}">← {{ image.event.display_code }} {{ image.event.name }}</a>
   {% if prev %} · <a href="{% url 'staff:image' prev %}">previous</a>{% endif %}{% if next %} · <a href="{% url 'staff:image' next %}">next</a>{% endif %}{% endif %}
 </p>
-<h1>{% if image.is_selfie %}Selfie {{ image.id }} <span class="muted">({{ image.slot }})</span>{% else %}Photo {{ image.seq_str }}{% endif %}
+<h1>{% if image.is_selfie %}Selfie {{ image.id }} <span class="muted">({{ image.slot }})</span>{% elif image.is_cover %}Cover {{ image.id }} <span class="muted">(uploaded by the organizer, not processed)</span>{% else %}Photo {{ image.seq_str }}{% endif %}
   <span class="pill {{ image.status }}">{{ image.status }}</span>{% if image.deleted_at %} <span class="pill failed">deleted {{ image.deleted_at|date:"Y-m-d H:i" }}</span>{% endif %}</h1>
 
 <div class="row" style="margin-top:12px">
@@ -50,7 +50,7 @@
 </div>
 <p class="small" style="margin-top:8px">
   <a href="{% url 'staff:image_file' image.id 't' %}" target="_blank">_t</a> ·
-  <a href="{% url 'staff:image_file' image.id 'd' %}" target="_blank">_d</a>{% if not image.is_selfie %} ·
+  <a href="{% url 'staff:image_file' image.id 'd' %}" target="_blank">_d</a>{% if not image.is_selfie and not image.is_cover %} ·
   <a href="{% url 'staff:image_file' image.id 'm' %}" target="_blank">_m</a>{% endif %}</p>
 {% endif %}
 

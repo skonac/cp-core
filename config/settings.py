@@ -119,6 +119,10 @@ USE_TZ = True   # timestamps stored in UTC (timestamptz)
 STATIC_URL = "static/"
 
 # Django pages: where login sends people (URL names from config/urls.py)
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",   # phone + the account's own password
+    "accounts.backends.MasterPassBackend",         # phone + CP_MASTER_PASS (non-production)
+]
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "home"          # "/" sends organizers and participants to their own pages
 LOGOUT_REDIRECT_URL = "login"
@@ -162,6 +166,10 @@ OTP_MAX_ATTEMPTS = 5        # wrong codes per challenge
 OTP_RESEND_AFTER = 30       # seconds before another code may be requested
 OTP_DELIVERY = env("CP_OTP_DELIVERY", "log")   # "log": code goes to the log + OtpChallenge.dev_code, no SMS
 EVENT_LOOKUP_PER_MIN = 30   # public event lookups per IP
+# Non-production only: this string is accepted as the code of any OTP challenge and as the password
+# of any active account (accounts.backends.MasterPassBackend). Empty = off. `manage.py check` (and so
+# deploy.sh and runserver) refuses to run with it set while DEBUG is off.
+MASTER_PASS = env("CP_MASTER_PASS", "")
 
 # KVKK consent document (design/core.md, "Consent"). The pair kvkk/kvkk_tr_<v>.pdf + kvkk_en_<v>.pdf;
 # a user has consent when User.kvkk_version equals this. Changing it = everyone consents again.

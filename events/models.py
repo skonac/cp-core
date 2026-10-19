@@ -17,13 +17,16 @@ class Event(models.Model):
     class Type(models.TextChoices):
         WEDDING = "wedding"
         SPORTS = "sports"
+        GRADUATION = "graduation"
+        CORPORATE = "corporate"
         OTHER = "other"
 
     code = models.CharField(max_length=8, unique=True, editable=False)
     name = models.CharField(max_length=200)
     type = models.CharField(max_length=16, choices=Type.choices, default=Type.WEDDING)
     date = models.DateField()
-    location_label = models.CharField(max_length=120, blank=True)   # "İstanbul"; never a full address
+    city = models.CharField(max_length=120, blank=True)      # "İstanbul"
+    venue = models.CharField(max_length=120, blank=True)     # "Çırağan Sarayı"; a place name, never a street address
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="owned_events")
     status = models.CharField(max_length=8, choices=Status.choices, default=Status.OPEN)
 
@@ -59,6 +62,11 @@ class Event(models.Model):
                     self.code = code
                     break
         super().save(*args, **kwargs)
+
+    @property
+    def location_label(self) -> str:
+        """"Çırağan Sarayı, İstanbul": venue and city, either may be missing."""
+        return ", ".join(part for part in (self.venue, self.city) if part)
 
     @property
     def display_code(self) -> str:

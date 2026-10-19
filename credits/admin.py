@@ -6,12 +6,19 @@ from django.db.models import F
 
 from accounts.models import User
 
-from .models import CreditTransaction
+from .models import CreditPackage, CreditTransaction
+
+
+@admin.register(CreditPackage)
+class CreditPackageAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "credits", "price", "currency", "is_active", "is_featured", "sort_order")
+    list_editable = ("is_active", "is_featured", "sort_order")
+    fields = ("name", "credits", "price", "currency", "is_active", "is_featured", "sort_order")
 
 
 @admin.register(CreditTransaction)
 class CreditTransactionAdmin(admin.ModelAdmin):
-    list_display = ("user", "delta", "kind", "ref", "actor", "note", "created_at")
+    list_display = ("id", "user", "delta", "kind", "ref", "actor", "note", "created_at")
     list_filter = ("kind",)
     search_fields = ("user__phone", "ref", "note")
     raw_id_fields = ("user",)

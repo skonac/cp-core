@@ -46,7 +46,7 @@ def selfie_json(img: Image) -> dict:
 
 
 def user_json(user: User) -> dict:
-    selfies = Image.objects.filter(owner=user, is_selfie=True, deleted_at__isnull=True).order_by("slot")
+    selfies = Image.objects.filter(owner=user, kind=Image.Kind.SELFIE, deleted_at__isnull=True).order_by("slot")
     first = selfies.first()   # "primary" sorts before "secondary"
     return {
         "id": str(user.pk), "phoneNumber": user.phone, "fullName": user.full_name or None, "email": user.email,
@@ -221,7 +221,7 @@ def my_events(request):
 @me_router.get("/selfies", response={200: S.SelfiesResponse, **errors(401)})
 def selfies(request):
     """The user's selfies (slots primary, secondary). Poll after an upload until status leaves processing."""
-    rows = Image.objects.filter(owner=request.user, is_selfie=True, deleted_at__isnull=True).order_by("slot")
+    rows = Image.objects.filter(owner=request.user, kind=Image.Kind.SELFIE, deleted_at__isnull=True).order_by("slot")
     return respond(request, "selfies_retrieved", {"selfies": [selfie_json(s) for s in rows],
                                                   "selfieState": selfie_state(request.user)})
 
@@ -249,7 +249,7 @@ def upload_selfie(request, file: File[UploadedFile], slot: Form[str] = "primary"
 @me_router.delete("/selfies/{selfie_id}", response={204: None, **errors(401, 403, 404)})
 def delete_selfie(request, selfie_id: int):
     """Deletes the selfie and its face data. Errors: 404 selfie_not_found."""
-    image = Image.objects.filter(pk=selfie_id, owner=request.user, is_selfie=True, deleted_at__isnull=True).first()
+    image = Image.objects.filter(pk=selfie_id, owner=request.user, kind=Image.Kind.SELFIE, deleted_at__isnull=True).first()
     if image is None:
         raise ApiError(404, "selfie_not_found", "Selfie bulunamadı.")
     with transaction.atomic():
@@ -261,7 +261,7 @@ def delete_selfie(request, selfie_id: int):
                openapi_extra=file_doc("image/jpeg", "Thumbnail (owner only)"))
 def selfie_thumb(request, selfie_id: int):
     """Use as <img src>. Errors: 404 selfie_not_found."""
-    image = Image.objects.filter(pk=selfie_id, owner=request.user, is_selfie=True, deleted_at__isnull=True).first()
+    image = Image.objects.filter(pk=selfie_id, owner=request.user, kind=Image.Kind.SELFIE, deleted_at__isnull=True).first()
     if image is None:
         raise ApiError(404, "selfie_not_found", "Selfie bulunamadı.")
     return file_response(image.relpath("t"))

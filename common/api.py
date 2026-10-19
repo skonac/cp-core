@@ -67,6 +67,7 @@ _ERROR_EXAMPLES = {
     422: ("validation_error", "Invalid input.", {"phoneNumber": ["Field required"]}),
     423: ("event_access_closed", "Bu etkinliğe erişim kapatıldı.", None),
     429: ("rate_limit_exceeded", "Çok fazla istek. Biraz sonra tekrar dene.", None),
+    501: ("payment_not_available", "Ödeme henüz kullanılamıyor.", None),
 }
 _ERROR_MODELS = {
     status: create_model(f"Error{status}", __base__=ErrorOut,

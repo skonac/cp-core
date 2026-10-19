@@ -1369,6 +1369,1483 @@
           }
         ]
       }
+    },
+    "/api/organizer/dashboard": {
+      "get": {
+        "operationId": "events_organizer_api_dashboard",
+        "summary": "Dashboard",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizerDashboardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          }
+        },
+        "description": "Balance, totals, events that are not expired (newest first).\n\nErrors: 403 organizer_access_required.",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/events": {
+      "get": {
+        "operationId": "events_organizer_api_list_events",
+        "summary": "List Events",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "includeExpired",
+            "schema": {
+              "default": false,
+              "title": "Includeexpired",
+              "type": "boolean"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizerEventListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          }
+        },
+        "description": "My events, newest first; expired ones only with `includeExpired=true`.\n\nErrors: 403 organizer_access_required.",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "events_organizer_api_create_event",
+        "summary": "Create Event",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizerEventCreatedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "multipart/form-data: name, type, date (YYYY-MM-DD), city, venue (optional), hasFaceSearch,\nallowsBrowseAll, requiresConsent (optional, defaults true/false/true), cover (optional image).\nThe event is open at once; the code is generated. Creating costs nothing.\n\nErrors: 403 organizer_access_required · 422 validation_error, invalid_event_settings,\nunsupported_file_type, unreadable_image, file_too_large (cover).",
+        "tags": [
+          "organizer"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "title": "MultiPartBodyParams",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "title": "Name",
+                    "type": "string"
+                  },
+                  "type": {
+                    "default": "wedding",
+                    "enum": [
+                      "wedding",
+                      "sports",
+                      "graduation",
+                      "corporate",
+                      "other"
+                    ],
+                    "title": "Type",
+                    "type": "string"
+                  },
+                  "date": {
+                    "format": "date",
+                    "title": "Date",
+                    "type": "string"
+                  },
+                  "city": {
+                    "default": "",
+                    "maxLength": 120,
+                    "title": "City",
+                    "type": "string"
+                  },
+                  "venue": {
+                    "default": "",
+                    "maxLength": 120,
+                    "title": "Venue",
+                    "type": "string"
+                  },
+                  "hasFaceSearch": {
+                    "default": true,
+                    "title": "Hasfacesearch",
+                    "type": "boolean"
+                  },
+                  "allowsBrowseAll": {
+                    "default": false,
+                    "title": "Allowsbrowseall",
+                    "type": "boolean"
+                  },
+                  "requiresConsent": {
+                    "default": true,
+                    "title": "Requiresconsent",
+                    "type": "boolean"
+                  },
+                  "cover": {
+                    "format": "binary",
+                    "title": "Cover",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "date"
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/events/{code}": {
+      "get": {
+        "operationId": "events_organizer_api_get_event",
+        "summary": "Get Event",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizerEventResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          }
+        },
+        "description": "One event with counts, settings and the join link.\n\nErrors: 403 organizer_access_required · 404 event_not_found.",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "events_organizer_api_update_event",
+        "summary": "Update Event",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizerEventUpdatedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "Change any of: name, type, date, city, venue, settings, and `status` (`active` = open,\n`access_closed` = participants locked out). Omitted fields stay.\n\nErrors: 403 organizer_access_required · 404 event_not_found · 410 event_expired ·\n422 validation_error, invalid_event_settings.",
+        "tags": [
+          "organizer"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/events/{code}/cover": {
+      "post": {
+        "operationId": "events_organizer_api_put_cover",
+        "summary": "Put Cover",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizerCoverResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "multipart/form-data: file (image). Free; replaces the previous uploaded cover.\n\nErrors: 404 event_not_found · 410 event_expired · 422 unsupported_file_type, unreadable_image, file_too_large.",
+        "tags": [
+          "organizer"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "title": "File",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "title": "FileParams",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "events_organizer_api_delete_cover",
+        "summary": "Delete Cover",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizerCoverResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          }
+        },
+        "description": "Removes the uploaded cover; the first photo is shown instead. Errors: 404 event_not_found.",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/events/{code}/cover/thumb.jpg": {
+      "get": {
+        "operationId": "events_organizer_api_cover_thumb",
+        "summary": "Cover Thumb",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Cover ~400 px (uploaded cover, else the first photo)",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/events/{code}/cover/display.jpg": {
+      "get": {
+        "operationId": "events_organizer_api_cover_display",
+        "summary": "Cover Display",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Cover ~1600 px",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/events/{code}/photo-upload-check": {
+      "post": {
+        "operationId": "events_organizer_api_upload_check",
+        "summary": "Upload Check",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadCheckResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "Before an upload: does the balance cover `photoCount` photos? Not enough is not an error\n(`eligible: false`, `missingCredits`). The upload itself checks every photo again.\n\nErrors: 404 event_not_found · 410 event_expired.",
+        "tags": [
+          "organizer"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/events/{code}/photos": {
+      "post": {
+        "operationId": "events_organizer_api_upload_photos",
+        "summary": "Upload Photos",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadBatchResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "multipart/form-data: repeated `files` (max 20 per request, ≤ 50 MB each, whole request ≤ 60 MB)\nand optionally the same number of `clientIds`, echoed back in `results`. Each file is accepted or\nrejected on its own; 1 credit per accepted photo. Per-file `errorCode`: unsupported_file_type,\nunreadable_image, file_too_large, duplicate_photo, insufficient_credits.\n\nErrors: 404 event_not_found · 410 event_expired · 422 too_many_files, validation_error.",
+        "tags": [
+          "organizer"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "files": {
+                    "items": {
+                      "format": "binary",
+                      "type": "string"
+                    },
+                    "title": "Files",
+                    "type": "array"
+                  },
+                  "clientIds": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "title": "Clientids",
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "files"
+                ],
+                "title": "MultiPartBodyParams",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "events_organizer_api_list_photos",
+        "summary": "List Photos",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "default": "",
+              "title": "Status",
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "default": 0,
+              "title": "Cursor",
+              "type": "integer"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizerPhotoListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "All photos of the event in upload order; `status` filter: queued, processing, ready, failed.\n`cursor` is an offset, `limit` ≤ 500.\n\nErrors: 404 event_not_found · 422 validation_error (bad status).",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "events_organizer_api_delete_photos",
+        "summary": "Delete Photos",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizerPhotosDeletedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "JSON body {\"photoIds\": [\"00017\", ...]}: deletes those photos (files and faces at once).\nCredits are not refunded. Unknown ids are skipped (`affectedCount` tells how many went).\n\nErrors: 404 event_not_found.",
+        "tags": [
+          "organizer"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoIdsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/events/{code}/photos/{photo_id}/thumb.jpg": {
+      "get": {
+        "operationId": "events_organizer_api_photo_thumb",
+        "summary": "Photo Thumb",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "schema": {
+              "title": "Photo Id",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "~400 px",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/events/{code}/photos/{photo_id}/display.jpg": {
+      "get": {
+        "operationId": "events_organizer_api_photo_display",
+        "summary": "Photo Display",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "schema": {
+              "title": "Photo Id",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "~1600 px",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/events/{code}/participants": {
+      "get": {
+        "operationId": "events_organizer_api_participants",
+        "summary": "Participants",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParticipantListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          }
+        },
+        "description": "People who opened the event (most recently active first): name, masked phone, where they\nare in consent → selfie → matching, and how many photos they appear in. No phone numbers,\nselfies or face data.\n\nErrors: 404 event_not_found.",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/credits": {
+      "get": {
+        "operationId": "events_organizer_api_credit_store",
+        "summary": "Credit Store",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditStoreResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          }
+        },
+        "description": "Balance, active credit packages (managed in the admin) and past purchases.\n\nErrors: 403 organizer_access_required.",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/credit-purchases": {
+      "post": {
+        "operationId": "events_organizer_api_credit_purchase",
+        "summary": "Credit Purchase",
+        "parameters": [],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error409"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error501"
+                }
+              }
+            }
+          }
+        },
+        "description": "Buy a package: checks the package and the price version, then would start the payment.\nNot available yet (payment provider pending): answers 501 payment_not_available.\n\nErrors: 403 organizer_access_required · 404 not_found (package) · 409 pricing_changed · 501 payment_not_available.",
+        "tags": [
+          "organizer"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurchaseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2586,6 +4063,8 @@
             "enum": [
               "wedding",
               "sports",
+              "graduation",
+              "corporate",
               "other"
             ],
             "title": "Type",
@@ -2955,6 +4434,8 @@
             "enum": [
               "wedding",
               "sports",
+              "graduation",
+              "corporate",
               "other"
             ],
             "title": "Type",
@@ -3468,6 +4949,1755 @@
           "requestId"
         ],
         "title": "GalleryPhotoResponse",
+        "type": "object"
+      },
+      "DashboardOrganizerOut": {
+        "additionalProperties": false,
+        "properties": {
+          "displayName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "Seko Konac"
+            ],
+            "title": "Displayname"
+          },
+          "creditBalance": {
+            "description": "May be negative (overdraft).",
+            "examples": [
+              1840
+            ],
+            "title": "Creditbalance",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "displayName",
+          "creditBalance"
+        ],
+        "title": "DashboardOrganizerOut",
+        "type": "object"
+      },
+      "DashboardOut": {
+        "additionalProperties": false,
+        "properties": {
+          "organizer": {
+            "$ref": "#/components/schemas/DashboardOrganizerOut"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/DashboardTotalsOut"
+          },
+          "events": {
+            "description": "Not expired, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/OrganizerEventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "recentActivity": {
+            "description": "Always empty in this version.",
+            "examples": [
+              []
+            ],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Recentactivity",
+            "type": "array"
+          }
+        },
+        "required": [
+          "organizer",
+          "totals",
+          "events",
+          "recentActivity"
+        ],
+        "title": "DashboardOut",
+        "type": "object"
+      },
+      "DashboardTotalsOut": {
+        "additionalProperties": false,
+        "properties": {
+          "activeEvents": {
+            "title": "Activeevents",
+            "type": "integer"
+          },
+          "totalPhotos": {
+            "title": "Totalphotos",
+            "type": "integer"
+          },
+          "totalParticipants": {
+            "title": "Totalparticipants",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "activeEvents",
+          "totalPhotos",
+          "totalParticipants"
+        ],
+        "title": "DashboardTotalsOut",
+        "type": "object"
+      },
+      "OrganizerDashboardResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_dashboard_retrieved",
+            "default": "organizer_dashboard_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DashboardOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "OrganizerDashboardResponse",
+        "type": "object"
+      },
+      "OrganizerEventOut": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Same as code; use either in paths.",
+            "examples": [
+              "RK238"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "code": {
+            "examples": [
+              "RK238"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "examples": [
+              "Derya & Can"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "wedding",
+              "sports",
+              "graduation",
+              "corporate",
+              "other"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "date": {
+            "examples": [
+              "2026-06-12"
+            ],
+            "title": "Date",
+            "type": "string"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "İstanbul"
+            ],
+            "title": "City"
+          },
+          "venue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "Çırağan Sarayı"
+            ],
+            "title": "Venue"
+          },
+          "status": {
+            "description": "active = open; access_closed = participants locked out; expired = final.",
+            "enum": [
+              "active",
+              "access_closed",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "hasFaceSearch": {
+            "description": "Photos go to face matching ('photos of me').",
+            "title": "Hasfacesearch",
+            "type": "boolean"
+          },
+          "allowsBrowseAll": {
+            "description": "Participants may browse all photos.",
+            "title": "Allowsbrowseall",
+            "type": "boolean"
+          },
+          "requiresConsent": {
+            "description": "Participants need KVKK consent to enter.",
+            "title": "Requiresconsent",
+            "type": "boolean"
+          },
+          "photoCount": {
+            "examples": [
+              684
+            ],
+            "title": "Photocount",
+            "type": "integer"
+          },
+          "processedPhotoCount": {
+            "description": "Face processing finished (done).",
+            "examples": [
+              680
+            ],
+            "title": "Processedphotocount",
+            "type": "integer"
+          },
+          "pendingPhotoCount": {
+            "description": "Waiting for or in face processing.",
+            "examples": [
+              4
+            ],
+            "title": "Pendingphotocount",
+            "type": "integer"
+          },
+          "failedPhotoCount": {
+            "examples": [
+              0
+            ],
+            "title": "Failedphotocount",
+            "type": "integer"
+          },
+          "participantCount": {
+            "examples": [
+              213
+            ],
+            "title": "Participantcount",
+            "type": "integer"
+          },
+          "coverThumbnailUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Uploaded cover, else the first photo; null when neither.",
+            "examples": [
+              "/api/organizer/events/RK238/cover/thumb.jpg"
+            ],
+            "title": "Coverthumbnailurl"
+          },
+          "coverIsUploaded": {
+            "description": "False: the cover shown is the first photo.",
+            "title": "Coverisuploaded",
+            "type": "boolean"
+          },
+          "joinUrl": {
+            "description": "Link for participants (QR content).",
+            "examples": [
+              "https://cp.futuruniq.com/?event=RK238"
+            ],
+            "title": "Joinurl",
+            "type": "string"
+          },
+          "createdAt": {
+            "examples": [
+              "2026-10-19T08:30:00+00:00"
+            ],
+            "title": "Createdat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "type",
+          "date",
+          "city",
+          "venue",
+          "status",
+          "hasFaceSearch",
+          "allowsBrowseAll",
+          "requiresConsent",
+          "photoCount",
+          "processedPhotoCount",
+          "pendingPhotoCount",
+          "failedPhotoCount",
+          "participantCount",
+          "coverThumbnailUrl",
+          "coverIsUploaded",
+          "joinUrl",
+          "createdAt"
+        ],
+        "title": "OrganizerEventOut",
+        "type": "object"
+      },
+      "EventListOut": {
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizerEventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "events",
+          "total"
+        ],
+        "title": "EventListOut",
+        "type": "object"
+      },
+      "OrganizerEventListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_events_retrieved",
+            "default": "organizer_events_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EventListOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "OrganizerEventListResponse",
+        "type": "object"
+      },
+      "EventDataOut": {
+        "additionalProperties": false,
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/OrganizerEventOut"
+          }
+        },
+        "required": [
+          "event"
+        ],
+        "title": "EventDataOut",
+        "type": "object"
+      },
+      "OrganizerEventCreatedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_event_created",
+            "default": "organizer_event_created",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EventDataOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "OrganizerEventCreatedResponse",
+        "type": "object"
+      },
+      "EventCreateIn": {
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "default": "wedding",
+            "enum": [
+              "wedding",
+              "sports",
+              "graduation",
+              "corporate",
+              "other"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "city": {
+            "default": "",
+            "maxLength": 120,
+            "title": "City",
+            "type": "string"
+          },
+          "venue": {
+            "default": "",
+            "maxLength": 120,
+            "title": "Venue",
+            "type": "string"
+          },
+          "hasFaceSearch": {
+            "default": true,
+            "title": "Hasfacesearch",
+            "type": "boolean"
+          },
+          "allowsBrowseAll": {
+            "default": false,
+            "title": "Allowsbrowseall",
+            "type": "boolean"
+          },
+          "requiresConsent": {
+            "default": true,
+            "title": "Requiresconsent",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "date"
+        ],
+        "title": "EventCreateIn",
+        "type": "object"
+      },
+      "OrganizerEventResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_event_retrieved",
+            "default": "organizer_event_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EventDataOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "OrganizerEventResponse",
+        "type": "object"
+      },
+      "OrganizerEventUpdatedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_event_updated",
+            "default": "organizer_event_updated",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EventDataOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "OrganizerEventUpdatedResponse",
+        "type": "object"
+      },
+      "EventPatchIn": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "wedding",
+                  "sports",
+                  "graduation",
+                  "corporate",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "venue": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "active",
+                  "access_closed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "hasFaceSearch": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasfacesearch"
+          },
+          "allowsBrowseAll": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowsbrowseall"
+          },
+          "requiresConsent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requiresconsent"
+          }
+        },
+        "title": "EventPatchIn",
+        "type": "object"
+      },
+      "OrganizerCoverResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_cover_updated",
+            "default": "organizer_cover_updated",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EventDataOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "OrganizerCoverResponse",
+        "type": "object"
+      },
+      "UploadCheckOut": {
+        "additionalProperties": false,
+        "properties": {
+          "eligible": {
+            "title": "Eligible",
+            "type": "boolean"
+          },
+          "requiredCredits": {
+            "examples": [
+              240
+            ],
+            "title": "Requiredcredits",
+            "type": "integer"
+          },
+          "creditBalance": {
+            "examples": [
+              180
+            ],
+            "title": "Creditbalance",
+            "type": "integer"
+          },
+          "remainingCredits": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Balance after the upload, when eligible.",
+            "examples": [
+              null
+            ],
+            "title": "Remainingcredits"
+          },
+          "missingCredits": {
+            "description": "Credits to buy first; 0 when eligible.",
+            "examples": [
+              60
+            ],
+            "title": "Missingcredits",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "eligible",
+          "requiredCredits",
+          "creditBalance",
+          "remainingCredits",
+          "missingCredits"
+        ],
+        "title": "UploadCheckOut",
+        "type": "object"
+      },
+      "UploadCheckResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "photo_upload_eligibility_checked",
+            "default": "photo_upload_eligibility_checked",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploadCheckOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "UploadCheckResponse",
+        "type": "object"
+      },
+      "UploadCheckIn": {
+        "properties": {
+          "photoCount": {
+            "maximum": 100000,
+            "minimum": 0,
+            "title": "Photocount",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "photoCount"
+        ],
+        "title": "UploadCheckIn",
+        "type": "object"
+      },
+      "UploadBatchOut": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptedCount": {
+            "title": "Acceptedcount",
+            "type": "integer"
+          },
+          "rejectedCount": {
+            "title": "Rejectedcount",
+            "type": "integer"
+          },
+          "creditBalance": {
+            "title": "Creditbalance",
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/UploadResultOut"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "acceptedCount",
+          "rejectedCount",
+          "creditBalance",
+          "results"
+        ],
+        "title": "UploadBatchOut",
+        "type": "object"
+      },
+      "UploadBatchResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_photos_uploaded",
+            "default": "organizer_photos_uploaded",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploadBatchOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "UploadBatchResponse",
+        "type": "object"
+      },
+      "UploadResultOut": {
+        "additionalProperties": false,
+        "properties": {
+          "clientId": {
+            "examples": [
+              "local-1"
+            ],
+            "title": "Clientid",
+            "type": "string"
+          },
+          "photoId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Accepted: the photo number.",
+            "examples": [
+              "00045"
+            ],
+            "title": "Photoid"
+          },
+          "fileName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Accepted: our name for it (never the uploaded name).",
+            "examples": [
+              "00045.jpg"
+            ],
+            "title": "Filename"
+          },
+          "status": {
+            "description": "queued = waiting for face processing.",
+            "enum": [
+              "queued",
+              "ready",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              null
+            ],
+            "title": "Errorcode"
+          }
+        },
+        "required": [
+          "clientId",
+          "photoId",
+          "fileName",
+          "status",
+          "errorCode"
+        ],
+        "title": "UploadResultOut",
+        "type": "object"
+      },
+      "OrganizerPhotoListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_photos_retrieved",
+            "default": "organizer_photos_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PhotoListOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "OrganizerPhotoListResponse",
+        "type": "object"
+      },
+      "OrganizerPhotoOut": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "examples": [
+              "00017"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "fileName": {
+            "examples": [
+              "00017.jpg"
+            ],
+            "title": "Filename",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "processing",
+              "ready",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "faceCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Faces found; null until processed.",
+            "examples": [
+              3
+            ],
+            "title": "Facecount"
+          },
+          "thumbnailUrl": {
+            "examples": [
+              "/api/organizer/events/RK238/photos/00017/thumb.jpg"
+            ],
+            "title": "Thumbnailurl",
+            "type": "string"
+          },
+          "displayUrl": {
+            "examples": [
+              "/api/organizer/events/RK238/photos/00017/display.jpg"
+            ],
+            "title": "Displayurl",
+            "type": "string"
+          },
+          "width": {
+            "description": "Display image pixels.",
+            "examples": [
+              1600
+            ],
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "examples": [
+              1200
+            ],
+            "title": "Height",
+            "type": "integer"
+          },
+          "takenAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "2026-06-12T18:14:00+00:00"
+            ],
+            "title": "Takenat"
+          },
+          "uploadedAt": {
+            "examples": [
+              "2026-10-18T18:30:00+00:00"
+            ],
+            "title": "Uploadedat",
+            "type": "string"
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              null
+            ],
+            "title": "Errorcode"
+          }
+        },
+        "required": [
+          "id",
+          "fileName",
+          "status",
+          "faceCount",
+          "thumbnailUrl",
+          "displayUrl",
+          "width",
+          "height",
+          "takenAt",
+          "uploadedAt",
+          "errorCode"
+        ],
+        "title": "OrganizerPhotoOut",
+        "type": "object"
+      },
+      "PhotoCountsOut": {
+        "additionalProperties": false,
+        "properties": {
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "processing": {
+            "title": "Processing",
+            "type": "integer"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "integer"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "queued",
+          "processing",
+          "ready",
+          "failed"
+        ],
+        "title": "PhotoCountsOut",
+        "type": "object"
+      },
+      "PhotoListOut": {
+        "additionalProperties": false,
+        "properties": {
+          "photos": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizerPhotoOut"
+            },
+            "title": "Photos",
+            "type": "array"
+          },
+          "total": {
+            "description": "Photos matching the status filter.",
+            "title": "Total",
+            "type": "integer"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/PhotoCountsOut",
+            "description": "All photos of the event, by status."
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "photos",
+          "total",
+          "counts",
+          "nextCursor"
+        ],
+        "title": "PhotoListOut",
+        "type": "object"
+      },
+      "OrganizerPhotosDeletedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_photos_deleted",
+            "default": "organizer_photos_deleted",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PhotoMutationOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "OrganizerPhotosDeletedResponse",
+        "type": "object"
+      },
+      "PhotoMutationOut": {
+        "additionalProperties": false,
+        "properties": {
+          "affectedCount": {
+            "title": "Affectedcount",
+            "type": "integer"
+          },
+          "creditBalance": {
+            "title": "Creditbalance",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "affectedCount",
+          "creditBalance"
+        ],
+        "title": "PhotoMutationOut",
+        "type": "object"
+      },
+      "PhotoIdsIn": {
+        "properties": {
+          "photoIds": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Photoids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "photoIds"
+        ],
+        "title": "PhotoIdsIn",
+        "type": "object"
+      },
+      "ParticipantCountsOut": {
+        "additionalProperties": false,
+        "properties": {
+          "completed": {
+            "title": "Completed",
+            "type": "integer"
+          },
+          "pending": {
+            "description": "consent_pending + selfie_pending + processing",
+            "title": "Pending",
+            "type": "integer"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "completed",
+          "pending",
+          "failed"
+        ],
+        "title": "ParticipantCountsOut",
+        "type": "object"
+      },
+      "ParticipantListOut": {
+        "additionalProperties": false,
+        "properties": {
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantOut"
+            },
+            "title": "Participants",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ParticipantCountsOut"
+          }
+        },
+        "required": [
+          "participants",
+          "total",
+          "counts"
+        ],
+        "title": "ParticipantListOut",
+        "type": "object"
+      },
+      "ParticipantListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_participants_retrieved",
+            "default": "organizer_participants_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ParticipantListOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "ParticipantListResponse",
+        "type": "object"
+      },
+      "ParticipantOut": {
+        "additionalProperties": false,
+        "properties": {
+          "membershipId": {
+            "examples": [
+              "123"
+            ],
+            "title": "Membershipid",
+            "type": "string"
+          },
+          "displayName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              "Ece Yılmaz"
+            ],
+            "title": "Displayname"
+          },
+          "maskedPhone": {
+            "examples": [
+              "•••••••••4218"
+            ],
+            "title": "Maskedphone",
+            "type": "string"
+          },
+          "joinedAt": {
+            "title": "Joinedat",
+            "type": "string"
+          },
+          "lastActiveAt": {
+            "title": "Lastactiveat",
+            "type": "string"
+          },
+          "hasConsent": {
+            "title": "Hasconsent",
+            "type": "boolean"
+          },
+          "matchStatus": {
+            "enum": [
+              "consent_pending",
+              "selfie_pending",
+              "processing",
+              "completed",
+              "failed"
+            ],
+            "title": "Matchstatus",
+            "type": "string"
+          },
+          "matchedPhotoCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null unless matchStatus is completed.",
+            "examples": [
+              18
+            ],
+            "title": "Matchedphotocount"
+          }
+        },
+        "required": [
+          "membershipId",
+          "displayName",
+          "maskedPhone",
+          "joinedAt",
+          "lastActiveAt",
+          "hasConsent",
+          "matchStatus",
+          "matchedPhotoCount"
+        ],
+        "title": "ParticipantOut",
+        "type": "object"
+      },
+      "CreditPackageOut": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "examples": [
+              "2"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "examples": [
+              "1000cr"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "creditAmount": {
+            "examples": [
+              1000
+            ],
+            "title": "Creditamount",
+            "type": "integer"
+          },
+          "price": {
+            "examples": [
+              1800.0
+            ],
+            "title": "Price",
+            "type": "number"
+          },
+          "currency": {
+            "examples": [
+              "TRY"
+            ],
+            "title": "Currency",
+            "type": "string"
+          },
+          "unitPrice": {
+            "examples": [
+              1.8
+            ],
+            "title": "Unitprice",
+            "type": "number"
+          },
+          "discountPercent": {
+            "description": "Against the package with the highest unit price.",
+            "examples": [
+              10
+            ],
+            "title": "Discountpercent",
+            "type": "integer"
+          },
+          "featured": {
+            "title": "Featured",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "creditAmount",
+          "price",
+          "currency",
+          "unitPrice",
+          "discountPercent",
+          "featured"
+        ],
+        "title": "CreditPackageOut",
+        "type": "object"
+      },
+      "CreditPurchaseOut": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "creditAmount": {
+            "title": "Creditamount",
+            "type": "integer"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "purchasedAt": {
+            "title": "Purchasedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "creditAmount",
+          "ref",
+          "purchasedAt"
+        ],
+        "title": "CreditPurchaseOut",
+        "type": "object"
+      },
+      "CreditStoreOut": {
+        "additionalProperties": false,
+        "properties": {
+          "creditBalance": {
+            "title": "Creditbalance",
+            "type": "integer"
+          },
+          "pricingVersion": {
+            "description": "Send back with a purchase; changes with any price change.",
+            "examples": [
+              "3f9a1c0b2d4e"
+            ],
+            "title": "Pricingversion",
+            "type": "string"
+          },
+          "packages": {
+            "items": {
+              "$ref": "#/components/schemas/CreditPackageOut"
+            },
+            "title": "Packages",
+            "type": "array"
+          },
+          "purchases": {
+            "items": {
+              "$ref": "#/components/schemas/CreditPurchaseOut"
+            },
+            "title": "Purchases",
+            "type": "array"
+          }
+        },
+        "required": [
+          "creditBalance",
+          "pricingVersion",
+          "packages",
+          "purchases"
+        ],
+        "title": "CreditStoreOut",
+        "type": "object"
+      },
+      "CreditStoreResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "credit_store_retrieved",
+            "default": "credit_store_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CreditStoreOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "CreditStoreResponse",
+        "type": "object"
+      },
+      "Error501": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "payment_not_available"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Ödeme henüz kullanılamıyor."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              null
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error501",
+        "type": "object"
+      },
+      "PurchaseIn": {
+        "properties": {
+          "packageId": {
+            "title": "Packageid",
+            "type": "string"
+          },
+          "pricingVersion": {
+            "title": "Pricingversion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "packageId",
+          "pricingVersion"
+        ],
+        "title": "PurchaseIn",
         "type": "object"
       }
     },

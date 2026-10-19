@@ -1,4 +1,4 @@
-"""Image (photos + selfies, also the face-worker queue), Face, DownloadLog. design/core.md."""
+"""Image (event photos, selfies, event covers; also the face-worker queue), Face, DownloadLog. design/core.md."""
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
@@ -16,6 +16,11 @@ class Image(models.Model):
         DONE = "done"                # result stored (num_faces may be 0)
         FAILED = "failed"            # gave up: unreadable, or WORKER_MAX_ATTEMPTS reached
 
+    class Kind(models.TextChoices):
+        PHOTO = "photo"     # event photo: numbered (seq), charged 1 credit, worker task all_faces
+        SELFIE = "selfie"   # a user's face profile: no event, slot primary/secondary, worker task main_face
+        COVER = "cover"     # event cover uploaded by the organizer: free, never processed, not in the gallery
+
     class Slot(models.TextChoices):
         PRIMARY = "primary"
         SECONDARY = "secondary"
@@ -25,7 +30,7 @@ class Image(models.Model):
         DISPLAY = "d"
         THUMB = "t"
 
-    is_selfie = models.BooleanField(default=False)   # worker task: main_face if True, all_faces if False
+    kind = models.CharField(max_length=8, choices=Kind.choices, default=Kind.PHOTO)
     event = models.ForeignKey("events.Event", null=True, blank=True, on_delete=models.CASCADE, related_name="images")
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="images")
     seq = models.PositiveIntegerField(null=True, blank=True)        # photos: 44 -> "00044"
@@ -53,37 +58,51 @@ class Image(models.Model):
 
     class Meta:
         constraints = [
-            # A photo belongs to an event and has a number; a selfie has neither.
+            # A photo belongs to an event and has a number; a selfie has neither; a cover has an event, no number.
             models.CheckConstraint(
-                condition=Q(is_selfie=True, event__isnull=True, seq__isnull=True)
-                | Q(is_selfie=False, event__isnull=False, seq__isnull=False),
-                name="image_photo_or_selfie"),
+                condition=Q(kind="photo", event__isnull=False, seq__isnull=False)
+                | Q(kind="selfie", event__isnull=True, seq__isnull=True)
+                | Q(kind="cover", event__isnull=False, seq__isnull=True),
+                name="image_kind_shape"),
             models.UniqueConstraint(fields=["event", "seq"], name="image_seq_per_event"),
             # The same file twice in one event is rejected (and not charged).
-            models.UniqueConstraint(fields=["event", "sha256"], condition=Q(is_selfie=False, deleted_at__isnull=True),
+            models.UniqueConstraint(fields=["event", "sha256"], condition=Q(kind="photo", deleted_at__isnull=True),
                                     name="image_no_duplicate_per_event"),
             # One live selfie per slot per user; uploading to a slot replaces (soft-deletes) the old one.
-            models.UniqueConstraint(fields=["owner", "slot"], condition=Q(is_selfie=True, deleted_at__isnull=True),
+            models.UniqueConstraint(fields=["owner", "slot"], condition=Q(kind="selfie", deleted_at__isnull=True),
                                     name="selfie_one_per_slot"),
         ]
         indexes = [
             # The worker queue: small, because finished rows drop out of these partial indexes.
             models.Index(fields=["event", "created_at"], condition=Q(status__in=UNFINISHED), name="image_queue"),
-            models.Index(fields=["created_at"], condition=Q(is_selfie=True, status__in=UNFINISHED), name="selfie_queue"),
+            models.Index(fields=["created_at"], condition=Q(kind="selfie", status__in=UNFINISHED), name="selfie_queue"),
         ]
+
+    @property
+    def is_selfie(self) -> bool:
+        return self.kind == self.Kind.SELFIE
+
+    @property
+    def is_cover(self) -> bool:
+        return self.kind == self.Kind.COVER
 
     @property
     def seq_str(self) -> str:
         return f"{self.seq:05d}" if self.seq is not None else ""
 
     def relpath(self, rendition: str) -> str:
-        """File path under MEDIA_ROOT: events/<event_id>/00044_m.jpg or selfies/<user_id>/<id>_d.jpg."""
+        """File path under MEDIA_ROOT: events/<event_id>/00044_m.jpg, events/<event_id>/cover_<id>_d.jpg
+        or selfies/<user_id>/<id>_d.jpg. Covers and selfies have no master (_d and _t only)."""
         if self.is_selfie:
             return f"selfies/{self.owner_id}/{self.pk}_{rendition}.jpg"
+        if self.is_cover:
+            return f"events/{self.event_id}/cover_{self.pk}_{rendition}.jpg"
         return f"events/{self.event_id}/{self.seq_str}_{rendition}.jpg"
 
     def __str__(self):
-        return f"selfie {self.pk} ({self.owner_id})" if self.is_selfie else f"{self.event_id}/{self.seq_str}"
+        if self.is_selfie:
+            return f"selfie {self.pk} ({self.owner_id})"
+        return f"{self.event_id}/cover {self.pk}" if self.is_cover else f"{self.event_id}/{self.seq_str}"
 
 
 class Face(models.Model):

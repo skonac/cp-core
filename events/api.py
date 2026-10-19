@@ -46,7 +46,7 @@ def _member_access(request, code: str) -> tuple[Event, Access]:
 
 
 def _photos(event):
-    return Image.objects.filter(event=event, is_selfie=False, deleted_at__isnull=True)
+    return Image.objects.filter(event=event, kind=Image.Kind.PHOTO, deleted_at__isnull=True)
 
 
 def _view_photos(request, event, access, view: str) -> list[Image]:

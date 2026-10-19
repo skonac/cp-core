@@ -8,13 +8,13 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cp.futuruniq.com/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-19 · API version 0.1 (KVKK documents: versioned PDFs)
+Last updated: 2026-10-19 · API version 0.2 (organizer API §3.6; event types, city/venue)
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then the
 > "Changes from cp-web's draft contract" section, which lists every place where this API
 > differs from `cp-web/docs/api/*.md` and the current MSW mocks. Update `src/features/*/api/*`
 > and `src/mocks/handlers.ts` to match. Do not keep `accessToken`, `match-jobs`, or the
-> event-scoped selfie/consent paths.
+> event-scoped selfie/consent paths. For the organizer screens: §3.6 and §5b.
 
 ## 1. Basics
 
@@ -73,14 +73,17 @@ Every response except files and `204` is:
 | 403 | `csrf_failed` | Missing/wrong `X-CSRFToken` on POST/PATCH/DELETE |
 | 403 | `consent_required` | Event needs consent and the user has not given it; selfie upload without consent |
 | 403 | `browse_all_not_allowed` | `view=all` on an event that doesn't allow it |
+| 403 | `organizer_access_required` | Organizer endpoint, account without the organizer role |
 | 404 | `event_not_found`, `photo_not_found`, `selfie_not_found`, `not_found` | Missing, or not visible to this user (never revealed which) |
 | 409 | `email_already_in_use` | `PATCH /me` with another account's email |
 | 409 | `consent_version_outdated` | Consent sent for a KVKK version that is no longer current |
+| 409 | `pricing_changed` | Credit purchase with an old `pricingVersion` |
 | 410 | `event_expired`, `otp_expired` | |
-| 422 | `validation_error`, `invalid_phone_number`, `invalid_role`, `invalid_otp`, `explicit_consent_required`, `unsupported_file_type`, `unreadable_image`, `file_too_large`, `file_required`, `invalid_slot` | |
+| 422 | `validation_error`, `invalid_phone_number`, `invalid_role`, `invalid_otp`, `explicit_consent_required`, `unsupported_file_type`, `unreadable_image`, `file_too_large`, `file_required`, `invalid_slot`, `invalid_event_settings`, `too_many_files` | |
 | 423 | `event_access_closed` | The organizer closed access |
 | 429 | `rate_limit_exceeded`, `download_limit_reached` | |
 | 500 | `internal_error` | Bug; quote the `requestId` |
+| 501 | `payment_not_available` | Credit purchase: payment provider not connected yet |
 
 ## 3. Endpoints
 
@@ -296,6 +299,146 @@ Downloads are logged and capped: the same user may download the same photo **3 t
 the 4th answers `429 download_limit_reached` (JSON envelope). Show `downloadsLeftToday` from the photo detail and hide the button at 0.
 A photo the user may not see answers `404 photo_not_found`.
 
+### 3.6 Organizer
+
+For accounts with the `organizer` role (`accountRoles` contains `organizer`; the account gets it by
+signing in with `"role": "organizer"`). Anyone else gets `403 organizer_access_required`. Events are
+addressed by their **code** (`/api/organizer/events/RK238`, any case); `id` in the event object is the
+same code. An organizer sees only their own events (another organizer's code answers `404 event_not_found`).
+
+Events have three states: `active` (open; created this way, there is no draft), `access_closed`
+(participants locked out; uploads and processing continue) and `expired` (final; set by an admin).
+Credits: **1 credit per accepted photo**, charged at upload. Creating an event, the cover, and deleting
+are free; deleting refunds nothing. `creditBalance` is the real balance and may go negative: the server
+allows an overdraft down to a floor, so a balance of −12 is shown as −12.
+
+**The event object** (`event` in the event endpoints, items of `events` in the lists):
+
+```json
+{ "id": "RK238", "code": "RK238", "name": "Derya & Can", "type": "wedding", "date": "2026-06-12",
+  "city": "İstanbul", "venue": "Çırağan Sarayı", "status": "active",
+  "hasFaceSearch": true, "allowsBrowseAll": false, "requiresConsent": true,
+  "photoCount": 684, "processedPhotoCount": 680, "pendingPhotoCount": 4, "failedPhotoCount": 0,
+  "participantCount": 213,
+  "coverThumbnailUrl": "/api/organizer/events/RK238/cover/thumb.jpg", "coverIsUploaded": true,
+  "joinUrl": "https://cp.futuruniq.com/?event=RK238", "createdAt": "2026-10-19T08:30:00+00:00" }
+```
+
+| Field | Notes |
+| --- | --- |
+| `type` | `wedding`, `sports`, `graduation`, `corporate`, `other` |
+| `hasFaceSearch` | Photos go to face matching ("photos of me"). Off: participants only browse all |
+| `allowsBrowseAll` | Participants may browse all photos. Must be `true` when `hasFaceSearch` is `false` |
+| `requiresConsent` | Participants need KVKK consent to enter (default `true`) |
+| `processedPhotoCount` / `pendingPhotoCount` / `failedPhotoCount` | Face processing: finished / waiting or running / failed |
+| `participantCount` | People who opened the event (the organizer not counted) |
+| `coverThumbnailUrl` | The uploaded cover; without one, the first photo; `null` when neither exists. `coverIsUploaded` tells which |
+| `joinUrl` | The link for participants; put it in the QR code |
+
+**`GET /api/organizer/dashboard`** → `200 organizer_dashboard_retrieved`:
+`{ organizer: {displayName, creditBalance}, totals: {activeEvents, totalPhotos, totalParticipants}, events: [event…], recentActivity: [] }`.
+`events`: the ones that are not expired, newest first. `recentActivity` is always empty in this version.
+
+**`GET /api/organizer/events?includeExpired=false`** → `200 organizer_events_retrieved` `{ events: [event…], total }`.
+
+**`POST /api/organizer/events`** — `multipart/form-data`: `name` (required), `date` (required, `YYYY-MM-DD`),
+`type` (default `wedding`), `city`, `venue`, `hasFaceSearch` (default `true`), `allowsBrowseAll` (default `false`),
+`requiresConsent` (default `true`), `cover` (optional image file).
+→ `201 organizer_event_created` `{ event }`. The event is active at once and its code is generated.
+Errors: `422 validation_error`, `invalid_event_settings` (face search off without browse-all), and for the cover
+`unsupported_file_type`, `unreadable_image`, `file_too_large`.
+
+**`GET /api/organizer/events/{code}`** → `200 organizer_event_retrieved` `{ event }`.
+
+**`PATCH /api/organizer/events/{code}`** — JSON, any subset of `name`, `type`, `date`, `city`, `venue`,
+`hasFaceSearch`, `allowsBrowseAll`, `requiresConsent`, `status` (`active` | `access_closed`: open/close access).
+→ `200 organizer_event_updated` `{ event }`. Errors: `410 event_expired`, `422 validation_error`, `invalid_event_settings`.
+
+**Cover.** `POST /api/organizer/events/{code}/cover` — `multipart/form-data`: `file`. Free, not face-processed,
+not in the gallery; replaces the previous uploaded cover. `DELETE /api/organizer/events/{code}/cover` removes it
+(the first photo is shown instead). Both → `200 organizer_cover_updated` `{ event }`.
+Files: `GET …/cover/thumb.jpg` (~400 px), `GET …/cover/display.jpg` (~1600 px).
+
+**`POST /api/organizer/events/{code}/photo-upload-check`** `{ "photoCount": 240 }` → `200 photo_upload_eligibility_checked`:
+
+```json
+{ "eligible": false, "requiredCredits": 240, "creditBalance": 180, "remainingCredits": null, "missingCredits": 10 }
+```
+
+Not enough credit is not an error: `eligible: false` and `missingCredits` (credits to buy first). `remainingCredits`
+is the balance after the upload when eligible (may be negative within the overdraft). The upload checks every
+photo again. Errors: `410 event_expired`.
+
+**`POST /api/organizer/events/{code}/photos`** — `multipart/form-data`: repeated `files` (max **20** per request,
+≤ 50 MB each, **the whole request ≤ 60 MB**) and optionally the same number of repeated `clientIds`, echoed back.
+Send large selections as several requests of a few files each (2 in parallel is plenty).
+→ `200 organizer_photos_uploaded`:
+
+```json
+{ "acceptedCount": 2, "rejectedCount": 1, "creditBalance": 178,
+  "results": [
+    { "clientId": "local-1", "photoId": "00045", "fileName": "00045.jpg", "status": "queued", "errorCode": null },
+    { "clientId": "local-2", "photoId": "00046", "fileName": "00046.jpg", "status": "queued", "errorCode": null },
+    { "clientId": "local-3", "photoId": null, "fileName": null, "status": "rejected", "errorCode": "duplicate_photo" } ] }
+```
+
+Each file is accepted or rejected on its own. `status`: `queued` (waiting for face processing), `ready`
+(event without face search), `rejected`. `fileName` is our name; the uploaded file name is not kept.
+Per-file `errorCode`: `unsupported_file_type`, `unreadable_image`, `file_too_large`, `duplicate_photo`
+(same file already in this event, not charged), `insufficient_credits` (balance at the floor: buy credits).
+Errors for the whole request: `410 event_expired`, `422 too_many_files`, `422 validation_error` (clientIds count).
+
+**`GET /api/organizer/events/{code}/photos?status=&cursor=0&limit=100`** → `200 organizer_photos_retrieved`:
+
+```json
+{ "photos": [ { "id": "00017", "fileName": "00017.jpg", "status": "ready", "faceCount": 3,
+                "thumbnailUrl": "/api/organizer/events/RK238/photos/00017/thumb.jpg",
+                "displayUrl": "/api/organizer/events/RK238/photos/00017/display.jpg",
+                "width": 1600, "height": 1200, "takenAt": "2026-06-12T18:14:00+00:00",
+                "uploadedAt": "2026-10-18T18:30:00+00:00", "errorCode": null } ],
+  "total": 1, "counts": { "queued": 0, "processing": 0, "ready": 1, "failed": 0 }, "nextCursor": null }
+```
+
+Upload order. `status` filter: `queued`, `processing`, `ready`, `failed`; `counts` always covers the whole event.
+`faceCount` is `null` until processed. `failed` (rare) means face processing gave up on the photo; it stays
+in the event and the gallery's "all photos", and we look at it on our side; there is no retry button.
+Files: `GET …/photos/{photoId}/thumb.jpg`, `…/display.jpg` (the organizer sees every photo).
+
+**`DELETE /api/organizer/events/{code}/photos`** — JSON `{ "photoIds": ["00017", "00018"] }` →
+`200 organizer_photos_deleted` `{ affectedCount, creditBalance }`. Files and face data go at once; no refund.
+Unknown ids are skipped.
+
+**`GET /api/organizer/events/{code}/participants`** → `200 organizer_participants_retrieved`:
+
+```json
+{ "participants": [ { "membershipId": "123", "displayName": "Ece Yılmaz", "maskedPhone": "•••••••••4218",
+                      "joinedAt": "2026-10-18T15:42:00+00:00", "lastActiveAt": "2026-10-18T20:12:00+00:00",
+                      "hasConsent": true, "matchStatus": "completed", "matchedPhotoCount": 18 } ],
+  "total": 1, "counts": { "completed": 1, "pending": 0, "failed": 0 } }
+```
+
+Most recently active first. `matchStatus`: `consent_pending` (no KVKK consent yet) → `selfie_pending` (no selfie)
+→ `processing` (selfie being checked) → `completed` (matching runs; `matchedPhotoCount` = photos they are in), or
+`failed` (selfie rejected; they need to upload a new one). `counts.pending` = consent_pending + selfie_pending +
+processing. No phone numbers, selfies or face data are returned.
+
+**`GET /api/organizer/credits`** → `200 credit_store_retrieved`:
+
+```json
+{ "creditBalance": 1840, "pricingVersion": "3f9a1c0b2d4e",
+  "packages": [ { "id": "2", "name": "1000cr", "creditAmount": 1000, "price": 1800.0, "currency": "TRY",
+                  "unitPrice": 1.8, "discountPercent": 10, "featured": true } ],
+  "purchases": [ { "id": "7", "creditAmount": 1000, "ref": "…", "purchasedAt": "2026-10-19T08:30:00+00:00" } ] }
+```
+
+Packages are managed in the admin (name, credits, price, currency, active, featured, order). `discountPercent` is
+against the package with the highest unit price. `pricingVersion` changes whenever a package or price changes.
+
+**`POST /api/organizer/credit-purchases`** `{ "packageId": "2", "pricingVersion": "3f9a1c0b2d4e" }`: checks the
+package and the price version, then would start the payment. **Payment is not connected yet** (provider: iyzico):
+it answers `501 payment_not_available`; credits are added by us by hand meanwhile. Errors: `404 not_found` (package),
+`409 pricing_changed` (reload the store). The flow will be: pick a package → pay → credits arrive; no cart.
+
 ## 4. Flows
 
 **Guest via QR** (`/…?event=RK238` in cp-web):
@@ -309,8 +452,9 @@ A photo the user may not see answers `404 photo_not_found`.
 7. `gallery` → `GET /api/events/RK238/gallery` (+ `view=all` tab when `canBrowseAll`).
 
 **Organizer sign-in** (organizer entry page): same OTP calls with `"role": "organizer"` and no `eventCode`;
-`nextStep` is `organizer_home`. The organizer API (events, uploads, credits) is not in this version;
-organizers use cp-core's Django pages at `/o/` for now.
+`nextStep` is `organizer_home`. Then `GET /api/organizer/dashboard`; create with `POST /api/organizer/events`;
+upload: `photo-upload-check` with the selected count → (not eligible: credit store) → `POST …/photos` in batches →
+poll `GET …/photos` (or the event) while `pendingPhotoCount > 0`. Share `joinUrl`.
 
 ## 5. Changes from cp-web's draft contract
 
@@ -339,7 +483,27 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 | 19 | `DELETE /api/auth/session` | Same | — |
 | 20 | Error `code` values | See §2 table | Map codes to messages |
 
+### 5b. Organizer API vs cp-web's draft (`docs/api/organizer-dashboard.md`, 2026-10-19)
+
+| # | Draft (cp-web) | cp-core | Action in cp-web |
+| --- | --- | --- | --- |
+| O1 | `eventId` (`evt_123`) in paths | The event **code** (`RK238`); `id` = code in the event object | Use `id` or `code` in paths, as before |
+| O2 | Status `draft` / `active` / `archived`; `PUT …/activation {confirmed}`; `activatedAt` | No draft: `active` on create, `access_closed` (organizer closed it), `expired`. No activation endpoint, no `activatedAt` | Drop the activation step/modal; `joinUrl` is always set. Open/close with `PATCH {status}` |
+| O3 | `POST /events` returns `{event, nextStep: "event_setup"}` | `{event}` | Ignore `nextStep` |
+| O4 | `availableCredits` | `creditBalance` (dashboard, upload check, upload, delete, store); may be negative | Rename; show negative balances as they are |
+| O5 | Event detail `matchedPhotoCount` | Not provided; per-participant counts are in the participants list | Drop the stat or sum the participants' counts |
+| O6 | Event object without settings | Adds `hasFaceSearch`, `allowsBrowseAll`, `requiresConsent`, `pendingPhotoCount`, `failedPhotoCount`, `coverIsUploaded`, `createdAt`; `PATCH` changes them | Settings tab can use them |
+| O7 | Upload result `{clientId, fileName, status: ready\|rejected, errorCode: photo_invalid}` | Adds `photoId`; `fileName` is our name (`00045.jpg`, `null` when rejected); `status` `queued` \| `ready` \| `rejected`; specific `errorCode`s | Map the codes; match results by `clientId`. Max 20 files and 60 MB per request |
+| O8 | Photo list `{id, fileName, thumbnailUrl, status, uploadedAt, errorCode}` | Adds `faceCount`, `displayUrl`, `width`, `height`, `takenAt`, `nextCursor`; `?status=` filter, paging | — |
+| O9 | `POST …/photos/retry` | Removed: a failed photo is rare and fixed on our side | Remove the retry action |
+| O10 | Participants: `joinMethod`, `accessStatus`, `DELETE …/participants/{id}/access` (revoke) | Not in v1 (no revoke); `matchStatus` adds `consent_pending`, drops `matching_pending`; adds `hasConsent`; `counts` has no `active` | Remove revoke and those fields |
+| O11 | Credit packages `{id, creditAmount, price, currency, discountPercent, unitPrice, featured}` | Adds `name` ("1000cr"); amounts from the admin, not fixed to 500/1000/3000 | Type `creditAmount` as `number` |
+| O12 | `POST /credit-purchases` completes as `paid` (demo) | `501 payment_not_available` until iyzico is connected; `404`/`409 pricing_changed` checked first | Show "not available yet" on 501 |
+| O13 | Cover: only at create, max 8 MB | Also `POST …/cover` / `DELETE …/cover` any time; cover URL is same-origin | — |
+| O14 | Plain `fetch` for POST/PUT/DELETE in `organizer-service.ts` | Every unsafe request needs `X-CSRFToken` | Use `apiMutation` for all of them (today they fail with `403 csrf_failed`) |
+
 ## 6. Not yet in this API
 
-Organizer endpoints (create event, upload, credits), ZIP download of several photos, event cover
-images, real SMS delivery, email login. Ask before building screens that need them.
+Credit payment (iyzico), organizer activity feed, participant access revoke, choosing the cover from
+the event's photos, covers for participants (`coverThumbnailUrl` in `/api/me/events`), ZIP download of
+several photos, real SMS delivery, email login. Ask before building screens that need them.

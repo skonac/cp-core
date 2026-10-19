@@ -28,7 +28,7 @@ def candidates():
 def _pick():
     """Lock and return the next image, or None. Must run inside a transaction."""
     # 1. Selfies first, oldest first: a guest is waiting on the screen.
-    selfie = (candidates().filter(is_selfie=True).order_by("created_at")
+    selfie = (candidates().filter(kind=Image.Kind.SELFIE).order_by("created_at")
               .select_for_update(skip_locked=True).first())
     if selfie:
         return selfie
@@ -36,11 +36,11 @@ def _pick():
     #    oldest photo. Events that are expired or have face processing off are skipped.
     running = (Event.objects
                .filter(status__in=[Event.Status.OPEN, Event.Status.CLOSED], is_processing_faces=True)
-               .filter(Exists(candidates().filter(event=OuterRef("pk"))))
+               .filter(Exists(candidates().filter(event=OuterRef("pk"), kind=Image.Kind.PHOTO)))
                .order_by(F("last_claimed_at").asc(nulls_first=True), "id")
                .values_list("pk", flat=True))
     for event_id in running[:5]:   # more than one only if another worker holds the first event's rows
-        photo = (candidates().filter(event_id=event_id).order_by("created_at")
+        photo = (candidates().filter(event_id=event_id, kind=Image.Kind.PHOTO).order_by("created_at")
                  .select_for_update(skip_locked=True).first())
         if photo:
             Event.objects.filter(pk=event_id).update(last_claimed_at=timezone.now())
@@ -71,7 +71,7 @@ def claim(worker_id: str):
 
 def queue_counts() -> dict:
     c = candidates()
-    return {"selfies": c.filter(is_selfie=True).count(), "photos": c.filter(is_selfie=False).count()}
+    return {"selfies": c.filter(kind=Image.Kind.SELFIE).count(), "photos": c.filter(kind=Image.Kind.PHOTO).count()}
 
 
 # ---------------------------------------------------------------------------- results

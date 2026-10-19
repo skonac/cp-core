@@ -108,3 +108,45 @@ class KvkkConsentTests(TestCase):
         user.refresh_from_db()
         self.assertTrue(user.is_consent)
         self.assertEqual(ConsentLog.objects.get().locale, "en")
+
+
+class MasterPassTest(TestCase):
+    """CP_MASTER_PASS (non-production): any OTP code, any account's password; off when empty."""
+
+    def setUp(self):
+        from accounts.models import User
+        self.user = User.objects.create_user("+905550000077", "own-password")
+
+    def _challenge(self):
+        from django.core.cache import cache
+
+        from accounts.otp import request_code
+        cache.clear()   # rate limiter
+        return request_code("+905550000077", "participant", None, "127.0.0.1")
+
+    @override_settings(MASTER_PASS="12345")
+    def test_otp_and_password(self):
+        from django.contrib.auth import authenticate
+
+        from accounts.otp import verify_code
+        user, is_new, _ = verify_code(self._challenge().pk, "12345")
+        self.assertEqual((user, is_new), (self.user, False))
+        self.assertEqual(authenticate(username="+905550000077", password="12345"), self.user)
+        self.assertEqual(authenticate(username="+905550000077", password="own-password"), self.user)
+        self.assertIsNone(authenticate(username="+905550000077", password="1234"))
+        self.assertTrue(self.client.login(phone="+905550000077", password="12345"))
+
+    @override_settings(MASTER_PASS="")
+    def test_off_when_empty(self):
+        from django.contrib.auth import authenticate
+
+        from accounts.otp import verify_code
+        from common.api import ApiError
+        with self.assertRaises(ApiError):
+            verify_code(self._challenge().pk, "")
+        self.assertIsNone(authenticate(username="+905550000077", password=""))
+
+    @override_settings(MASTER_PASS="12345", DEBUG=False)
+    def test_check_refuses_production(self):
+        from accounts.apps import check_master_pass
+        self.assertEqual([e.id for e in check_master_pass()], ["cp.E003"])

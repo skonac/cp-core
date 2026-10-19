@@ -5,6 +5,26 @@ from django.db import models
 from django.utils import timezone
 
 
+class CreditPackage(models.Model):
+    """A credit package for sale ("1000cr": 1000 credits for a price). Edited in the admin only.
+    Change a price by editing the row: the store's pricingVersion (a hash of the active packages)
+    changes with it, so a purchase started at the old price is refused."""
+    name = models.CharField(max_length=40)                          # "1000cr"; shown to organizers
+    credits = models.PositiveIntegerField()                         # credits the package adds
+    price = models.DecimalField(max_digits=10, decimal_places=2)    # what the organizer pays
+    currency = models.CharField(max_length=3, default="TRY")
+    is_active = models.BooleanField(default=True)                   # False: hidden from the store
+    is_featured = models.BooleanField(default=False)                # highlighted in the store
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["sort_order", "credits"]
+
+    def __str__(self):
+        return f"{self.name} ({self.credits} cr, {self.price} {self.currency})"
+
+
 class CreditTransaction(models.Model):
     class Kind(models.TextChoices):
         PURCHASE = "purchase"

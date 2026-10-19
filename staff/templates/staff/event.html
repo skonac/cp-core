@@ -12,7 +12,7 @@
     <tr><td>Face processing</td><td>{{ event.is_processing_faces|yesno:"on,off" }}</td></tr>
     <tr><td>Browse all</td><td>{{ event.is_browse_all|yesno:"allowed,no" }}</td></tr>
     <tr><td>Consent required</td><td>{{ event.is_consent_required|yesno:"yes,no" }}</td></tr>
-    <tr><td>Cover</td><td>{% if cover %}<a href="{% url 'staff:image' cover.id %}">{{ cover.seq_str }}</a>{% if not event.cover_image %} <span class="muted">(first photo)</span>{% endif %}{% else %}—{% endif %}</td></tr>
+    <tr><td>Cover</td><td>{% if cover %}<a href="{% url 'staff:image' cover.id %}">{% if cover.is_cover %}uploaded cover {{ cover.id }}{% else %}photo {{ cover.seq_str }}{% endif %}</a>{% if not event.cover_image %} <span class="muted">(first photo)</span>{% endif %}{% else %}—{% endif %}</td></tr>
     <tr><td>Next number</td><td>{{ event.next_seq }}</td></tr>
     <tr><td>Worker last served</td><td>{{ event.last_claimed_at|date:"Y-m-d H:i:s"|default:"never" }}</td></tr>
     <tr><td>Created / updated</td><td>{{ event.created_at|date:"Y-m-d H:i" }} / {{ event.updated_at|date:"Y-m-d H:i" }}</td></tr>

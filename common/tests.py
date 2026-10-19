@@ -30,7 +30,7 @@ class ApiContractTests(TempMedia, TestCase):
         cache.clear()
         self.owner = User.objects.create_user("+905550000001", is_organizer=True, credit_balance=100,
                                               email="owner@example.com")
-        self.event = make_event(self.owner, name="Derya & Can", location_label="İstanbul")
+        self.event = make_event(self.owner, name="Derya & Can", city="İstanbul")
         self.p_me = add_photo(self.event, 1, [face_of(ME, 1), face_of(STRANGER, 2)])
         self.p_other = add_photo(self.event, 2, [face_of(STRANGER, 3)])
         self.p_me2 = add_photo(self.event, 3, [face_of(ME, 4)])
@@ -168,7 +168,8 @@ class ApiContractTests(TempMedia, TestCase):
 
         # --- every API endpoint was called (add new endpoints to this test)
         called = {(m, _norm(route)) for m, route, _ in c.checked}
-        documented = {(m.upper(), _norm(path)) for path, ops in api.get_openapi_schema()["paths"].items() for m in ops}
+        documented = {(m.upper(), _norm(path)) for path, ops in api.get_openapi_schema()["paths"].items() for m in ops
+                      if not path.startswith("/api/organizer/")}   # those: events/tests_organizer.py
         self.assertEqual(documented - called, set(), "endpoints never called by this test")
 
 

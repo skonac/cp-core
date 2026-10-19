@@ -26,8 +26,9 @@ class UserAdmin(DjangoUserAdmin):
     form = UserEditForm
     ordering = ("-created_at",)
     search_fields = ("phone", "email", "full_name")
-    list_display = ("phone", "full_name", "email", "is_participant", "is_organizer", "kvkk_version",
+    list_display = ("id", "phone", "full_name", "email", "is_participant", "is_organizer", "kvkk_version",
                     "credit_balance", "is_staff", "created_at")
+    list_display_links = ("id", "phone")
     filter_horizontal = ()      # Django's UserAdmin lists groups/permissions here; we have none
     list_filter = ("is_participant", "is_organizer", "is_photographer", "kvkk_version", "is_staff", "is_active")
     readonly_fields = ("credit_balance", "kvkk_version", "created_at", "last_login")   # consent only via the consent step   # credits change via Credit transactions
@@ -49,7 +50,7 @@ admin.site.unregister(Group)   # no Django groups in cp-core: staff = full acces
 
 @admin.register(OtpChallenge)
 class OtpChallengeAdmin(admin.ModelAdmin):
-    list_display = ("phone", "dev_code", "role", "event", "created_at", "expires_at", "attempts", "consumed_at")
+    list_display = ("id", "phone", "dev_code", "role", "event", "created_at", "expires_at", "attempts", "consumed_at")
     search_fields = ("phone",)
     readonly_fields = [f.name for f in OtpChallenge._meta.fields]
 
@@ -57,7 +58,7 @@ class OtpChallengeAdmin(admin.ModelAdmin):
 @admin.register(ConsentLog)
 class ConsentLogAdmin(admin.ModelAdmin):
     """The legal record: read-only, no adding or deleting from the admin."""
-    list_display = ("created_at", "phone", "full_name", "version", "locale", "ip")
+    list_display = ("id", "created_at", "phone", "full_name", "version", "locale", "ip")
     list_filter = ("version", "locale")
     search_fields = ("phone", "full_name")
     readonly_fields = [f.name for f in ConsentLog._meta.fields]

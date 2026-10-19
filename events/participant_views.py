@@ -53,7 +53,7 @@ def _event_or_404(code) -> Event:
 
 
 def _photos(event):
-    return Image.objects.filter(event=event, is_selfie=False, deleted_at__isnull=True)
+    return Image.objects.filter(event=event, kind=Image.Kind.PHOTO, deleted_at__isnull=True)
 
 
 @login_required
@@ -152,14 +152,14 @@ def my_face(request):
             except IngestError as e:
                 messages.error(request, INGEST_MESSAGES.get(e.code, e.code))
         return redirect("participant:my_face")
-    selfies = {s.slot: s for s in Image.objects.filter(owner=request.user, is_selfie=True, deleted_at__isnull=True)}
+    selfies = {s.slot: s for s in Image.objects.filter(owner=request.user, kind=Image.Kind.SELFIE, deleted_at__isnull=True)}
     slots = [(slot, label, selfies.get(slot)) for slot, label in Image.Slot.choices]
     return render(request, "participant/my_face.html", {"slots": slots})
 
 
 @login_required
 def selfie_thumb(request, image_id):
-    image = get_object_or_404(Image, pk=image_id, owner=request.user, is_selfie=True, deleted_at__isnull=True)
+    image = get_object_or_404(Image, pk=image_id, owner=request.user, kind=Image.Kind.SELFIE, deleted_at__isnull=True)
     return file_response(image.relpath("t"))
 
 

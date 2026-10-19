@@ -10,14 +10,11 @@ from .models import Face, Image
 
 
 def user_faces(user):
-    return Face.objects.filter(image__owner=user, image__is_selfie=True, image__status=Image.Status.DONE,
+    return Face.objects.filter(image__owner=user, image__kind=Image.Kind.SELFIE, image__status=Image.Status.DONE,
                                image__num_faces=1, image__deleted_at__isnull=True)
 
 
-def selfie_state(user) -> str:
-    """no_selfie | selfie_processing | selfie_rejected | ready"""
-    selfies = list(Image.objects.filter(owner=user, is_selfie=True, deleted_at__isnull=True)
-                   .values_list("status", "num_faces"))
+def _state(selfies) -> str:
     if not selfies:
         return "no_selfie"
     if any(status == Image.Status.DONE and n == 1 for status, n in selfies):
@@ -27,13 +24,29 @@ def selfie_state(user) -> str:
     return "selfie_rejected"
 
 
+def selfie_state(user) -> str:
+    """no_selfie | selfie_processing | selfie_rejected | ready"""
+    return _state(list(Image.objects.filter(owner=user, kind=Image.Kind.SELFIE, deleted_at__isnull=True)
+                       .values_list("status", "num_faces")))
+
+
+def selfie_states(user_ids) -> dict[int, str]:
+    """selfie_state() for many users in one query."""
+    rows: dict[int, list] = {uid: [] for uid in user_ids}
+    for owner_id, status, n in (Image.objects.filter(owner_id__in=list(rows), kind=Image.Kind.SELFIE,
+                                                     deleted_at__isnull=True)
+                                .values_list("owner_id", "status", "num_faces")):
+        rows[owner_id].append((status, n))
+    return {uid: _state(selfies) for uid, selfies in rows.items()}
+
+
 def my_photos(user, event, threshold: float | None = None) -> dict[int, float]:
     """{image_id: best similarity} for this user's photos in this event. One query per selfie (max 2)."""
     threshold = settings.MATCH_THRESHOLD if threshold is None else threshold
     best: dict[int, float] = {}
     for embedding in user_faces(user).values_list("embedding", flat=True):
         rows = (Face.objects
-                .filter(image__event=event, image__is_selfie=False, image__deleted_at__isnull=True)
+                .filter(image__event=event, image__kind=Image.Kind.PHOTO, image__deleted_at__isnull=True)
                 .annotate(distance=CosineDistance("embedding", embedding))   # 1 - cosine similarity
                 .filter(distance__lte=1 - threshold)
                 .values_list("image_id", "distance"))
