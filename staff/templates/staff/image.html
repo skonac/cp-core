@@ -1,0 +1,76 @@
+{% extends "staff/_base.html" %}
+{% block title %}{% if image.is_selfie %}Selfie {{ image.id }}{% else %}{{ image.event.display_code }} {{ image.seq_str }}{% endif %} · staff{% endblock %}
+{% block staff %}
+<p class="small">
+{% if image.is_selfie %}<a href="{% url 'staff:user' image.owner_id %}">← {{ image.owner.phone }}</a>
+{% else %}<a href="{% url 'staff:event' image.event.code %}">← {{ image.event.display_code }} {{ image.event.name }}</a>
+  {% if prev %} · <a href="{% url 'staff:image' prev %}">previous</a>{% endif %}{% if next %} · <a href="{% url 'staff:image' next %}">next</a>{% endif %}{% endif %}
+</p>
+<h1>{% if image.is_selfie %}Selfie {{ image.id }} <span class="muted">({{ image.slot }})</span>{% else %}Photo {{ image.seq_str }}{% endif %}
+  <span class="pill {{ image.status }}">{{ image.status }}</span>{% if image.deleted_at %} <span class="pill failed">deleted {{ image.deleted_at|date:"Y-m-d H:i" }}</span>{% endif %}</h1>
+
+<div class="row" style="margin-top:12px">
+  <div class="card"><table class="kv t">
+    <tr><td>Image id</td><td>{{ image.id }} · <a href="/admin/media/image/{{ image.id }}/change/">admin</a></td></tr>
+    <tr><td>Owner</td><td><a href="{% url 'staff:user' image.owner_id %}">{{ image.owner.phone }}</a> {{ image.owner.full_name }}</td></tr>
+    <tr><td>Master (stored)</td><td>{{ image.width }}×{{ image.height }} · {{ image.bytes|filesizeformat }}</td></tr>
+    <tr><td>sha256</td><td class="small"><code>{{ image.sha256 }}</code></td></tr>
+    <tr><td>Taken</td><td>{{ image.taken_at|date:"Y-m-d H:i:s"|default:"—" }}</td></tr>
+    <tr><td>Uploaded</td><td>{{ image.created_at|date:"Y-m-d H:i:s" }}</td></tr>
+  </table></div>
+  <div class="card"><table class="kv t">
+    <tr><td>Faces</td><td>{% if image.num_faces is not None %}<a href="#faces">{{ image.num_faces }}</a>{% else %}—{% endif %}</td></tr>
+    <tr><td>Engine</td><td class="small">{{ image.engine|default:"—" }}</td></tr>
+    <tr><td>Processed</td><td>{{ image.processed_at|date:"Y-m-d H:i:s"|default:"—" }}</td></tr>
+    <tr><td>Worker / attempts</td><td>{{ image.worker|default:"—" }} / {{ image.attempts }}</td></tr>
+    <tr><td>Lease until</td><td>{{ image.processing_until|date:"Y-m-d H:i:s"|default:"—" }}</td></tr>
+    <tr><td>Last error</td><td class="wrap">{% if image.error %}<span style="color:var(--bad)">{{ image.error }}</span> {{ image.error_detail }}{% else %}—{% endif %}</td></tr>
+  </table></div>
+</div>
+
+<h2>Files</h2>
+<div class="scroll"><table class="t">
+<tr><th>Rendition</th><th>File</th><th>Pixels</th><th class="n">Bytes</th><th></th></tr>
+{% for r in renditions %}<tr>
+  <td>_{{ r.r }} {{ r.label }}</td><td><code class="small">{{ r.path }}</code></td>
+  {% if r.exists %}<td>{{ r.width }}×{{ r.height }}</td><td class="n">{{ r.bytes|filesizeformat }}</td><td><a href="{% url 'staff:image_file' image.id r.r %}" target="_blank">open</a></td>
+  {% else %}<td colspan="3" style="color:var(--bad)">missing</td>{% endif %}
+</tr>{% endfor %}
+</table></div>
+
+{% if not image.deleted_at %}
+<h2>Display image with faces</h2>
+<div style="position:relative; display:inline-block; max-width:100%">
+  <img src="{% url 'staff:image_file' image.id 'd' %}" alt="" style="display:block; max-width:100%; max-height:80vh; height:auto">
+  {% for f in faces %}
+  <div title="face {{ f.id }} · score {{ f.score|floatformat:3 }}" style="position:absolute; left:{{ f.box.left|stringformat:'.3f' }}%; top:{{ f.box.top|stringformat:'.3f' }}%; width:{{ f.box.width|stringformat:'.3f' }}%; height:{{ f.box.height|stringformat:'.3f' }}%; border:2px solid #39f; border-radius:3px; box-shadow:0 0 0 1px rgba(0,0,0,.4)">
+    <span style="position:absolute; top:-18px; left:-2px; background:#39f; color:#fff; font-size:11px; padding:0 4px; border-radius:3px">{{ forloop.counter }}</span>
+  </div>
+  {% endfor %}
+</div>
+<p class="small" style="margin-top:8px">
+  <a href="{% url 'staff:image_file' image.id 't' %}" target="_blank">_t</a> ·
+  <a href="{% url 'staff:image_file' image.id 'd' %}" target="_blank">_d</a>{% if not image.is_selfie %} ·
+  <a href="{% url 'staff:image_file' image.id 'm' %}" target="_blank">_m</a>{% endif %}</p>
+{% endif %}
+
+<h2 id="faces">Faces ({{ faces|length }})</h2>
+{% if faces %}<div class="scroll"><table class="t">
+<tr><th>#</th><th>Face id</th><th class="n">Score</th><th class="n">Width %</th><th>bbox (x1, y1, x2, y2)</th><th>Landmarks</th><th>Engine</th></tr>
+{% for f in faces %}<tr>
+  <td>{{ forloop.counter }}</td><td>{{ f.id }}</td><td class="n">{{ f.score|floatformat:3 }}</td><td class="n">{{ f.size_pct }}</td>
+  <td><code class="small">{% for v in f.bbox %}{{ v|floatformat:4 }}{% if not forloop.last %}, {% endif %}{% endfor %}</code></td>
+  <td class="wrap"><code class="small">{% for v in f.landmarks %}{{ v|floatformat:3 }}{% if not forloop.last %}, {% endif %}{% endfor %}</code></td>
+  <td class="small">{{ f.engine }}</td>
+</tr>{% endfor %}
+</table></div>{% else %}<p class="muted">No faces stored.</p>{% endif %}
+
+{% if downloads %}<h2>Downloads (last 20)</h2>
+<div class="scroll"><table class="t"><tr><th>When</th><th>User</th><th>IP</th></tr>
+{% for d in downloads %}<tr><td>{{ d.downloaded_at|date:"Y-m-d H:i:s" }}</td><td><a href="{% url 'staff:user' d.user_id %}">{{ d.user.phone }}</a></td><td>{{ d.ip }}</td></tr>{% endfor %}
+</table></div>{% endif %}
+
+<h2>EXIF</h2>
+{% if exif %}<div class="scroll"><table class="t kv">{% for k, v in exif %}<tr><td>{{ k }}</td><td class="wrap">{{ v }}</td></tr>{% endfor %}</table></div>
+{% else %}<p class="muted">None.</p>{% endif %}
+{% endblock %}

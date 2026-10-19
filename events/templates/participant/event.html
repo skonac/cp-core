@@ -21,7 +21,7 @@
 
   {% if view == "mine" %}
     {% if access.matching == "consent_required" %}
-      <div class="notice">To find the photos you are in, we need your consent to process a selfie. <a href="/consent/?next=/e/{{ event.code }}/">Give consent</a></div>
+      <div class="notice">To find the photos you are in, we need your consent to process a selfie. <a href="{% url 'participant:consent' %}?next={% url 'participant:event' event.code %}">Give consent</a></div>
     {% elif access.matching == "matching_off" %}
       <div class="notice">This event has no photo search.</div>
     {% elif access.matching == "no_selfie" %}
@@ -40,7 +40,7 @@
   {% if page %}
   <div class="grid">
     {% for img in page %}
-    <a href="{% url 'participant:photo' event.code img.seq %}"><img loading="lazy" src="/e/{{ event.code }}/photos/{{ img.seq_str }}_t.jpg" alt=""></a>
+    <a href="{% url 'participant:photo' event.code img.seq %}"><img loading="lazy" src="{% url 'participant:event' event.code %}photos/{{ img.seq_str }}_t.jpg" alt=""></a>
     {% endfor %}
   </div>
   {% if page.has_other_pages %}<p class="small">Page {{ page.number }} of {{ page.paginator.num_pages }} ·

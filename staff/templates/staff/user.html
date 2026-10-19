@@ -1,0 +1,76 @@
+{% extends "staff/_base.html" %}
+{% block title %}{{ u.phone }} · staff{% endblock %}
+{% block staff %}
+<p class="small"><a href="{% url 'staff:users' %}">← Users</a></p>
+<h1>{{ u.phone }}{% if u.full_name %} <span class="muted">{{ u.full_name }}</span>{% endif %}
+  {% for r in u.account_roles %}<span class="pill">{{ r }}</span> {% endfor %}{% if not u.is_active %}<span class="pill failed">locked</span>{% endif %}</h1>
+<p class="small"><a href="/admin/accounts/user/{{ u.id }}/change/">edit in admin</a>{% if u.is_organizer %} · <a href="/admin/credits/credittransaction/add/?user={{ u.id }}">adjust credits</a>{% endif %}</p>
+
+<div class="row" style="margin-top:12px">
+  <div class="card"><table class="kv t">
+    <tr><td>User id</td><td>{{ u.id }}</td></tr>
+    <tr><td>Phone verified</td><td>{{ u.phone_verified_at|date:"Y-m-d H:i"|default:"—" }}</td></tr>
+    <tr><td>Email</td><td>{{ u.email|default:"—" }}{% if u.email_verified_at %} (verified){% endif %}</td></tr>
+    <tr><td>Password login</td><td>{{ u.has_usable_password|yesno:"set,no" }}</td></tr>
+    <tr><td>Created / last login</td><td>{{ u.created_at|date:"Y-m-d H:i" }} / {{ u.last_login|date:"Y-m-d H:i"|default:"never" }}</td></tr>
+  </table></div>
+  <div class="card"><table class="kv t">
+    <tr><td>KVKK consent</td><td>{% if u.is_consent %}{{ u.kvkk_version }} (current){% elif u.kvkk_version %}<span style="color:var(--warn)">{{ u.kvkk_version }}, current is {{ kvkk_version }}</span>{% else %}never{% endif %}</td></tr>
+    <tr><td>Selfie state</td><td><span class="pill {% if selfie_state == 'ready' %}ready{% elif selfie_state == 'selfie_rejected' %}rejected{% endif %}">{{ selfie_state }}</span></td></tr>
+    <tr><td>Credit balance / floor</td><td>{{ u.credit_balance }} / {{ u.effective_credit_floor }}{% if u.credit_floor is None %} <span class="muted">(default)</span>{% endif %}</td></tr>
+    <tr><td>Photos uploaded</td><td>{{ uploads }}</td></tr>
+    <tr><td>Downloads</td><td>{{ download_total }}</td></tr>
+  </table></div>
+</div>
+
+<h2>Selfies</h2>
+{% if selfies %}<div class="scroll"><table class="t">
+<tr><th></th><th>Id</th><th>Slot</th><th>Status</th><th class="n">Faces</th><th>Error</th><th>Uploaded</th><th>Processed</th><th>Deleted</th></tr>
+{% for s in selfies %}<tr class="{% if s.deleted_at %}dim{% endif %}">
+  <td>{% if not s.deleted_at %}<a href="{% url 'staff:image' s.id %}"><img class="thumb" src="{% url 'staff:image_file' s.id 't' %}" alt=""></a>{% endif %}</td>
+  <td><a href="{% url 'staff:image' s.id %}">{{ s.id }}</a></td><td>{{ s.slot }}</td><td><span class="pill {{ s.status }}">{{ s.status }}</span></td>
+  <td class="n">{% if s.num_faces is not None %}<a href="{% url 'staff:image' s.id %}#faces">{{ s.num_faces }}</a>{% endif %}</td>
+  <td>{{ s.error }}</td><td>{{ s.created_at|date:"Y-m-d H:i" }}</td><td>{{ s.processed_at|date:"Y-m-d H:i:s" }}</td><td>{{ s.deleted_at|date:"Y-m-d H:i" }}</td>
+</tr>{% endfor %}</table></div>{% else %}<p class="muted">None.</p>{% endif %}
+
+<h2>Events joined ({{ memberships|length }})</h2>
+{% if memberships %}<div class="scroll"><table class="t">
+<tr><th>Code</th><th>Name</th><th>Status</th><th class="n">Their photos</th><th class="n">Event photos</th><th class="n">Pending</th><th>Joined</th><th>Last activity</th></tr>
+{% for m in memberships %}<tr>
+  <td><a class="code" href="{% url 'staff:event' m.event.code %}">{{ m.event.display_code }}</a></td><td>{{ m.event.name }}</td>
+  <td><span class="pill {{ m.event.status }}">{{ m.event.status }}</span></td>
+  <td class="n">{% if m.matched is not None %}<a href="{% url 'staff:event' m.event.code %}?as={{ u.id }}#photos">{{ m.matched }}</a>{% else %}—{% endif %}</td>
+  <td class="n">{{ m.photos.total }}</td><td class="n">{{ m.photos.pending|add:m.photos.processing|default:"" }}</td>
+  <td>{{ m.joined_at|date:"Y-m-d H:i" }}</td><td>{{ m.last_activity_at|date:"Y-m-d H:i" }}</td>
+</tr>{% endfor %}</table></div>{% else %}<p class="muted">None.</p>{% endif %}
+
+{% if owned or u.is_organizer %}<h2>Events owned ({{ owned|length }})</h2>
+{% if owned %}<div class="scroll"><table class="t">
+<tr><th>Code</th><th>Name</th><th>Status</th><th>Date</th><th class="n">Photos</th><th class="n">Pending</th><th class="n">Failed</th><th class="n">Members</th><th>Created</th></tr>
+{% for e in owned %}<tr>
+  <td><a class="code" href="{% url 'staff:event' e.code %}">{{ e.display_code }}</a></td><td>{{ e.name }}</td>
+  <td><span class="pill {{ e.status }}">{{ e.status }}</span></td><td>{{ e.date|date:"Y-m-d" }}</td>
+  <td class="n">{{ e.photos.total }}</td><td class="n">{{ e.photos.pending|add:e.photos.processing|default:"" }}</td>
+  <td class="n">{{ e.photos.failed|default:"" }}</td><td class="n">{{ e.member_count }}</td><td>{{ e.created_at|date:"Y-m-d H:i" }}</td>
+</tr>{% endfor %}</table></div>{% else %}<p class="muted">None.</p>{% endif %}{% endif %}
+
+{% if credits %}<h2>Credit transactions</h2>
+<div class="scroll"><table class="t"><tr><th>When</th><th class="n">Delta</th><th>Kind</th><th>Ref</th><th>By</th><th>Note</th></tr>
+{% for t in credits %}<tr><td>{{ t.created_at|date:"Y-m-d H:i" }}</td><td class="n">{{ t.delta|stringformat:"+d" }}</td><td>{{ t.kind }}</td><td>{{ t.ref }}</td><td>{{ t.actor.phone|default:"" }}</td><td class="wrap">{{ t.note }}</td></tr>{% endfor %}
+</table></div>{% endif %}
+
+<h2>Consent log</h2>
+{% if consents %}<div class="scroll"><table class="t"><tr><th>When</th><th>Version</th><th>Locale</th><th>IP</th><th>sha256</th><th>Browser</th></tr>
+{% for c in consents %}<tr><td>{{ c.created_at|date:"Y-m-d H:i:s" }}</td><td>{{ c.version }}</td><td>{{ c.locale }}</td><td>{{ c.ip }}</td><td><code class="small">{{ c.sha256|truncatechars:13 }}</code></td><td class="wrap small">{{ c.user_agent|truncatechars:80 }}</td></tr>{% endfor %}
+</table></div>{% else %}<p class="muted">None.</p>{% endif %}
+
+{% if downloads %}<h2>Downloads (last 20 of {{ download_total }})</h2>
+<div class="scroll"><table class="t"><tr><th>When</th><th>Photo</th><th>IP</th></tr>
+{% for d in downloads %}<tr><td>{{ d.downloaded_at|date:"Y-m-d H:i:s" }}</td><td><a href="{% url 'staff:image' d.image_id %}">{{ d.image.event.display_code }} {{ d.image.seq_str }}</a></td><td>{{ d.ip }}</td></tr>{% endfor %}
+</table></div>{% endif %}
+
+{% if otps %}<h2>Recent sign-in codes</h2>
+<div class="scroll"><table class="t"><tr><th>Sent</th><th>Role</th><th>Event</th><th>Dev code</th><th class="n">Wrong</th><th>Used</th><th>IP</th></tr>
+{% for o in otps %}<tr><td>{{ o.created_at|date:"Y-m-d H:i:s" }}</td><td>{{ o.role }}</td><td>{{ o.event.display_code|default:"" }}</td><td><code>{{ o.dev_code }}</code></td><td class="n">{{ o.attempts }}</td><td>{{ o.consumed_at|date:"H:i:s"|default:"" }}</td><td>{{ o.ip }}</td></tr>{% endfor %}
+</table></div>{% endif %}
+{% endblock %}

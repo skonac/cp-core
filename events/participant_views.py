@@ -1,4 +1,4 @@
-"""Participant pages (Django templates). Login is phone + password until SMS sign-in exists.
+"""Participant pages (Django templates), under /dj/. Login is phone + password until SMS sign-in exists.
 
     /e/<code>/                          event: my photos (+ all photos if the event allows)
     /e/<code>/photos/<seq>/             one photo, download button
@@ -17,6 +17,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
@@ -62,7 +63,7 @@ def event_page(request, code, view="mine"):
     touch_membership(request.user, event)
     access = access_for(request.user, event)
     if access.blocked == "consent_required":
-        return redirect(f"/consent/?next=/e/{event.code}/")
+        return redirect(f"{reverse('participant:consent')}?next={reverse('participant:event', args=[event.code])}")
     if view == "all" and not access.can_browse:
         return redirect("participant:event", code=event.code)
     if view == "mine" and not access.can_match and access.can_browse:
@@ -139,7 +140,7 @@ def my_events(request):
 def my_face(request):
     if request.method == "POST":
         if not request.user.is_consent:
-            return redirect("/consent/?next=/me/face/")
+            return redirect(f"{reverse('participant:consent')}?next={reverse('participant:my_face')}")
         upload = request.FILES.get("file")
         slot = request.POST.get("slot", "primary")
         if upload is None:
@@ -164,9 +165,9 @@ def selfie_thumb(request, image_id):
 
 @login_required
 def consent(request):
-    next_url = request.GET.get("next") or request.POST.get("next") or "/me/"
+    next_url = request.GET.get("next") or request.POST.get("next") or reverse("participant:my_events")
     if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
-        next_url = "/me/"
+        next_url = reverse("participant:my_events")
     if request.method == "POST" and request.POST.get("agree") == "yes":
         if request.POST.get("version") != settings.KVKK_VERSION:   # the document changed while the page was open
             messages.error(request, "The consent text has been updated; please read the current version.")

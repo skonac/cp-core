@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "media",      # Image (also the worker queue), Face, DownloadLog
     "credits",    # CreditTransaction
     "worker",     # face worker API, Worker (monitoring)
+    "staff",      # staff data browser pages (/dj/staff/): no models
 ]
 
 AUTH_USER_MODEL = "accounts.User"   # must exist before the first migrate

@@ -1,0 +1,20 @@
+{% extends "staff/_base.html" %}
+{% block title %}Users · staff{% endblock %}
+{% block staff %}
+<h1>Users <span class="muted">({{ page.paginator.count }})</span></h1>
+<form method="get" class="filters"><input type="text" name="q" value="{{ q }}" placeholder="phone, name or email" style="max-width:260px"> <button class="secondary">Search</button>{% if q %} <a href="?">clear</a>{% endif %}</form>
+{% include "staff/_pager.html" %}
+<div class="scroll"><table class="t">
+<tr><th>Phone</th><th>Name</th><th>Email</th><th>Roles</th><th>Consent</th><th>Selfie</th><th class="n">Joined</th><th class="n">Owns</th><th class="n">Credits</th><th>Last login</th><th>Created</th></tr>
+{% for u in page %}<tr class="{% if not u.is_active %}dim{% endif %}">
+  <td><a href="{% url 'staff:user' u.id %}">{{ u.phone }}</a></td><td>{{ u.full_name }}</td><td>{{ u.email|default:"" }}</td>
+  <td>{{ u.account_roles|join:", " }}{% if not u.is_active %} <span class="pill failed">locked</span>{% endif %}</td>
+  <td>{% if u.kvkk_version == kvkk_version %}{{ u.kvkk_version }}{% elif u.kvkk_version %}<span style="color:var(--warn)">{{ u.kvkk_version }} (old)</span>{% else %}—{% endif %}</td>
+  <td><span class="pill {% if u.selfie_state == 'ready' %}ready{% elif u.selfie_state == 'selfie_rejected' %}rejected{% endif %}">{{ u.selfie_state }}</span></td>
+  <td class="n">{{ u.joined|default:"" }}</td><td class="n">{{ u.owned|default:"" }}</td>
+  <td class="n">{% if u.is_organizer or u.credit_balance %}{{ u.credit_balance }}{% endif %}</td>
+  <td>{{ u.last_login|date:"Y-m-d H:i"|default:"" }}</td><td>{{ u.created_at|date:"Y-m-d H:i" }}</td>
+</tr>{% empty %}<tr><td colspan="11" class="muted">No users.</td></tr>{% endfor %}
+</table></div>
+{% include "staff/_pager.html" %}
+{% endblock %}

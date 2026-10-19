@@ -1,0 +1,36 @@
+{% extends "staff/_base.html" %}
+{% block title %}Worker · staff{% endblock %}
+{% block staff %}
+<h1>Worker &amp; queue</h1>
+<h2>Workers</h2>
+<div class="scroll"><table class="t"><tr><th>Worker id</th><th>Version</th><th>IP</th><th>Last poll</th><th></th></tr>
+{% for w in workers %}<tr><td>{{ w.worker_id }}</td><td>{{ w.version }}</td><td>{{ w.ip }}</td><td>{{ w.last_seen_at|date:"Y-m-d H:i:s" }}</td>
+  <td>{% if w.silent_s > 60 %}<span class="pill failed">silent {{ w.silent_s }} s</span>{% else %}<span class="pill done">live</span>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="5" class="muted">No worker has polled yet.</td></tr>{% endfor %}
+</table></div>
+
+<h2>Queue</h2>
+<p>Selfies waiting: <b>{{ selfies_waiting }}</b></p>
+<div class="scroll"><table class="t"><tr><th>Event</th><th>Status</th><th>Faces on</th><th class="n">Pending</th><th class="n">Processing</th></tr>
+{% for q in queue_events %}<tr><td><a class="code" href="{% url 'staff:event' q.event__code %}?status=pending#photos">{{ q.event__code|upper }}</a> {{ q.event__name }}</td>
+  <td>{{ q.event__status }}</td><td>{{ q.event__is_processing_faces|yesno:"yes,no (stays pending)" }}</td><td class="n">{{ q.pending }}</td><td class="n">{{ q.processing }}</td></tr>
+{% empty %}<tr><td colspan="5" class="muted">No event photos waiting.</td></tr>{% endfor %}
+</table></div>
+
+{% if processing %}<h2>Being processed now</h2>
+<div class="scroll"><table class="t"><tr><th>Image</th><th>Worker</th><th class="n">Attempt</th><th>Lease until</th></tr>
+{% for i in processing %}<tr><td><a href="{% url 'staff:image' i.id %}">{% if i.is_selfie %}selfie {{ i.id }}{% else %}{{ i.event.display_code }} {{ i.seq_str }}{% endif %}</a></td><td>{{ i.worker }}</td><td class="n">{{ i.attempts }}</td><td>{{ i.processing_until|date:"H:i:s" }}</td></tr>{% endfor %}
+</table></div>{% endif %}
+
+<h2>Failed ({{ failed|length }})</h2>
+{% if failed %}<div class="scroll"><table class="t"><tr><th>Image</th><th>Owner</th><th class="n">Attempts</th><th>Error</th><th>Detail</th><th>Uploaded</th></tr>
+{% for i in failed %}<tr><td><a href="{% url 'staff:image' i.id %}">{% if i.is_selfie %}selfie {{ i.id }}{% else %}{{ i.event.display_code }} {{ i.seq_str }}{% endif %}</a></td>
+  <td><a href="{% url 'staff:user' i.owner_id %}">{{ i.owner.phone }}</a></td><td class="n">{{ i.attempts }}</td>
+  <td style="color:var(--bad)">{{ i.error }}</td><td class="wrap small">{{ i.error_detail|truncatechars:200 }}</td><td>{{ i.created_at|date:"Y-m-d H:i" }}</td></tr>{% endfor %}
+</table></div>{% else %}<p class="muted">None.</p>{% endif %}
+
+{% if had_errors %}<h2>Done after an error (last 50)</h2>
+<div class="scroll"><table class="t"><tr><th>Image</th><th class="n">Attempts</th><th>Error</th><th>Detail</th><th>Processed</th></tr>
+{% for i in had_errors %}<tr><td><a href="{% url 'staff:image' i.id %}">{% if i.is_selfie %}selfie {{ i.id }}{% else %}{{ i.event.display_code }} {{ i.seq_str }}{% endif %}</a></td><td class="n">{{ i.attempts }}</td><td>{{ i.error }}</td><td class="wrap small">{{ i.error_detail|truncatechars:200 }}</td><td>{{ i.processed_at|date:"Y-m-d H:i" }}</td></tr>{% endfor %}
+</table></div>{% endif %}
+{% endblock %}

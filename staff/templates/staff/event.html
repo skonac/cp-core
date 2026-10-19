@@ -1,0 +1,66 @@
+{% extends "staff/_base.html" %}
+{% block title %}{{ event.display_code }} · staff{% endblock %}
+{% block staff %}
+<p class="small"><a href="{% url 'staff:events' %}">← Events</a></p>
+<h1><span class="code">{{ event.display_code }}</span> {{ event.name }} <span class="pill {{ event.status }}">{{ event.status }}</span></h1>
+<p class="muted small">{{ event.type }} · {{ event.date|date:"Y-m-d" }}{% if event.location_label %} · {{ event.location_label }}{% endif %}
+ · owner <a href="{% url 'staff:user' event.owner_id %}">{{ event.owner.phone }}</a>{% if event.owner.full_name %} {{ event.owner.full_name }}{% endif %}
+ · <a href="{% url 'organizer:event' event.code %}">organizer page</a> · <a href="{% url 'participant:event' event.code %}">participant page</a> · <a href="/admin/events/event/{{ event.id }}/change/">admin</a></p>
+
+<div class="row" style="margin-top:12px">
+  <div class="card"><table class="kv t">
+    <tr><td>Face processing</td><td>{{ event.is_processing_faces|yesno:"on,off" }}</td></tr>
+    <tr><td>Browse all</td><td>{{ event.is_browse_all|yesno:"allowed,no" }}</td></tr>
+    <tr><td>Consent required</td><td>{{ event.is_consent_required|yesno:"yes,no" }}</td></tr>
+    <tr><td>Cover</td><td>{% if cover %}<a href="{% url 'staff:image' cover.id %}">{{ cover.seq_str }}</a>{% if not event.cover_image %} <span class="muted">(first photo)</span>{% endif %}{% else %}—{% endif %}</td></tr>
+    <tr><td>Next number</td><td>{{ event.next_seq }}</td></tr>
+    <tr><td>Worker last served</td><td>{{ event.last_claimed_at|date:"Y-m-d H:i:s"|default:"never" }}</td></tr>
+    <tr><td>Created / updated</td><td>{{ event.created_at|date:"Y-m-d H:i" }} / {{ event.updated_at|date:"Y-m-d H:i" }}</td></tr>
+  </table></div>
+  <div class="card"><div class="stats">
+    <div><b>{{ counts.total }}</b>photos</div><div><b>{{ counts.pending }}</b>pending</div>
+    <div><b>{{ counts.processing }}</b>processing</div><div><b>{{ counts.done }}</b>done</div>
+    <div><b>{{ counts.failed }}</b>failed</div><div><b>{{ counts.deleted }}</b>deleted</div>
+    <div><b>{{ members|length }}</b>members</div></div></div>
+  {% if cover %}<div class="card" style="flex:0 0 auto"><img src="{% url 'staff:image_file' cover.id 't' %}" style="height:120px;display:block;border-radius:4px" alt=""></div>{% endif %}
+</div>
+
+<h2>Members ({{ members|length }})</h2>
+{% if members %}<div class="scroll"><table class="t">
+<tr><th>Phone</th><th>Name</th><th>Consent</th><th>Selfie</th><th class="n">Matched</th><th>Joined</th><th>Last activity</th><th></th></tr>
+{% for m in members %}<tr>
+  <td><a href="{% url 'staff:user' m.user_id %}">{{ m.user.phone }}</a></td><td>{{ m.user.full_name }}</td>
+  <td>{{ m.user.is_consent|yesno:"yes,—" }}</td><td><span class="pill {% if m.selfie_state == 'ready' %}ready{% elif m.selfie_state == 'selfie_rejected' %}rejected{% endif %}">{{ m.selfie_state }}</span></td>
+  <td class="n">{% if m.matched is not None %}<a href="?as={{ m.user_id }}">{{ m.matched }}</a>{% else %}—{% endif %}</td>
+  <td>{{ m.joined_at|date:"Y-m-d H:i" }}</td><td>{{ m.last_activity_at|date:"Y-m-d H:i" }}</td>
+  <td class="small"><a href="?as={{ m.user_id }}">their photos</a></td>
+</tr>{% endfor %}
+</table></div>{% else %}<p class="muted">Nobody has opened this event yet.</p>{% endif %}
+
+<h2 id="photos">{% if as_user %}Photos of <a href="{% url 'staff:user' as_user.id %}">{{ as_user.phone }}</a>{% if as_user.full_name %} {{ as_user.full_name }}{% endif %} ({{ page.paginator.count }}){% else %}Photos ({{ page.paginator.count }}){% endif %}</h2>
+<div class="filters">
+  {% if as_user %}<a href="?">× show all photos</a> ·{% endif %}
+  Status: <a href="?{% if as_user %}as={{ as_user.id }}&{% endif %}{% if show_deleted %}deleted=1{% endif %}#photos" class="{% if not status_filter %}on{% endif %}">all</a>
+  {% for s in statuses %}<a href="?status={{ s }}{% if as_user %}&as={{ as_user.id }}{% endif %}{% if show_deleted %}&deleted=1{% endif %}#photos" class="{% if status_filter == s %}on{% endif %}">{{ s }}</a>{% endfor %}
+  · {% if show_deleted %}<a href="?{% if status_filter %}status={{ status_filter }}{% endif %}{% if as_user %}&as={{ as_user.id }}{% endif %}#photos">hide deleted</a>{% else %}<a href="?deleted=1{% if status_filter %}&status={{ status_filter }}{% endif %}{% if as_user %}&as={{ as_user.id }}{% endif %}#photos">show deleted</a>{% endif %}
+  {% if as_user %}<span class="muted">· match threshold {{ threshold }}</span>{% endif %}
+</div>
+{% include "staff/_pager.html" %}
+<div class="scroll"><table class="t">
+<tr><th></th><th>#</th><th>Status</th><th class="n">Faces</th>{% if as_user %}<th class="n">Score</th>{% endif %}<th class="n">Tries</th><th>Error</th>
+    <th>Master</th><th class="n">Bytes</th><th>Taken</th><th>Uploaded</th><th>Processed</th><th>Worker</th></tr>
+{% for img in page %}<tr class="{% if img.deleted_at %}dim{% endif %}">
+  <td>{% if not img.deleted_at %}<a href="{% url 'staff:image' img.id %}"><img class="thumb" loading="lazy" src="{% url 'staff:image_file' img.id 't' %}" alt=""></a>{% endif %}</td>
+  <td><a class="code" href="{% url 'staff:image' img.id %}">{{ img.seq_str }}</a>{% if img.deleted_at %} <span class="muted">deleted</span>{% endif %}{% if event.cover_image_id == img.id %} <span class="pill">cover</span>{% endif %}</td>
+  <td><span class="pill {{ img.status }}">{{ img.status }}</span></td>
+  <td class="n">{% if img.num_faces is not None %}<a href="{% url 'staff:image' img.id %}#faces">{{ img.num_faces }}</a>{% endif %}</td>
+  {% if as_user %}<td class="n">{{ img.score|floatformat:3 }}</td>{% endif %}
+  <td class="n">{{ img.attempts }}</td>
+  <td>{% if img.error %}<span style="color:var(--bad)" title="{{ img.error_detail }}">{{ img.error }}</span>{% endif %}</td>
+  <td>{{ img.width }}×{{ img.height }}</td><td class="n">{{ img.bytes|filesizeformat }}</td>
+  <td>{{ img.taken_at|date:"Y-m-d H:i:s" }}</td><td>{{ img.created_at|date:"m-d H:i:s" }}</td>
+  <td>{{ img.processed_at|date:"m-d H:i:s" }}</td><td>{{ img.worker }}</td>
+</tr>{% empty %}<tr><td colspan="13" class="muted">No photos.</td></tr>{% endfor %}
+</table></div>
+{% include "staff/_pager.html" %}
+{% endblock %}

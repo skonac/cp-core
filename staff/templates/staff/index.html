@@ -1,0 +1,37 @@
+{% extends "staff/_base.html" %}
+{% block title %}Staff{% endblock %}
+{% block staff %}
+<h1>Staff</h1>
+<p class="muted small">Read-only views over all data. Changes: <a href="/admin/">Django admin</a>.</p>
+<div class="card stats" style="margin:14px 0">
+  <div><b><a href="{% url 'staff:users' %}">{{ stats.users }}</a></b>users</div>
+  <div><b>{{ stats.organizers }}</b>organizers</div>
+  <div><b><a href="{% url 'staff:events' %}">{{ stats.events }}</a></b>events</div>
+  <div><b>{{ stats.photos }}</b>photos</div>
+  <div><b>{{ stats.selfies }}</b>selfies</div>
+  <div><b>{{ stats.faces }}</b>faces</div>
+  <div><b><a href="{% url 'staff:worker' %}">{{ stats.queue }}</a></b>in queue</div>
+  <div><b><a href="{% url 'staff:worker' %}" {% if stats.failed %}style="color:var(--bad)"{% endif %}>{{ stats.failed }}</a></b>failed</div>
+  <div><b {% if not stats.workers_live %}style="color:var(--bad)"{% endif %}>{{ stats.workers_live }}</b>workers live</div>
+</div>
+<div class="row">
+  <div class="card"><h2 style="margin-top:0">Staff pages</h2>
+    <p><a href="{% url 'staff:events' %}">Events</a> — all events, photos by status, members</p>
+    <p><a href="{% url 'staff:users' %}">Users</a> — profiles, roles, selfies, credits, events</p>
+    <p><a href="{% url 'staff:worker' %}">Worker &amp; queue</a> — workers, queue per event, failed images</p>
+    <p><a href="/admin/">Django admin</a> — edit anything; credit adjustments: Credits → Add</p>
+  </div>
+  <div class="card"><h2 style="margin-top:0">Django pages</h2>
+    <p><a href="{% url 'organizer:home' %}">/dj/o/</a> — organizer: my events, credits, upload</p>
+    <p><a href="{% url 'participant:my_events' %}">/dj/me/</a> — participant: my events ·
+       <a href="{% url 'participant:my_face' %}">/dj/me/face/</a> selfies ·
+       <a href="{% url 'participant:consent' %}">/dj/consent/</a></p>
+    <p class="muted small">Event pages: /dj/e/&lt;code&gt;/ (links on the events page) · <a href="{% url 'login' %}">/dj/login/</a></p>
+  </div>
+  <div class="card"><h2 style="margin-top:0">Other</h2>
+    <p><a href="/api/docs">/api/docs</a> — Swagger · <a href="/api/openapi.json">openapi.json</a></p>
+    <p><a href="/api/health">/api/health</a> — version, build</p>
+    <p><a href="/photodisk/">/photodisk/</a> — raw file listing (nginx; remove before real users)</p>
+  </div>
+</div>
+{% endblock %}

@@ -2,7 +2,7 @@
 
 Cleverphotos core app: Django + PostgreSQL (pgvector). Accounts and OTP sign-in, events,
 image storage, the face-worker job queue, matching, credits, downloads, the JSON API for
-cp-web, and simple Django pages (organizer and participant fallback UI).
+cp-web, and simple Django pages under `/dj/` (organizer and participant fallback UI, staff data browser).
 
 - API contract for the frontend: [`docs/api.md`](docs/api.md) (+ [`docs/openapi.json`](docs/openapi.json), live Swagger at `/api/docs`).
 - Design: `design/core.md` (outside this repo for now).
@@ -33,4 +33,5 @@ Test data: `cp-core-manage import_photos`, `import_selfie`, `show_matches` (see 
 | `media/` | images (photos + selfies, also the worker queue), faces, downloads, upload pipeline, matching |
 | `credits/` | credit transactions |
 | `worker/` | face worker protocol and queue |
+| `staff/` | staff data browser at `/dj/staff/` (read-only; edits in `/admin/`) |
 | `deploy/` | deploy script and server commands |

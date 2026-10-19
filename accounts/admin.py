@@ -2,6 +2,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
+from django.contrib.auth.models import Group
 
 from .models import ConsentLog, OtpChallenge, User
 
@@ -27,6 +28,7 @@ class UserAdmin(DjangoUserAdmin):
     search_fields = ("phone", "email", "full_name")
     list_display = ("phone", "full_name", "email", "is_participant", "is_organizer", "kvkk_version",
                     "credit_balance", "is_staff", "created_at")
+    filter_horizontal = ()      # Django's UserAdmin lists groups/permissions here; we have none
     list_filter = ("is_participant", "is_organizer", "is_photographer", "kvkk_version", "is_staff", "is_active")
     readonly_fields = ("credit_balance", "kvkk_version", "created_at", "last_login")   # consent only via the consent step   # credits change via Credit transactions
     fieldsets = (
@@ -34,12 +36,15 @@ class UserAdmin(DjangoUserAdmin):
         ("Profile", {"fields": ("full_name", "email", "phone_verified_at", "email_verified_at", "kvkk_version")}),
         ("Roles", {"fields": ("is_participant", "is_organizer", "is_photographer")}),
         ("Credits", {"fields": ("credit_balance", "credit_floor")}),
-        ("Admin access", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
+        ("Admin access", {"fields": ("is_active", "is_staff")}),
         ("Dates", {"fields": ("created_at", "last_login")}),
     )
     add_fieldsets = (
         (None, {"classes": ("wide",), "fields": ("phone", "usable_password", "password1", "password2")}),
     )
+
+
+admin.site.unregister(Group)   # no Django groups in cp-core: staff = full access
 
 
 @admin.register(OtpChallenge)

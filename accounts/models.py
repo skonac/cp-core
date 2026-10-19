@@ -2,7 +2,7 @@
 import secrets
 
 from django.conf import settings
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
@@ -34,12 +34,12 @@ class UserManager(BaseUserManager):
     def create_superuser(self, phone, password=None, **extra):
         # `manage.py createsuperuser` lands here; admins log in to /admin with phone + password.
         extra.setdefault("is_staff", True)
-        extra.setdefault("is_superuser", True)
         return self.create_user(phone, password, **extra)
 
 
-class User(AbstractBaseUser, PermissionsMixin):
-    # From AbstractBaseUser: password, last_login. From PermissionsMixin: is_superuser, groups, user_permissions.
+class User(AbstractBaseUser):
+    # From AbstractBaseUser: password, last_login. No Django groups or per-model permissions:
+    # staff (is_staff) may do everything in the admin; see has_perm below.
     phone = models.CharField(max_length=16, unique=True, validators=[phone_validator])
     phone_verified_at = models.DateTimeField(null=True, blank=True)
     email = models.EmailField(unique=True, null=True, blank=True)   # NULLs don't collide in a unique column
@@ -66,6 +66,16 @@ class User(AbstractBaseUser, PermissionsMixin):
     def save(self, *args, **kwargs):
         self.email = self.email or None   # "" from forms would collide in the unique column
         super().save(*args, **kwargs)
+
+    # The admin asks these. One rule: an active staff account has every permission.
+    def has_perm(self, perm, obj=None) -> bool:
+        return self.is_active and self.is_staff
+
+    def has_perms(self, perm_list, obj=None) -> bool:
+        return self.is_active and self.is_staff
+
+    def has_module_perms(self, app_label) -> bool:
+        return self.is_active and self.is_staff
 
     @property
     def effective_credit_floor(self) -> int:

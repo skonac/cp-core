@@ -10,7 +10,7 @@
     <input type="hidden" name="version" value="{{ kvkk.version }}">
     <label>Language I read <select name="locale"><option value="tr">Türkçe</option><option value="en">English</option></select></label>
     <button name="agree" value="yes">I consent</button>
-    <a class="button secondary" href="/me/">Not now</a>
+    <a class="button secondary" href="{% url 'participant:my_events' %}">Not now</a>
   </form>
 </div>
 {% endblock %}

@@ -99,12 +99,12 @@ class KvkkConsentTests(TestCase):
 
     def test_django_consent_page(self):
         user = self.sign_in()
-        r = self.c.get("/consent/")
+        r = self.c.get("/dj/consent/")
         self.assertContains(r, f"/api/kvkk/kvkk_en_{V}.pdf")
         token = r.cookies["csrftoken"].value if "csrftoken" in r.cookies else self.c.cookies["csrftoken"].value
-        r = self.c.post("/consent/", {"agree": "yes", "version": V, "locale": "en", "next": "/me/",
+        r = self.c.post("/dj/consent/", {"agree": "yes", "version": V, "locale": "en", "next": "/dj/me/",
                                       "csrfmiddlewaretoken": token})
-        self.assertRedirects(r, "/me/", fetch_redirect_response=False)
+        self.assertRedirects(r, "/dj/me/", fetch_redirect_response=False)
         user.refresh_from_db()
         self.assertTrue(user.is_consent)
         self.assertEqual(ConsentLog.objects.get().locale, "en")

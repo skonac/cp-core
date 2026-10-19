@@ -1,0 +1,5 @@
+{% if page.paginator.num_pages > 1 %}
+<p class="small">Page {{ page.number }} of {{ page.paginator.num_pages }} ·
+  {% if page.has_previous %}<a href="?{% for k, v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page.previous_page_number }}">previous</a>{% endif %}
+  {% if page.has_next %}<a href="?{% for k, v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v|urlencode }}&{% endif %}{% endfor %}page={{ page.next_page_number }}">next</a>{% endif %}</p>
+{% endif %}

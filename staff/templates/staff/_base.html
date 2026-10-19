@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .snav { display:flex; gap:14px; flex-wrap:wrap; font-size:14px; margin:-6px 0 16px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+  .snav b { color:var(--muted); font-weight:600; }
+  table.t { font-size:13px; } table.t td, table.t th { padding:5px 8px; white-space:nowrap; }
+  table.t td.wrap { white-space:normal; } .n { text-align:right; font-variant-numeric:tabular-nums; }
+  .scroll { overflow-x:auto; border:1px solid var(--line); border-radius:6px; }
+  .dim { opacity:.5; } .kv td:first-child { color:var(--muted); width:190px; }
+  .thumb { height:44px; width:auto; display:block; border-radius:3px; background:#eee; }
+  .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:center; font-size:13px; margin:8px 0; }
+  .filters a.on { font-weight:700; color:var(--ink); }
+</style>
+<nav class="snav"><b>Staff</b>
+  <a href="{% url 'staff:index' %}">Index</a>
+  <a href="{% url 'staff:events' %}">Events</a>
+  <a href="{% url 'staff:users' %}">Users</a>
+  <a href="{% url 'staff:worker' %}">Worker &amp; queue</a>
+  <a href="/admin/">Admin</a>
+  <a href="/api/docs">API docs</a>
+</nav>
+{% block staff %}{% endblock %}
+{% endblock %}

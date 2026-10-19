@@ -1,0 +1,261 @@
+"""Staff data browser: read-only pages over everything, under /dj/staff/ (staff accounts only).
+
+A stopgap until the admin frontend exists in cp-web. Edits stay in the Django admin (/admin/).
+
+    /dj/staff/                       index: links to every non-API page, counters
+    /dj/staff/events/                all events: owner, photo counts by status, members
+    /dj/staff/events/<code>/         one event: settings, members, photo table
+                                     ?as=<user_id>  only that user's matched photos, with scores
+                                     ?status=failed ?deleted=1
+    /dj/staff/images/<id>/           one photo or selfie: renditions, worker fields, faces, EXIF
+    /dj/staff/images/<id>/m.jpg      the files (m, d, t)
+    /dj/staff/users/                 all users (?q= phone / name / email)
+    /dj/staff/users/<id>/            one user: profile, consent, selfies, credits, events joined and owned
+    /dj/staff/worker/                workers, queue, failed images
+"""
+from collections import defaultdict
+from datetime import timedelta
+from functools import wraps
+
+from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
+from django.db.models import BooleanField, Count, ExpressionWrapper, Q
+from django.http import Http404
+from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
+from PIL import Image as PILImage
+
+from accounts.models import ConsentLog, OtpChallenge, User
+from credits.models import CreditTransaction
+from events.codes import normalize_code
+from events.models import Event, EventMember
+from media.matching import my_photos, selfie_state
+from media.models import DownloadLog, Face, Image
+from media.storage import abspath, file_response
+from worker.models import Worker
+
+PAGE = 200
+STATUSES = list(Image.Status.values)   # pending, processing, done, failed
+
+
+def staff_required(view):
+    @wraps(view)
+    @login_required
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_staff:
+            raise PermissionDenied
+        return view(request, *args, **kwargs)
+    return wrapper
+
+
+def _photo_counts(event_ids) -> dict[int, dict]:
+    """{event_id: {pending, processing, done, failed, total, deleted}} in one query."""
+    counts = defaultdict(lambda: dict.fromkeys(STATUSES + ["total", "deleted"], 0))
+    rows = (Image.objects.filter(event_id__in=event_ids, is_selfie=False)
+            .annotate(live=ExpressionWrapper(Q(deleted_at__isnull=True), output_field=BooleanField()))
+            .values_list("event_id", "status", "live").annotate(n=Count("id")))
+    for event_id, status, live, n in rows:
+        c = counts[event_id]
+        if live:
+            c[status] += n
+            c["total"] += n
+        else:
+            c["deleted"] += n
+    return counts
+
+
+def _member_counts(event_ids) -> dict[int, int]:
+    return dict(EventMember.objects.filter(event_id__in=event_ids)
+                .values_list("event_id").annotate(n=Count("id")))
+
+
+def _selfie_states(user_ids) -> dict[int, str]:
+    """selfie_state() for many users in one query (same rules as media.matching.selfie_state)."""
+    rows = defaultdict(list)
+    for owner_id, status, n in (Image.objects.filter(owner_id__in=user_ids, is_selfie=True, deleted_at__isnull=True)
+                                .values_list("owner_id", "status", "num_faces")):
+        rows[owner_id].append((status, n))
+    states = {}
+    for uid in user_ids:
+        selfies = rows.get(uid, [])
+        if not selfies:
+            states[uid] = "no_selfie"
+        elif any(s == Image.Status.DONE and n == 1 for s, n in selfies):
+            states[uid] = "ready"
+        elif any(s in (Image.Status.PENDING, Image.Status.PROCESSING) for s, _ in selfies):
+            states[uid] = "selfie_processing"
+        else:
+            states[uid] = "selfie_rejected"
+    return states
+
+
+@staff_required
+def index(request):
+    now = timezone.now()
+    stats = {
+        "users": User.objects.count(),
+        "organizers": User.objects.filter(is_organizer=True).count(),
+        "events": Event.objects.count(),
+        "photos": Image.objects.filter(is_selfie=False, deleted_at__isnull=True).count(),
+        "selfies": Image.objects.filter(is_selfie=True, deleted_at__isnull=True).count(),
+        "faces": Face.objects.count(),
+        "queue": Image.objects.filter(status__in=[Image.Status.PENDING, Image.Status.PROCESSING],
+                                      deleted_at__isnull=True).count(),
+        "failed": Image.objects.filter(status=Image.Status.FAILED, deleted_at__isnull=True).count(),
+        "workers_live": Worker.objects.filter(last_seen_at__gte=now - timedelta(minutes=1)).count(),
+    }
+    return render(request, "staff/index.html", {"stats": stats})
+
+
+@staff_required
+def events(request):
+    rows = list(Event.objects.select_related("owner").order_by("-created_at"))
+    ids = [e.id for e in rows]
+    photos, members = _photo_counts(ids), _member_counts(ids)
+    for e in rows:
+        e.photos, e.member_count = photos[e.id], members.get(e.id, 0)
+    return render(request, "staff/events.html", {"events": rows})
+
+
+@staff_required
+def event(request, code):
+    event = get_object_or_404(Event.objects.select_related("owner", "cover_image"), code=normalize_code(code))
+    as_user = None
+    scores: dict[int, float] = {}
+    photos = Image.objects.filter(event=event, is_selfie=False)
+    if request.GET.get("deleted") != "1":
+        photos = photos.filter(deleted_at__isnull=True)
+    if request.GET.get("status") in STATUSES:
+        photos = photos.filter(status=request.GET["status"])
+    if request.GET.get("as"):
+        as_user = get_object_or_404(User, pk=request.GET["as"])
+        scores = my_photos(as_user, event)
+        photos = photos.filter(id__in=scores)
+    page = Paginator(photos.order_by("seq"), PAGE).get_page(request.GET.get("page"))
+    for img in page:
+        img.score = scores.get(img.id)
+
+    members = list(EventMember.objects.filter(event=event).select_related("user").order_by("-last_activity_at"))
+    states = _selfie_states([m.user_id for m in members])
+    for m in members:
+        m.selfie_state = states[m.user_id]
+        m.matched = len(my_photos(m.user, event)) if m.selfie_state == "ready" else None
+    cover = event.cover_image or photos.model.objects.filter(
+        event=event, is_selfie=False, deleted_at__isnull=True).order_by("seq").first()
+    return render(request, "staff/event.html", {
+        "event": event, "counts": _photo_counts([event.id])[event.id], "page": page, "members": members,
+        "as_user": as_user, "cover": cover, "statuses": STATUSES, "threshold": settings.MATCH_THRESHOLD,
+        "status_filter": request.GET.get("status", ""), "show_deleted": request.GET.get("deleted") == "1"})
+
+
+def _rendition_info(image) -> list[dict]:
+    out = []
+    for r, label in (("t", "thumbnail"), ("d", "display"), ("m", "master")):
+        if image.is_selfie and r == "m":
+            continue   # selfies keep display + thumbnail only
+        path = abspath(image.relpath(r))
+        info = {"r": r, "label": label, "path": image.relpath(r), "exists": path.is_file()}
+        if info["exists"]:
+            info["bytes"] = path.stat().st_size
+            try:
+                with PILImage.open(path) as im:
+                    info["width"], info["height"] = im.size
+            except OSError:
+                pass
+        out.append(info)
+    return out
+
+
+@staff_required
+def image(request, image_id):
+    image = get_object_or_404(Image.objects.select_related("event", "owner"), pk=image_id)
+    faces = list(image.faces.order_by("-score"))
+    for f in faces:
+        f.box = {"left": f.bbox[0] * 100, "top": f.bbox[1] * 100,
+                 "width": (f.bbox[2] - f.bbox[0]) * 100, "height": (f.bbox[3] - f.bbox[1]) * 100}
+        f.size_pct = round((f.bbox[2] - f.bbox[0]) * 100, 1)
+    neighbours = {}
+    if not image.is_selfie:
+        siblings = Image.objects.filter(event=image.event, is_selfie=False)
+        neighbours = {
+            "prev": siblings.filter(seq__lt=image.seq).order_by("-seq").values_list("id", flat=True).first(),
+            "next": siblings.filter(seq__gt=image.seq).order_by("seq").values_list("id", flat=True).first()}
+    return render(request, "staff/image.html", {
+        "image": image, "faces": faces, "renditions": _rendition_info(image),
+        "exif": sorted((image.exif or {}).items()), **neighbours,
+        "downloads": image.downloads.select_related("user").order_by("-downloaded_at")[:20]})
+
+
+@staff_required
+def image_file(request, image_id, rendition):
+    if rendition not in ("m", "d", "t"):
+        raise Http404
+    image = get_object_or_404(Image, pk=image_id)
+    return file_response(image.relpath(rendition))
+
+
+@staff_required
+def users(request):
+    rows = User.objects.order_by("-created_at")
+    q = request.GET.get("q", "").strip()
+    if q:
+        rows = rows.filter(Q(phone__icontains=q) | Q(full_name__icontains=q) | Q(email__icontains=q))
+    page = Paginator(rows, PAGE).get_page(request.GET.get("page"))
+    ids = [u.id for u in page]
+    joined = dict(EventMember.objects.filter(user_id__in=ids).values_list("user_id").annotate(n=Count("id")))
+    owned = dict(Event.objects.filter(owner_id__in=ids).values_list("owner_id").annotate(n=Count("id")))
+    states = _selfie_states(ids)
+    for u in page:
+        u.joined, u.owned, u.selfie_state = joined.get(u.id, 0), owned.get(u.id, 0), states[u.id]
+    return render(request, "staff/users.html", {"page": page, "q": q, "kvkk_version": settings.KVKK_VERSION})
+
+
+@staff_required
+def user(request, user_id):
+    u = get_object_or_404(User, pk=user_id)
+    memberships = list(EventMember.objects.filter(user=u).select_related("event").order_by("-last_activity_at"))
+    owned = list(Event.objects.filter(owner=u).order_by("-created_at"))
+    counts = _photo_counts([m.event_id for m in memberships] + [e.id for e in owned])
+    state = selfie_state(u)
+    for m in memberships:
+        m.photos = counts[m.event_id]
+        m.matched = len(my_photos(u, m.event)) if state == "ready" else None
+    members = _member_counts([e.id for e in owned])
+    for e in owned:
+        e.photos, e.member_count = counts[e.id], members.get(e.id, 0)
+    return render(request, "staff/user.html", {
+        "u": u, "selfie_state": state, "memberships": memberships, "owned": owned,
+        "selfies": Image.objects.filter(owner=u, is_selfie=True).order_by("deleted_at", "slot", "-created_at"),
+        "consents": ConsentLog.objects.filter(user=u).order_by("-created_at"),
+        "credits": CreditTransaction.objects.filter(user=u).select_related("actor").order_by("-created_at")[:50],
+        "uploads": Image.objects.filter(owner=u, is_selfie=False, deleted_at__isnull=True).count(),
+        "downloads": DownloadLog.objects.filter(user=u).select_related("image__event").order_by("-downloaded_at")[:20],
+        "download_total": DownloadLog.objects.filter(user=u).count(),
+        "otps": OtpChallenge.objects.filter(phone=u.phone).select_related("event").order_by("-created_at")[:10],
+        "kvkk_version": settings.KVKK_VERSION})
+
+
+@staff_required
+def worker(request):
+    now = timezone.now()
+    workers = list(Worker.objects.order_by("-last_seen_at"))
+    for w in workers:
+        w.silent_s = int((now - w.last_seen_at).total_seconds())
+    live = Image.objects.filter(deleted_at__isnull=True)
+    unfinished = live.filter(status__in=[Image.Status.PENDING, Image.Status.PROCESSING])
+    queue_events = (unfinished.filter(is_selfie=False).values("event__code", "event__name", "event__status",
+                                                              "event__is_processing_faces")
+                    .annotate(pending=Count("id", filter=Q(status=Image.Status.PENDING)),
+                              processing=Count("id", filter=Q(status=Image.Status.PROCESSING)))
+                    .order_by("event__code"))
+    return render(request, "staff/worker.html", {
+        "workers": workers, "queue_events": queue_events,
+        "selfies_waiting": unfinished.filter(is_selfie=True).count(),
+        "processing": unfinished.filter(status=Image.Status.PROCESSING).select_related("event", "owner")
+                                .order_by("processing_until")[:50],
+        "failed": live.filter(status=Image.Status.FAILED).select_related("event", "owner").order_by("-created_at")[:200],
+        "had_errors": live.filter(status=Image.Status.DONE).exclude(error="").select_related("event", "owner")
+                          .order_by("-processed_at")[:50],
+        "lease_s": settings.WORKER_LEASE})

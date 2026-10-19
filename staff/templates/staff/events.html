@@ -1,0 +1,29 @@
+{% extends "staff/_base.html" %}
+{% block title %}Events · staff{% endblock %}
+{% block staff %}
+<h1>Events <span class="muted">({{ events|length }})</span></h1>
+<div class="scroll" style="margin-top:12px"><table class="t">
+<tr><th>Code</th><th>Name</th><th>Status</th><th>Type</th><th>Date</th><th>Owner</th>
+    <th class="n">Photos</th><th class="n">Pending</th><th class="n">Proc.</th><th class="n">Done</th><th class="n">Failed</th><th class="n">Deleted</th>
+    <th class="n">Members</th><th>Faces / browse / consent</th><th>Created</th><th></th></tr>
+{% for e in events %}
+<tr>
+  <td><a class="code" href="{% url 'staff:event' e.code %}">{{ e.display_code }}</a></td>
+  <td class="wrap">{{ e.name }}</td>
+  <td><span class="pill {{ e.status }}">{{ e.status }}</span></td>
+  <td>{{ e.type }}</td><td>{{ e.date|date:"Y-m-d" }}</td>
+  <td><a href="{% url 'staff:user' e.owner_id %}">{{ e.owner.phone }}</a>{% if e.owner.full_name %} <span class="muted">{{ e.owner.full_name }}</span>{% endif %}</td>
+  <td class="n"><a href="{% url 'staff:event' e.code %}">{{ e.photos.total }}</a></td>
+  <td class="n">{{ e.photos.pending|default:"" }}</td><td class="n">{{ e.photos.processing|default:"" }}</td>
+  <td class="n">{{ e.photos.done }}</td>
+  <td class="n">{% if e.photos.failed %}<a style="color:var(--bad)" href="{% url 'staff:event' e.code %}?status=failed">{{ e.photos.failed }}</a>{% endif %}</td>
+  <td class="n muted">{{ e.photos.deleted|default:"" }}</td>
+  <td class="n">{{ e.member_count }}</td>
+  <td>{{ e.is_processing_faces|yesno:"faces,no faces" }} · {{ e.is_browse_all|yesno:"browse,—" }} · {{ e.is_consent_required|yesno:"consent,no consent" }}</td>
+  <td>{{ e.created_at|date:"Y-m-d H:i" }}</td>
+  <td class="small"><a href="{% url 'organizer:event' e.code %}">/o/</a> <a href="{% url 'participant:event' e.code %}">/e/</a> <a href="/admin/events/event/{{ e.id }}/change/">admin</a></td>
+</tr>
+{% empty %}<tr><td colspan="16" class="muted">No events.</td></tr>
+{% endfor %}
+</table></div>
+{% endblock %}
