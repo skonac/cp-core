@@ -45,7 +45,7 @@ class Command(BaseCommand):
         files = []
         for p in map(Path, paths):
             files += sorted(f for f in p.iterdir() if f.suffix.lower() in SUFFIXES) if p.is_dir() else [p]
-        ok = 0
+        ok = failed = 0
         for f in files:
             try:
                 img = ingest_photo(ev, ev.owner, f.read_bytes())
@@ -53,6 +53,11 @@ class Command(BaseCommand):
                 self.stdout.write(f"{img.seq_str}  {f.name}  {img.width}x{img.height}  taken {img.taken_at or '-'}")
             except IngestError as e:
                 self.stdout.write(self.style.WARNING(f"-----  {f.name}  {e.code} {e.detail}"))
+            except Exception as e:   # a bug on one file: report it, keep importing (nothing was charged)
+                failed += 1
+                self.stdout.write(self.style.ERROR(f"-----  {f.name}  ERROR {type(e).__name__}: {str(e)[:200]}"))
         ev.owner.refresh_from_db()
         self.stdout.write(f"{ok}/{len(files)} accepted into {ev.display_code}; "
                           f"owner balance {ev.owner.credit_balance}")
+        if failed:
+            self.stdout.write(self.style.ERROR(f"{failed} failed with an error (see above); please report"))

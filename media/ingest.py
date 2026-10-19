@@ -7,6 +7,7 @@ photos the single place where a credit is spent (design/core.md, "Photo upload a
 import hashlib
 import io
 import logging
+import math
 from datetime import datetime, timedelta, timezone as dt_timezone
 
 from django.conf import settings
@@ -50,12 +51,14 @@ def _jsonable(value):
         return value
     if isinstance(value, float) or hasattr(value, "numerator"):   # IFDRational
         try:
-            return round(float(value), 6)
+            number = float(value)
         except (ZeroDivisionError, ValueError):
             return None
+        # A 0/0 rational ("unknown", e.g. a lens's max aperture) gives NaN; JSON has no NaN/Infinity.
+        return round(number, 6) if math.isfinite(number) else None
     if isinstance(value, (tuple, list)):
-        items = [_jsonable(v) for v in value]
-        return items if items and all(v is not None for v in items) else None
+        items = [_jsonable(v) for v in value]   # unknown items stay as null: [24.0, 70.0, null, null]
+        return items if any(v is not None for v in items) else None
     return None
 
 
