@@ -6540,40 +6540,32 @@
             "type": "string"
           },
           "name": {
+            "$ref": "#/components/schemas/TextOut",
             "examples": [
-              "2000cr"
-            ],
-            "title": "Name",
-            "type": "string"
+              {
+                "en": "2000cr",
+                "tr": "2000cr"
+              }
+            ]
           },
           "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "$ref": "#/components/schemas/TextOut",
             "examples": [
-              "Mini paket"
-            ],
-            "title": "Title"
+              {
+                "en": "Small pack",
+                "tr": "Mini paket"
+              }
+            ]
           },
           "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "$ref": "#/components/schemas/TextOut",
             "description": "Subtitle.",
             "examples": [
-              "Küçük düğünler için"
-            ],
-            "title": "Description"
+              {
+                "en": "For small weddings",
+                "tr": "Küçük düğünler için"
+              }
+            ]
           },
           "creditAmount": {
             "description": "Credits the product adds to the account.",
@@ -6673,6 +6665,32 @@
         "title": "ShopCatalogResponse",
         "type": "object"
       },
+      "TextOut": {
+        "additionalProperties": false,
+        "description": "A shown text in both languages; \"\" when not filled in.",
+        "properties": {
+          "tr": {
+            "examples": [
+              "Mini paket"
+            ],
+            "title": "Tr",
+            "type": "string"
+          },
+          "en": {
+            "examples": [
+              "Small pack"
+            ],
+            "title": "En",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tr",
+          "en"
+        ],
+        "title": "TextOut",
+        "type": "object"
+      },
       "PurchaseListOut": {
         "additionalProperties": false,
         "properties": {
@@ -6754,12 +6772,14 @@
             "type": "string"
           },
           "productName": {
+            "$ref": "#/components/schemas/TextOut",
             "description": "As it was at purchase time.",
             "examples": [
-              "2000cr"
-            ],
-            "title": "Productname",
-            "type": "string"
+              {
+                "en": "2000cr",
+                "tr": "2000cr"
+              }
+            ]
           },
           "creditAmount": {
             "examples": [

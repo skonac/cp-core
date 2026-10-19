@@ -32,7 +32,8 @@ class PaymentError(Exception):
 
 def _new(user, product: Product, ip: str | None) -> Purchase:
     return Purchase.objects.create(
-        user=user, product=product, product_name=product.name, credits=product.credits,
+        user=user, product=product, product_name_tr=product.name_tr, product_name_en=product.name_en,
+        credits=product.credits,
         list_price=product.price, amount=product.price, currency=product.currency,
         provider=settings.PAYMENT_PROVIDER, conversation_id="cp_" + secrets.token_hex(12), ip=ip or None)
 
@@ -50,7 +51,7 @@ def complete(purchase: Purchase, payment_id: str, response: dict | None = None) 
         purchase.save()
         CreditTransaction.objects.create(user_id=purchase.user_id, delta=purchase.credits,
                                          kind=CreditTransaction.Kind.PURCHASE, ref=f"purchase:{purchase.pk}",
-                                         note=f"{purchase.product_name} {purchase.amount} {purchase.currency}")
+                                         note=f"{purchase.product_name_tr} {purchase.amount} {purchase.currency}")
         User.objects.filter(pk=purchase.user_id).update(credit_balance=F("credit_balance") + purchase.credits)
     log.info("purchase %s paid: +%s credits for user %s", purchase.pk, purchase.credits, purchase.user_id)
     return purchase

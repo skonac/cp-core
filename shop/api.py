@@ -36,7 +36,8 @@ def _pricing_version(products) -> str:
 
 
 def purchase_json(p: Purchase) -> dict:
-    return {"id": str(p.pk), "productId": str(p.product_id), "productName": p.product_name,
+    return {"id": str(p.pk), "productId": str(p.product_id),
+            "productName": {"tr": p.product_name_tr, "en": p.product_name_en},
             "creditAmount": p.credits, "amount": float(p.amount), "currency": p.currency, "status": p.status,
             "purchasedAt": p.created_at.isoformat(), "paidAt": p.paid_at.isoformat() if p.paid_at else None}
 
@@ -52,7 +53,9 @@ def products(request):
     out = []
     for p in on_sale:
         unit = float(p.price) / p.credits if p.credits else 0
-        out.append({"id": str(p.pk), "name": p.name, "title": p.title or None, "description": p.description or None,
+        out.append({"id": str(p.pk), "name": {"tr": p.name_tr, "en": p.name_en},
+                    "title": {"tr": p.title_tr, "en": p.title_en},
+                    "description": {"tr": p.description_tr, "en": p.description_en},
                     "creditAmount": p.credits, "price": float(p.price), "currency": p.currency,
                     "unitPrice": round(unit, 4),
                     "discountPercent": round((1 - unit / top_unit) * 100) if top_unit else 0,

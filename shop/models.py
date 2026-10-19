@@ -10,9 +10,13 @@ class Product(models.Model):
     2000 credits for a price); another kind of product would add a `kind` column. Disable
     (is_active) instead of deleting: purchases point at their product. Changing a price changes the
     catalog's pricingVersion, so a purchase started at the old price is refused."""
-    name = models.CharField(max_length=40)                          # "2000cr": short product name / code
-    title = models.CharField(max_length=80, blank=True)             # "Mini paket": shown as the heading
-    description = models.CharField(max_length=200, blank=True)      # subtitle: "Küçük düğünler için"
+    # Shown texts in both languages the site has (tr, en); the API returns both.
+    name_tr = models.CharField(max_length=40)                       # "2000cr": short product name
+    name_en = models.CharField(max_length=40)
+    title_tr = models.CharField(max_length=80, blank=True)          # "Mini paket": heading
+    title_en = models.CharField(max_length=80, blank=True)          # "Small pack"
+    description_tr = models.CharField(max_length=200, blank=True)   # subtitle: "Küçük düğünler için"
+    description_en = models.CharField(max_length=200, blank=True)
     credits = models.PositiveIntegerField()                         # credits the product adds to the account
     price = models.DecimalField(max_digits=10, decimal_places=2)    # regular price
     currency = models.CharField(max_length=3, default="TRY")
@@ -25,7 +29,7 @@ class Product(models.Model):
         ordering = ["sort_order", "credits"]
 
     def __str__(self):
-        return f"{self.name} ({self.credits} cr, {self.price} {self.currency})"
+        return f"{self.name_tr} ({self.credits} cr, {self.price} {self.currency})"
 
 
 class Purchase(models.Model):
@@ -41,7 +45,8 @@ class Purchase(models.Model):
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="purchases")
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="purchases")
-    product_name = models.CharField(max_length=40)                  # copies at purchase time
+    product_name_tr = models.CharField(max_length=40)               # copies at purchase time
+    product_name_en = models.CharField(max_length=40)
     credits = models.PositiveIntegerField()
     list_price = models.DecimalField(max_digits=10, decimal_places=2)   # the product's regular price
     amount = models.DecimalField(max_digits=10, decimal_places=2)       # charged (= list_price until discounts exist)
@@ -62,4 +67,4 @@ class Purchase(models.Model):
         indexes = [models.Index(fields=["user", "created_at"], name="shop_purchase_user")]
 
     def __str__(self):
-        return f"{self.user} {self.product_name} {self.status}"
+        return f"{self.user} {self.product_name_tr} {self.status}"

@@ -426,13 +426,17 @@ processing. No phone numbers, selfies or face data are returned.
 
 What organizers buy: today every product adds credits to the account (`2000cr` = 2000 credits). One product per
 purchase, no cart. For organizer accounts (`403 organizer_access_required` otherwise). Products are managed in the
-admin: name, title, description (subtitle), credits, price, currency, on sale, featured, order.
+admin: name, title, description (subtitle) in Turkish and English, credits, price, currency, on sale, featured, order.
+Shown texts come in both languages, `{"tr": "…", "en": "…"}`; pick by the interface language. An empty string means
+not filled in (fall back to the other language, or hide it).
 
 **`GET /api/shop/products`** → `200 products_retrieved`:
 
 ```json
 { "creditBalance": 1840, "pricingVersion": "3f9a1c0b2d4e",
-  "products": [ { "id": "2", "name": "2000cr", "title": "Mini paket", "description": "Küçük düğünler için",
+  "products": [ { "id": "2", "name": { "tr": "2000cr", "en": "2000cr" },
+                  "title": { "tr": "Mini paket", "en": "Small pack" },
+                  "description": { "tr": "Küçük düğünler için", "en": "For small weddings" },
                   "creditAmount": 2000, "price": 3600.0, "currency": "TRY",
                   "unitPrice": 1.8, "discountPercent": 10, "featured": true } ] }
 ```
@@ -443,7 +447,8 @@ admin: name, title, description (subtitle), credits, price, currency, on sale, f
 **`GET /api/shop/purchases`** → `200 purchases_retrieved`:
 
 ```json
-{ "purchases": [ { "id": "7", "productId": "2", "productName": "2000cr", "creditAmount": 2000, "amount": 3600.0,
+{ "purchases": [ { "id": "7", "productId": "2", "productName": { "tr": "2000cr", "en": "2000cr" },
+                   "creditAmount": 2000, "amount": 3600.0,
                    "currency": "TRY", "status": "paid", "purchasedAt": "2026-10-19T08:30:00+00:00",
                    "paidAt": "2026-10-19T08:30:05+00:00" } ],
   "total": 1 }
@@ -518,8 +523,8 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 | O8 | Photo list `{id, fileName, thumbnailUrl, status, uploadedAt, errorCode}` | Adds `faceCount`, `displayUrl`, `width`, `height`, `takenAt`, `nextCursor`; `?status=` filter, paging | — |
 | O9 | `POST …/photos/retry` | Removed: a failed photo is rare and fixed on our side | Remove the retry action |
 | O10 | Participants: `joinMethod`, `accessStatus`, `DELETE …/participants/{id}/access` (revoke) | Not in v1 (no revoke); `matchStatus` adds `consent_pending`, drops `matching_pending`; adds `hasConsent`; `counts` has no `active` | Remove revoke and those fields |
-| O11 | `GET /api/organizer/credits` → `{availableCredits, pricingVersion, packages, purchases}` | Split (§3.7): `GET /api/shop/products` → `{creditBalance, pricingVersion, products}` and `GET /api/shop/purchases` → `{purchases, total}`. A product adds `name` ("2000cr"), `title` ("Mini paket"), `description`; amounts from the admin, not fixed to 500/1000/3000 | Change the URLs; `packages` → `products`; type `creditAmount` as `number`; show title/description |
-| O12 | `POST /api/organizer/credit-purchases {packageId, pricingVersion}` → `{purchase, availableCredits}` | `POST /api/shop/purchases {productId, pricingVersion}` → `201 purchase_completed` `{purchase, creditBalance}`; simulated `paid` on dev servers; purchase has `productId`, `productName`, `paidAt`; `404`/`409 pricing_changed` checked first; `501` if no provider | Change the URL; `packageId` → `productId`; `creditBalance` |
+| O11 | `GET /api/organizer/credits` → `{availableCredits, pricingVersion, packages, purchases}` | Split (§3.7): `GET /api/shop/products` → `{creditBalance, pricingVersion, products}` and `GET /api/shop/purchases` → `{purchases, total}`. A product adds `name`, `title`, `description`, each `{tr, en}`; amounts from the admin, not fixed to 500/1000/3000 | Change the URLs; `packages` → `products`; type `creditAmount` as `number`; pick texts by language |
+| O12 | `POST /api/organizer/credit-purchases {packageId, pricingVersion}` → `{purchase, availableCredits}` | `POST /api/shop/purchases {productId, pricingVersion}` → `201 purchase_completed` `{purchase, creditBalance}`; simulated `paid` on dev servers; purchase has `productId`, `productName` (`{tr, en}`), `paidAt`; `404`/`409 pricing_changed` checked first; `501` if no provider | Change the URL; `packageId` → `productId`; `creditBalance` |
 | O13 | Cover: only at create, max 8 MB | Also `POST …/cover` / `DELETE …/cover` any time; cover URL is same-origin | — |
 | O14 | Plain `fetch` for POST/PUT/DELETE in `organizer-service.ts` | Every unsafe request needs `X-CSRFToken` | Use `apiMutation` for all of them (today they fail with `403 csrf_failed`) |
 

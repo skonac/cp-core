@@ -7,11 +7,17 @@ from pydantic import Field
 from common.api import Out, envelope
 
 
+class TextOut(Out):
+    """A shown text in both languages; "" when not filled in."""
+    tr: str = Field(examples=["Mini paket"])
+    en: str = Field(examples=["Small pack"])
+
+
 class ProductOut(Out):
     id: str = Field(examples=["2"])
-    name: str = Field(examples=["2000cr"])
-    title: str | None = Field(examples=["Mini paket"])
-    description: str | None = Field(description="Subtitle.", examples=["Küçük düğünler için"])
+    name: TextOut = Field(examples=[{"tr": "2000cr", "en": "2000cr"}])
+    title: TextOut = Field(examples=[{"tr": "Mini paket", "en": "Small pack"}])
+    description: TextOut = Field(description="Subtitle.", examples=[{"tr": "Küçük düğünler için", "en": "For small weddings"}])
     creditAmount: int = Field(description="Credits the product adds to the account.", examples=[2000])
     price: float = Field(examples=[3600.0])
     currency: str = Field(examples=["TRY"])
@@ -30,7 +36,7 @@ class CatalogOut(Out):
 class PurchaseOut(Out):
     id: str = Field(examples=["7"])
     productId: str = Field(examples=["2"])
-    productName: str = Field(description="As it was at purchase time.", examples=["2000cr"])
+    productName: TextOut = Field(description="As it was at purchase time.", examples=[{"tr": "2000cr", "en": "2000cr"}])
     creditAmount: int = Field(examples=[2000])
     amount: float = Field(description="Charged.", examples=[3600.0])
     currency: str = Field(examples=["TRY"])
