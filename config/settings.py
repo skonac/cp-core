@@ -164,7 +164,7 @@ EVENT_LOOKUP_PER_MIN = 30   # public event lookups per IP
 
 # KVKK consent document (design/core.md, "Consent"). The pair kvkk/kvkk_tr_<v>.pdf + kvkk_en_<v>.pdf;
 # a user has consent when User.kvkk_version equals this. Changing it = everyone consents again.
-KVKK_VERSION = env("CP_KVKK_VERSION", "000")
+KVKK_VERSION = env("CP_KVKK_VERSION", "001")
 KVKK_DIR = BASE_DIR / "kvkk"
 KVKK_LOCALES = ("tr", "en")
 

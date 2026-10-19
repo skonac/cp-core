@@ -119,7 +119,7 @@ def sign_out(request):
 
 # ---------------------------------------------------------------------------- kvkk
 
-@kvkk_router.get("/{filename}", auth=None)
+@kvkk_router.api_operation(["GET", "HEAD"], "/{filename}", auth=None)
 def kvkk_document(request, filename: str):
     """A KVKK document PDF, current or older (what earlier consents refer to). Public."""
     path = settings.KVKK_DIR / filename
