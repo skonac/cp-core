@@ -134,7 +134,8 @@ def event(request, code):
 
 def _face_matches(image, faces, threshold: float, scope_all: bool) -> set[int]:
     """For each face of a photo: the people whose selfie faces are closest (best per person, up to 3),
-    with cosine similarity; f.match = the best one when it reaches the threshold. Candidates: the
+    with cosine similarity; f.match = the best one when it reaches the threshold, f.also = the others
+    that reach it too (today's matching shows the photo to all of them). Candidates: the
     event's members (scope_all: everyone with a ready selfie). Sets f.candidates, f.match."""
     selfie_faces = Face.objects.filter(image__kind=Image.Kind.SELFIE, image__status=Image.Status.DONE,
                                        image__num_faces=1, image__deleted_at__isnull=True)
@@ -153,6 +154,7 @@ def _face_matches(image, faces, threshold: float, scope_all: bool) -> set[int]:
     for f, rows in zip(faces, rows_per_face):
         f.candidates = [{"user": users[uid], "sim": sim, "is_match": sim >= threshold} for uid, sim in rows]
         f.match = f.candidates[0] if f.candidates and f.candidates[0]["is_match"] else None
+        f.also = [c for c in f.candidates[1:] if c["is_match"]]   # others the face would also be shown to
         if f.match:
             matched.add(f.match["user"].pk)
     return matched

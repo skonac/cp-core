@@ -85,7 +85,7 @@ class StaffPagesTest(TestCase):
         matches = [f.match["user"] for f in r.context["faces"] if f.match]
         self.assertEqual(matches, [self.guest])
         self.assertEqual((r.context["matched_faces"], r.context["matched_users"]), (1, 1))
-        self.assertContains(r, "Best match")
+        self.assertContains(r, "Matched to")
         r = self.client.get(f"/dj/staff/images/{photo.id}/", {"t": "1.01", "scope": "all"})
         self.assertEqual(r.context["matched_faces"], 0)
         self.assertIn(self.guest, [f.candidates[0]["user"] for f in r.context["faces"]])   # still listed, below threshold

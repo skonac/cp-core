@@ -67,12 +67,11 @@
 </form>
 {% endif %}
 {% if faces %}<div class="scroll"><table class="t">
-<tr><th>#</th><th>Face id</th><th class="n">Score</th><th class="n">Width %</th>{% if image.kind == "photo" %}<th>Best match (similarity)</th><th>Next closest</th>{% endif %}<th>bbox (x1, y1, x2, y2)</th><th>Landmarks</th><th>Engine</th></tr>
+<tr><th>#</th><th>Face id</th><th class="n">Score</th><th class="n">Width %</th>{% if image.kind == "photo" %}<th>Matched to (similarity)</th>{% endif %}<th>bbox (x1, y1, x2, y2)</th><th>Landmarks</th><th>Engine</th></tr>
 {% for f in faces %}<tr>
   <td>{{ forloop.counter }}</td><td>{{ f.id }}</td><td class="n">{{ f.score|floatformat:3 }}</td><td class="n">{{ f.size_pct }}</td>
   {% if image.kind == "photo" %}
-  <td>{% with m=f.candidates.0 %}{% if m %}<a href="{% url 'staff:user' m.user.pk %}" {% if m.is_match %}style="color:var(--ok); font-weight:700"{% else %}class="muted"{% endif %}>{{ m.user.full_name|default:m.user.phone }}</a> {{ m.sim|floatformat:3 }}{% if m.is_match %} ✓{% endif %}{% else %}<span class="muted">no candidates</span>{% endif %}{% endwith %}</td>
-  <td class="small">{% for m in f.candidates|slice:"1:" %}<a href="{% url 'staff:user' m.user.pk %}" class="{% if not m.is_match %}muted{% endif %}">{{ m.user.full_name|default:m.user.phone|truncatechars:16 }}</a> {{ m.sim|floatformat:3 }}{% if not forloop.last %} · {% endif %}{% endfor %}</td>
+  <td>{% if f.match %}<a href="{% url 'staff:user' f.match.user.pk %}" style="color:var(--ok); font-weight:700">{{ f.match.user.full_name|default:f.match.user.phone }}</a> {{ f.match.sim|floatformat:3 }}{% if f.also %} <span class="pill" title="also at or above the threshold: {% for m in f.also %}{{ m.user.full_name|default:m.user.phone }} {{ m.sim|floatformat:3 }}{% if not forloop.last %}, {% endif %}{% endfor %}">+{{ f.also|length }}</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
   {% endif %}
   <td><code class="small">{% for v in f.bbox %}{{ v|floatformat:4 }}{% if not forloop.last %}, {% endif %}{% endfor %}</code></td>
   <td class="wrap"><code class="small">{% for v in f.landmarks %}{{ v|floatformat:3 }}{% if not forloop.last %}, {% endif %}{% endfor %}</code></td>
