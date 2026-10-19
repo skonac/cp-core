@@ -43,9 +43,11 @@
 <div style="position:relative; display:inline-block; max-width:100%">
   <img src="{% url 'staff:image_file' image.id 'd' %}" alt="" style="display:block; max-width:100%; max-height:80vh; height:auto">
   {% for f in faces %}
-  <div title="face {{ f.id }} · score {{ f.score|floatformat:3 }}" style="position:absolute; left:{{ f.box.left|stringformat:'.3f' }}%; top:{{ f.box.top|stringformat:'.3f' }}%; width:{{ f.box.width|stringformat:'.3f' }}%; height:{{ f.box.height|stringformat:'.3f' }}%; border:2px solid #39f; border-radius:3px; box-shadow:0 0 0 1px rgba(0,0,0,.4)">
-    <span style="position:absolute; top:-18px; left:-2px; background:#39f; color:#fff; font-size:11px; padding:0 4px; border-radius:3px">{{ forloop.counter }}</span>
+  {% with c=f.match|yesno:"#1f9d55,#39f" %}
+  <div title="face {{ forloop.counter }} · score {{ f.score|floatformat:3 }}{% if f.match %} · {{ f.match.user.full_name|default:f.match.user.phone }} {{ f.match.sim|floatformat:3 }}{% endif %}" style="position:absolute; left:{{ f.box.left|stringformat:'.3f' }}%; top:{{ f.box.top|stringformat:'.3f' }}%; width:{{ f.box.width|stringformat:'.3f' }}%; height:{{ f.box.height|stringformat:'.3f' }}%; border:2px solid {{ c }}; border-radius:3px; box-shadow:0 0 0 1px rgba(0,0,0,.4)">
+    <span style="position:absolute; top:-18px; left:-2px; background:{{ c }}; color:#fff; font-size:11px; padding:0 4px; border-radius:3px; white-space:nowrap">{{ forloop.counter }}{% if f.match %} {{ f.match.user.full_name|default:f.match.user.phone|truncatechars:18 }}{% endif %}</span>
   </div>
+  {% endwith %}
   {% endfor %}
 </div>
 <p class="small" style="margin-top:8px">
@@ -55,10 +57,23 @@
 {% endif %}
 
 <h2 id="faces">Faces ({{ faces|length }})</h2>
+{% if image.kind == "photo" and faces %}
+<form method="get" action="#faces" class="filters">
+  <span><b>{{ matched_faces }}</b> of {{ faces|length }} faces matched to <b>{{ matched_users }}</b> {{ scope_all|yesno:"users,members" }} at threshold</span>
+  <input type="text" name="t" value="{{ threshold }}" style="width:70px">
+  <select name="scope" style="width:auto"><option value="">event members</option><option value="all" {% if scope_all %}selected{% endif %}>all users with a selfie</option></select>
+  <button class="secondary">Apply</button>
+  {% if threshold != default_threshold or scope_all %}<a href="?#faces">reset ({{ default_threshold }}, members)</a>{% endif %}
+</form>
+{% endif %}
 {% if faces %}<div class="scroll"><table class="t">
-<tr><th>#</th><th>Face id</th><th class="n">Score</th><th class="n">Width %</th><th>bbox (x1, y1, x2, y2)</th><th>Landmarks</th><th>Engine</th></tr>
+<tr><th>#</th><th>Face id</th><th class="n">Score</th><th class="n">Width %</th>{% if image.kind == "photo" %}<th>Best match (similarity)</th><th>Next closest</th>{% endif %}<th>bbox (x1, y1, x2, y2)</th><th>Landmarks</th><th>Engine</th></tr>
 {% for f in faces %}<tr>
   <td>{{ forloop.counter }}</td><td>{{ f.id }}</td><td class="n">{{ f.score|floatformat:3 }}</td><td class="n">{{ f.size_pct }}</td>
+  {% if image.kind == "photo" %}
+  <td>{% with m=f.candidates.0 %}{% if m %}<a href="{% url 'staff:user' m.user.pk %}" {% if m.is_match %}style="color:var(--ok); font-weight:700"{% else %}class="muted"{% endif %}>{{ m.user.full_name|default:m.user.phone }}</a> {{ m.sim|floatformat:3 }}{% if m.is_match %} ✓{% endif %}{% else %}<span class="muted">no candidates</span>{% endif %}{% endwith %}</td>
+  <td class="small">{% for m in f.candidates|slice:"1:" %}<a href="{% url 'staff:user' m.user.pk %}" class="{% if not m.is_match %}muted{% endif %}">{{ m.user.full_name|default:m.user.phone|truncatechars:16 }}</a> {{ m.sim|floatformat:3 }}{% if not forloop.last %} · {% endif %}{% endfor %}</td>
+  {% endif %}
   <td><code class="small">{% for v in f.bbox %}{{ v|floatformat:4 }}{% if not forloop.last %}, {% endif %}{% endfor %}</code></td>
   <td class="wrap"><code class="small">{% for v in f.landmarks %}{{ v|floatformat:3 }}{% if not forloop.last %}, {% endif %}{% endfor %}</code></td>
   <td class="small">{{ f.engine }}</td>

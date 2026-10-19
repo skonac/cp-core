@@ -79,6 +79,20 @@ class StaffPagesTest(TestCase):
         self.assertEqual(self.client.get(f"/dj/staff/images/{cover.id}/").status_code, 200)
         self.assertContains(self.client.get(f"/dj/staff/events/{self.event.code}/"), "uploaded cover")
 
+    def test_face_matches_on_photo_page(self):
+        photo = self.event.images.get(seq=1)          # the guest's face + a stranger
+        r = self.client.get(f"/dj/staff/images/{photo.id}/")
+        matches = [f.match["user"] for f in r.context["faces"] if f.match]
+        self.assertEqual(matches, [self.guest])
+        self.assertEqual((r.context["matched_faces"], r.context["matched_users"]), (1, 1))
+        self.assertContains(r, "Best match")
+        r = self.client.get(f"/dj/staff/images/{photo.id}/", {"t": "1.01", "scope": "all"})
+        self.assertEqual(r.context["matched_faces"], 0)
+        self.assertIn(self.guest, [f.candidates[0]["user"] for f in r.context["faces"]])   # still listed, below threshold
+
+    def test_admin_links_to_staff(self):
+        self.assertContains(self.client.get("/admin/"), 'href="/dj/staff/"')
+
     def test_files(self):
         photo = self.event.images.order_by("seq").first()
         for r in ("t", "d", "m"):

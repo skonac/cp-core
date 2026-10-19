@@ -26,6 +26,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from PIL import Image as PILImage
+from pgvector.django import CosineDistance
 
 from accounts.models import ConsentLog, OtpChallenge, User
 from credits.models import CreditTransaction
@@ -131,6 +132,32 @@ def event(request, code):
         "status_filter": request.GET.get("status", ""), "show_deleted": request.GET.get("deleted") == "1"})
 
 
+def _face_matches(image, faces, threshold: float, scope_all: bool) -> set[int]:
+    """For each face of a photo: the people whose selfie faces are closest (best per person, up to 3),
+    with cosine similarity; f.match = the best one when it reaches the threshold. Candidates: the
+    event's members (scope_all: everyone with a ready selfie). Sets f.candidates, f.match."""
+    selfie_faces = Face.objects.filter(image__kind=Image.Kind.SELFIE, image__status=Image.Status.DONE,
+                                       image__num_faces=1, image__deleted_at__isnull=True)
+    if not scope_all:
+        selfie_faces = selfie_faces.filter(image__owner__memberships__event=image.event)
+    rows_per_face = []
+    for f in faces:
+        rows = (selfie_faces.annotate(distance=CosineDistance("embedding", f.embedding))
+                .order_by("distance").values_list("image__owner_id", "distance")[:6])
+        best: dict[int, float] = {}
+        for owner_id, distance in rows:
+            best.setdefault(owner_id, 1 - distance)   # rows are nearest first: first per person is their best
+        rows_per_face.append(list(best.items())[:3])
+    users = User.objects.in_bulk({uid for rows in rows_per_face for uid, _ in rows})
+    matched = set()
+    for f, rows in zip(faces, rows_per_face):
+        f.candidates = [{"user": users[uid], "sim": sim, "is_match": sim >= threshold} for uid, sim in rows]
+        f.match = f.candidates[0] if f.candidates and f.candidates[0]["is_match"] else None
+        if f.match:
+            matched.add(f.match["user"].pk)
+    return matched
+
+
 def _rendition_info(image) -> list[dict]:
     out = []
     for r, label in (("t", "thumbnail"), ("d", "display"), ("m", "master")):
@@ -157,6 +184,14 @@ def image(request, image_id):
         f.box = {"left": f.bbox[0] * 100, "top": f.bbox[1] * 100,
                  "width": (f.bbox[2] - f.bbox[0]) * 100, "height": (f.bbox[3] - f.bbox[1]) * 100}
         f.size_pct = round((f.bbox[2] - f.bbox[0]) * 100, 1)
+    try:
+        threshold = float(request.GET.get("t", settings.MATCH_THRESHOLD))
+    except ValueError:
+        threshold = settings.MATCH_THRESHOLD
+    scope_all = request.GET.get("scope") == "all"
+    matched_users = set()
+    if image.kind == Image.Kind.PHOTO and faces:
+        matched_users = _face_matches(image, faces, threshold, scope_all)
     neighbours = {}
     if image.kind == Image.Kind.PHOTO:
         siblings = Image.objects.filter(event=image.event, kind=Image.Kind.PHOTO)
@@ -165,6 +200,8 @@ def image(request, image_id):
             "next": siblings.filter(seq__gt=image.seq).order_by("seq").values_list("id", flat=True).first()}
     return render(request, "staff/image.html", {
         "image": image, "faces": faces, "renditions": _rendition_info(image),
+        "threshold": threshold, "default_threshold": settings.MATCH_THRESHOLD, "scope_all": scope_all,
+        "matched_users": len(matched_users), "matched_faces": sum(1 for f in faces if getattr(f, "match", None)),
         "exif": sorted((image.exif or {}).items()), **neighbours,
         "downloads": image.downloads.select_related("user").order_by("-downloaded_at")[:20]})
 
