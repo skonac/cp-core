@@ -1,29 +1,35 @@
 # cp-core
 
-Cleverphotos core app: Django + PostgreSQL (pgvector). Accounts, events, image storage,
-the face-worker job queue, matching, credits, downloads, and the JSON API for cp-web.
+Cleverphotos core app: Django + PostgreSQL (pgvector). Accounts and OTP sign-in, events,
+image storage, the face-worker job queue, matching, credits, downloads, the JSON API for
+cp-web, and simple Django pages (organizer and participant fallback UI).
 
-Design: `design/core.md` (outside this repo for now). API notes for the frontend: `docs/api.md`.
+- API contract for the frontend: [`docs/api.md`](docs/api.md) (+ [`docs/openapi.json`](docs/openapi.json), live Swagger at `/api/docs`).
+- Design: `design/core.md` (outside this repo for now).
 
-## Dev setup (server)
+## Deploy (server)
 
 ```bash
-uv venv --python 3.12 && uv pip install -r requirements.txt
-cp .env.example .env            # then set CP_SECRET_KEY
-.venv/bin/python manage.py check
+git pull && sudo deploy/deploy.sh      # -> /opt/cleverphotos/core, settings /etc/cp-core/env
+cp-core-run                            # (re)start runserver in screen "core" (dev phase)
+cp-core-manage <command>               # manage.py against the deployed copy
 ```
 
-Database: `cpcore`, owned by your Linux user (peer auth over the unix socket), with the
-`vector` extension created by the postgres superuser.
+First install: `deploy.sh` creates `/etc/cp-core/env` from `.env.example` and stops; edit it
+(`sudoedit /etc/cp-core/env`) and run it again. Needs Postgres with the `vector` extension
+(created by the postgres superuser) and the media folder (`CP_MEDIA_ROOT`, `/photodisk`).
+
+Test data: `cp-core-manage import_photos`, `import_selfie`, `show_matches` (see `--help`).
 
 ## Layout
 
 | Path | What |
 | --- | --- |
-| `config/` | settings, root URLs, the API object, WSGI |
-| `common/` | API envelope and errors, request ids |
-| `accounts/` | User, OTP sign-in |
-| `events/` | events, memberships |
-| `media/` | images (photos + selfies, also the worker queue), faces, downloads |
+| `config/` | settings, root URLs, the API object, WSGI, version |
+| `common/` | API envelope and errors, middleware, rate limiter, legal texts |
+| `accounts/` | User, OTP sign-in, profile API |
+| `events/` | events, memberships, organizer and participant pages, event API |
+| `media/` | images (photos + selfies, also the worker queue), faces, downloads, upload pipeline, matching |
 | `credits/` | credit transactions |
-| `worker/` | face worker API and monitoring |
+| `worker/` | face worker protocol and queue |
+| `deploy/` | deploy script and server commands |
