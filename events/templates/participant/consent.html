@@ -3,15 +3,12 @@
 {% block content %}
 <div class="card" style="max-width:640px">
   <h1>Processing of your facial data</h1>
-  <p class="notice warn small">Placeholder text. The final KVKK notice (aydınlatma metni) and explicit consent text will replace it after legal review.</p>
-  <p>To find the event photos you appear in, we turn your selfie into a numeric face representation and compare it with the faces in the photos of the events you join.</p>
-  <ul>
-    <li>Your selfie and its face representation are not shown to organizers or other participants.</li>
-    <li>They are used only to find your photos in events you open.</li>
-    <li>Deleting your account deletes them.</li>
-  </ul>
+  <p>To find the event photos you appear in, we turn your selfie into a numeric face representation and compare it with the faces in the photos of the events you join. Please read the KVKK notice and explicit consent text:</p>
+  <p><a href="{{ kvkk.urls.tr }}" target="_blank">Türkçe (PDF)</a> · <a href="{{ kvkk.urls.en }}" target="_blank">English (PDF)</a> <span class="small">version {{ kvkk.version }}</span></p>
   <form method="post">{% csrf_token %}
     <input type="hidden" name="next" value="{{ next }}">
+    <input type="hidden" name="version" value="{{ kvkk.version }}">
+    <label>Language I read <select name="locale"><option value="tr">Türkçe</option><option value="en">English</option></select></label>
     <button name="agree" value="yes">I consent</button>
     <a class="button secondary" href="/me/">Not now</a>
   </form>

@@ -4,7 +4,7 @@ The JSON API that cp-web (React) uses. Served by cp-core (Django) on the same do
 frontend, under `/api/`. This document is the contract; the machine-readable companion is
 [`openapi.json`](openapi.json) (request shapes; live at `/api/openapi.json`, interactive at `/api/docs`).
 
-Last updated: 2026-10-19 · API version 0.1
+Last updated: 2026-10-19 · API version 0.1 (KVKK documents: versioned PDFs)
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then the
 > "Changes from cp-web's draft contract" section, which lists every place where this API
@@ -22,7 +22,7 @@ Last updated: 2026-10-19 · API version 0.1
 | JSON | camelCase field names, UTF-8. Timestamps ISO 8601 with offset (`2026-10-19T08:30:00+00:00`); dates `YYYY-MM-DD`. |
 | IDs | Always strings. Photo ids are the photo's number in its event, zero-padded: `"00017"`. Unique only within an event. |
 | Event codes | 5 characters, case-insensitive, digits 2–9 and letters without i/l/o. The API returns them uppercase (`"RK238"`); send them in any case. |
-| Locale | Messages (`message`) are Turkish. The consent notice takes `?locale=tr|en`. |
+| Locale | Messages (`message`) are Turkish. The KVKK document exists in `tr` and `en`. |
 
 ### Recommended fetch helper
 
@@ -71,6 +71,7 @@ Every response except files and `204` is:
 | 403 | `browse_all_not_allowed` | `view=all` on an event that doesn't allow it |
 | 404 | `event_not_found`, `photo_not_found`, `selfie_not_found`, `not_found` | Missing, or not visible to this user (never revealed which) |
 | 409 | `email_already_in_use` | `PATCH /me` with another account's email |
+| 409 | `consent_version_outdated` | Consent sent for a KVKK version that is no longer current |
 | 410 | `event_expired`, `otp_expired` | |
 | 422 | `validation_error`, `invalid_phone_number`, `invalid_role`, `invalid_otp`, `explicit_consent_required`, `unsupported_file_type`, `unreadable_image`, `file_too_large`, `file_required`, `invalid_slot` | |
 | 423 | `event_access_closed` | The organizer closed access |
@@ -121,6 +122,8 @@ The event context comes from the challenge; `eventCode` in this body is not need
 {
   "user": { "id": "69", "phoneNumber": "+905551234567", "fullName": null, "email": null,
             "profileCompleted": false, "accountRoles": ["participant"], "hasConsent": false,
+            "consentVersion": null,
+            "kvkk": { "version": "001", "urls": { "tr": "/api/kvkk/kvkk_tr_001.pdf", "en": "/api/kvkk/kvkk_en_001.pdf" } },
             "selfieState": "no_selfie", "selfieThumbnailUrl": null },
   "nextStep": "consent",
   "isNewUser": true,
@@ -151,7 +154,9 @@ Errors: `422 invalid_otp` (wrong code, unknown or already used challenge), `410 
 | Field | Notes |
 | --- | --- |
 | `accountRoles` | Any of `participant`, `organizer`, `photographer`, `admin`. UI visibility only; the server checks everything. `participant` = has joined at least one event. |
-| `hasConsent` | KVKK explicit consent for face processing given. |
+| `hasConsent` | KVKK explicit consent given **to the current document version**. A new version makes it `false` for everyone until they consent again. |
+| `consentVersion` | The version the user last consented to (`null` = never). Differs from `kvkk.version` when the text was updated since. |
+| `kvkk` | The current KVKK document: `version` and one PDF URL per language (`tr`, `en`). Show these on the consent screen. |
 | `selfieState` | `no_selfie` · `selfie_processing` · `selfie_rejected` · `ready` (see 3.4) |
 | `profileCompleted` | `true` when `fullName` is set |
 | `selfieThumbnailUrl` | The primary selfie's thumbnail, or `null` |
@@ -174,18 +179,23 @@ Errors: `422 invalid_otp` (wrong code, unknown or already used challenge), `410 
 
 ### 3.3 Consent
 
-**`GET /api/legal/biometric-consent/current?locale=tr`** (no session needed) → `200 consent_notice_retrieved`:
+The KVKK notice and explicit consent text is a PDF, one per language, versioned as a pair
+(`kvkk_tr_001.pdf` + `kvkk_en_001.pdf`). The current version and its URLs are in the user object
+(`user.kvkk`, from `GET /api/me` or the OTP verification).
 
-```json
-{ "id": "biometric-consent", "version": "draft-1", "effectiveAt": "2026-10-01T00:00:00Z",
-  "title": "…", "summary": "…", "sections": [ { "id": "purpose", "title": "…", "body": "…" } ] }
-```
+**`GET /api/kvkk/{file}`** (no session needed) → the PDF (`application/pdf`), e.g. `/api/kvkk/kvkk_tr_001.pdf`.
+Older versions stay available. Unknown file → `404 not_found`.
 
-Draft text until the legal text is approved.
+**`POST /api/me/consent`** `{ "granted": true, "version": "001", "locale": "tr" }` → `201 consent_recorded` `{ "hasConsent": true, "version": "001" }`.
 
-**`POST /api/me/consent`** `{ "granted": true }` → `201 consent_recorded` `{ "hasConsent": true, "noticeVersion": "draft-1" }`.
-`granted: false` → `422 explicit_consent_required`. Consent belongs to the account (not to an event) and is
-asked once. There is no withdrawal; deleting the account is the way out.
+- `version`: required, the `user.kvkk.version` the screen showed. If the document was updated meanwhile →
+  `409 consent_version_outdated`: re-fetch `GET /api/me` and show the new text.
+- `locale`: the language the user read, `tr` (default) or `en`. Recorded with the consent.
+- `granted: false` → `422 explicit_consent_required`.
+
+Consent belongs to the account (not to an event) and is asked once per document version. Each consent is
+recorded with the version, language, the file's SHA-256, IP and browser (user agent). There is no
+withdrawal; deleting the account is the way out.
 
 ### 3.4 Selfies (the user's face profile)
 
@@ -290,7 +300,7 @@ A photo the user may not see answers `404 photo_not_found`.
 2. `GET /api/me`: `401` → sign-in; `200` → skip to step 5.
 3. `POST /api/auth/otp-requests {phoneNumber, eventCode}` → code screen with countdown.
 4. `POST /api/auth/otp-verifications {challengeId, code}` → follow `nextStep`.
-5. `consent` → `GET /api/legal/biometric-consent/current` + `POST /api/me/consent {granted: true}`.
+5. `consent` → show the PDF from `user.kvkk.urls[locale]` + `POST /api/me/consent {granted: true, version: user.kvkk.version, locale}`.
 6. `selfie` → `POST /api/me/selfies` → poll `GET /api/me/selfies` until `ready` / `rejected`.
 7. `gallery` → `GET /api/events/RK238/gallery` (+ `view=all` tab when `canBrowseAll`).
 
@@ -308,10 +318,10 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 | 2 | OTP request `{eventCode, phoneNumber}` | Adds optional `role` (`participant` default, `organizer`) | Organizer entry sends `role: "organizer"` |
 | 3 | OTP verify body has `eventCode` | Not needed (taken from the challenge) | Optional to remove |
 | 4 | `expiresInSeconds: 120` | Same; `resendAfterSeconds: 30` | — |
-| 5 | `user` = `{id, phoneNumber, profileCompleted, accountRoles}` | Adds `fullName`, `email`, `hasConsent`, `selfieState`, `selfieThumbnailUrl`; `accountRoles` lists `participant`, `organizer`, `photographer`, `admin` | `AccountRole` type: add `participant`, `photographer`, `admin` |
+| 5 | `user` = `{id, phoneNumber, profileCompleted, accountRoles}` | Adds `fullName`, `email`, `hasConsent`, `consentVersion`, `kvkk`, `selfieState`, `selfieThumbnailUrl`; `accountRoles` lists `participant`, `organizer`, `photographer`, `admin` | `AccountRole` type: add `participant`, `photographer`, `admin` |
 | 6 | `nextStep: consent \| account_home \| organizer_home` | Adds `selfie`, `gallery` | Handle the two new values |
-| 7 | `POST /api/events/{code}/biometric-consents {noticeVersion, granted}` | `POST /api/me/consent {granted}`; consent is per account | Change path/body; skip the consent screen when `user.hasConsent` |
-| 8 | `GET /api/legal/biometric-consent/current?locale=` | Same | — |
+| 7 | `POST /api/events/{code}/biometric-consents {noticeVersion, granted}` | `POST /api/me/consent {granted, version, locale}`; consent is per account and per document version; `409 consent_version_outdated` | Change path/body; skip the consent screen when `user.hasConsent` |
+| 8 | `GET /api/legal/biometric-consent/current?locale=` (JSON sections) | Removed. The text is a PDF per language: `user.kvkk.urls.tr` / `.en` → `GET /api/kvkk/{file}` | Show/link the PDF instead of rendering sections; drop the notice fetch and its types/mocks |
 | 9 | `POST /api/events/{code}/face-profile/uploads` (sync `faceCount`, `face_not_detected`…) | `POST /api/me/selfies` (async); results via `GET /api/me/selfies` `status`/`reason` | Upload, then poll; map `reason` to messages |
 | 10 | `PUT /api/me/face-profile` | `POST /api/me/selfies` with `slot=primary` | Same endpoint as #9 |
 | 11 | `POST/GET /api/events/{code}/match-jobs` | Removed. The gallery is always current; `matching` + `photosPending` tell the state | Delete match-job calls/types/mocks; after the selfie is `ready`, load the gallery |

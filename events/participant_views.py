@@ -20,6 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
+from accounts import kvkk
 from media.ingest import IngestError, ingest_selfie
 from media.matching import my_photos
 from media.models import DownloadLog, Image
@@ -167,7 +168,11 @@ def consent(request):
     if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
         next_url = "/me/"
     if request.method == "POST" and request.POST.get("agree") == "yes":
-        request.user.is_consent = True
-        request.user.save(update_fields=["is_consent"])
-        return redirect(next_url)
-    return render(request, "participant/consent.html", {"next": next_url})
+        if request.POST.get("version") != settings.KVKK_VERSION:   # the document changed while the page was open
+            messages.error(request, "The consent text has been updated; please read the current version.")
+        else:
+            locale = request.POST.get("locale") if request.POST.get("locale") in settings.KVKK_LOCALES else "tr"
+            kvkk.record_consent(request.user, locale, request.META.get("REMOTE_ADDR"),
+                                request.META.get("HTTP_USER_AGENT", ""))
+            return redirect(next_url)
+    return render(request, "participant/consent.html", {"next": next_url, "kvkk": kvkk.documents()})

@@ -26,7 +26,8 @@ Test data: `cp-core-manage import_photos`, `import_selfie`, `show_matches` (see 
 | Path | What |
 | --- | --- |
 | `config/` | settings, root URLs, the API object, WSGI, version |
-| `common/` | API envelope and errors, middleware, rate limiter, legal texts |
+| `kvkk/` | KVKK documents, one pair per version: `kvkk_tr_001.pdf` + `kvkk_en_001.pdf`; current = `CP_KVKK_VERSION`. Never edit a published file: add a new version |
+| `common/` | API envelope and errors, middleware, rate limiter |
 | `accounts/` | User, OTP sign-in, profile API |
 | `events/` | events, memberships, organizer and participant pages, event API |
 | `media/` | images (photos + selfies, also the worker queue), faces, downloads, upload pipeline, matching |

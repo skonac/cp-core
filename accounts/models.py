@@ -46,7 +46,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     email_verified_at = models.DateTimeField(null=True, blank=True)
     full_name = models.CharField(max_length=150, blank=True)
 
-    is_consent = models.BooleanField(default=False)        # KVKK explicit consent
+    kvkk_version = models.CharField(max_length=8, blank=True)   # KVKK document version consented to; "" = never
     is_participant = models.BooleanField(default=False)
     is_organizer = models.BooleanField(default=False)
     is_photographer = models.BooleanField(default=False)
@@ -70,6 +70,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def effective_credit_floor(self) -> int:
         return settings.CREDIT_FLOOR_DEFAULT if self.credit_floor is None else self.credit_floor
+
+    @property
+    def is_consent(self) -> bool:
+        """KVKK explicit consent to the current document. A new document version voids older consent."""
+        return bool(self.kvkk_version) and self.kvkk_version == settings.KVKK_VERSION
 
     @property
     def account_roles(self) -> list[str]:
@@ -108,3 +113,23 @@ class OtpChallenge(models.Model):
 
     def __str__(self):
         return f"{self.phone} {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class ConsentLog(models.Model):
+    """One row per consent given: the legal record. Append-only (read-only in the admin).
+    Kept when the account is deleted (user becomes NULL; phone and name are copies)."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
+    phone = models.CharField(max_length=16)
+    full_name = models.CharField(max_length=150, blank=True)
+    version = models.CharField(max_length=8)                  # e.g. "001" = kvkk_tr_001.pdf + kvkk_en_001.pdf
+    locale = models.CharField(max_length=2)                   # the language shown: tr | en
+    sha256 = models.CharField(max_length=64)                  # of the shown file: proves the exact text
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "created_at"], name="consentlog_user")]
+
+    def __str__(self):
+        return f"{self.phone} {self.version}/{self.locale} {self.created_at:%Y-%m-%d %H:%M}"

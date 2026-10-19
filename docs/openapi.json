@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "cp-core API",
-    "version": "0.1",
+    "version": "0.1-dev",
     "description": "Cleverphotos core API for cp-web. Session cookie + X-CSRFToken. See docs/api.md."
   },
   "paths": {
@@ -325,20 +325,19 @@
         ]
       }
     },
-    "/api/legal/biometric-consent/current": {
+    "/api/kvkk/{filename}": {
       "get": {
-        "operationId": "accounts_api_consent_notice",
-        "summary": "Consent Notice",
+        "operationId": "accounts_api_kvkk_document",
+        "summary": "Kvkk Document",
         "parameters": [
           {
-            "in": "query",
-            "name": "locale",
+            "in": "path",
+            "name": "filename",
             "schema": {
-              "default": "tr",
-              "title": "Locale",
+              "title": "Filename",
               "type": "string"
             },
-            "required": false
+            "required": true
           }
         ],
         "responses": {
@@ -346,8 +345,9 @@
             "description": "OK"
           }
         },
+        "description": "A KVKK document PDF, current or older (what earlier consents refer to). Public.",
         "tags": [
-          "legal"
+          "kvkk"
         ]
       }
     },
@@ -681,10 +681,20 @@
           "granted": {
             "title": "Granted",
             "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "locale": {
+            "default": "tr",
+            "title": "Locale",
+            "type": "string"
           }
         },
         "required": [
-          "granted"
+          "granted",
+          "version"
         ],
         "title": "ConsentIn",
         "type": "object"

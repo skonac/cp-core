@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 
-from .models import OtpChallenge, User
+from .models import ConsentLog, OtpChallenge, User
 
 
 class UserCreateForm(AdminUserCreationForm):
@@ -25,13 +25,13 @@ class UserAdmin(DjangoUserAdmin):
     form = UserEditForm
     ordering = ("-created_at",)
     search_fields = ("phone", "email", "full_name")
-    list_display = ("phone", "full_name", "email", "is_participant", "is_organizer", "is_consent",
+    list_display = ("phone", "full_name", "email", "is_participant", "is_organizer", "kvkk_version",
                     "credit_balance", "is_staff", "created_at")
-    list_filter = ("is_participant", "is_organizer", "is_photographer", "is_consent", "is_staff", "is_active")
-    readonly_fields = ("credit_balance", "created_at", "last_login")   # credits change via Credit transactions
+    list_filter = ("is_participant", "is_organizer", "is_photographer", "kvkk_version", "is_staff", "is_active")
+    readonly_fields = ("credit_balance", "kvkk_version", "created_at", "last_login")   # consent only via the consent step   # credits change via Credit transactions
     fieldsets = (
         (None, {"fields": ("phone", "password")}),
-        ("Profile", {"fields": ("full_name", "email", "phone_verified_at", "email_verified_at", "is_consent")}),
+        ("Profile", {"fields": ("full_name", "email", "phone_verified_at", "email_verified_at", "kvkk_version")}),
         ("Roles", {"fields": ("is_participant", "is_organizer", "is_photographer")}),
         ("Credits", {"fields": ("credit_balance", "credit_floor")}),
         ("Admin access", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
@@ -47,3 +47,18 @@ class OtpChallengeAdmin(admin.ModelAdmin):
     list_display = ("phone", "dev_code", "role", "event", "created_at", "expires_at", "attempts", "consumed_at")
     search_fields = ("phone",)
     readonly_fields = [f.name for f in OtpChallenge._meta.fields]
+
+
+@admin.register(ConsentLog)
+class ConsentLogAdmin(admin.ModelAdmin):
+    """The legal record: read-only, no adding or deleting from the admin."""
+    list_display = ("created_at", "phone", "full_name", "version", "locale", "ip")
+    list_filter = ("version", "locale")
+    search_fields = ("phone", "full_name")
+    readonly_fields = [f.name for f in ConsentLog._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

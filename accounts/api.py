@@ -5,13 +5,12 @@ from django.contrib.auth import login, logout
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from django.middleware.csrf import get_token
 from ninja import File, Form, Router
 from ninja.files import UploadedFile
 from ninja.security import django_auth
 
-from common import legal
 from common.api import ApiError, CamelSchema, respond
 from events.codes import normalize_code
 from events.models import Event, EventMember
@@ -21,12 +20,13 @@ from media.matching import my_photos, selfie_state
 from media.models import Image
 from media.storage import file_response, soft_delete
 
+from . import kvkk
 from .models import User
 from .otp import mask_phone, request_code, verify_code
 
 auth_router = Router(tags=["auth"])
 me_router = Router(tags=["me"], auth=django_auth)
-legal_router = Router(tags=["legal"])
+kvkk_router = Router(tags=["kvkk"])
 
 
 # ---------------------------------------------------------------------------- shapes
@@ -50,7 +50,8 @@ def user_json(user: User) -> dict:
     return {
         "id": str(user.pk), "phoneNumber": user.phone, "fullName": user.full_name or None, "email": user.email,
         "profileCompleted": bool(user.full_name), "accountRoles": user.account_roles,
-        "hasConsent": user.is_consent, "selfieState": selfie_state(user),
+        "hasConsent": user.is_consent, "consentVersion": user.kvkk_version or None, "kvkk": kvkk.documents(),
+        "selfieState": selfie_state(user),
         "selfieThumbnailUrl": f"/api/me/selfies/{first.pk}/thumb.jpg" if first else None,
     }
 
@@ -116,13 +117,15 @@ def sign_out(request):
     return HttpResponse(status=204)
 
 
-# ---------------------------------------------------------------------------- legal
+# ---------------------------------------------------------------------------- kvkk
 
-@legal_router.get("/biometric-consent/current", auth=None)
-def consent_notice(request, locale: str = "tr"):
-    text = legal.BIOMETRIC_CONSENT.get(locale, legal.BIOMETRIC_CONSENT["tr"])
-    return respond(request, "consent_notice_retrieved", {
-        "id": "biometric-consent", "version": legal.VERSION, "effectiveAt": legal.EFFECTIVE_AT, **text})
+@kvkk_router.get("/{filename}", auth=None)
+def kvkk_document(request, filename: str):
+    """A KVKK document PDF, current or older (what earlier consents refer to). Public."""
+    path = settings.KVKK_DIR / filename
+    if not kvkk.FILENAME_RE.match(filename) or not path.is_file():
+        raise ApiError(404, "not_found", "Belge bulunamadı.")
+    return FileResponse(path.open("rb"), content_type="application/pdf", filename=filename)
 
 
 # ---------------------------------------------------------------------------- me
@@ -134,6 +137,8 @@ class MeUpdateIn(CamelSchema):
 
 class ConsentIn(CamelSchema):
     granted: bool
+    version: str          # the KVKK version the user was shown (user.kvkk.version)
+    locale: str = "tr"    # the language shown: tr | en
 
 
 @me_router.get("")
@@ -166,9 +171,13 @@ def me_update(request, body: MeUpdateIn):
 def give_consent(request, body: ConsentIn):
     if not body.granted:
         raise ApiError(422, "explicit_consent_required", "Açık rıza olmadan devam edilemez.")
-    request.user.is_consent = True
-    request.user.save(update_fields=["is_consent"])
-    return respond(request, "consent_recorded", {"hasConsent": True, "noticeVersion": legal.VERSION},
+    if body.locale not in settings.KVKK_LOCALES:
+        raise ApiError(422, "validation_error", "Geçersiz dil.")
+    if body.version != settings.KVKK_VERSION:
+        raise ApiError(409, "consent_version_outdated", "Metin güncellendi; lütfen güncel metni oku.")
+    kvkk.record_consent(request.user, body.locale, request.META.get("REMOTE_ADDR"),
+                        request.META.get("HTTP_USER_AGENT", ""))
+    return respond(request, "consent_recorded", {"hasConsent": True, "version": settings.KVKK_VERSION},
                    status=201, message="Açık rıza kaydedildi.")
 
 

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand
 
+from accounts.kvkk import record_consent
 from accounts.models import User
 from media.ingest import IngestError, ingest_selfie
 
@@ -17,13 +18,12 @@ class Command(BaseCommand):
         parser.add_argument("phone")
         parser.add_argument("file")
         parser.add_argument("--slot", default="primary", choices=["primary", "secondary"])
-        parser.add_argument("--consent", action="store_true", help="record consent first (testing)")
+        parser.add_argument("--consent", action="store_true", help="record consent to the current KVKK version first (testing; logged)")
 
     def handle(self, phone, file, slot, consent, **_):
         user = User.objects.filter(phone=phone).first() or User.objects.create_user(phone, is_participant=True)
-        if consent and not user.is_consent:
-            user.is_consent = True
-            user.save(update_fields=["is_consent"])
+        if consent:
+            record_consent(user, "tr", None, "manage.py import_selfie --consent")
         try:
             img = ingest_selfie(user, Path(file).read_bytes(), slot)
         except IngestError as e:

@@ -162,6 +162,12 @@ OTP_RESEND_AFTER = 30       # seconds before another code may be requested
 OTP_DELIVERY = env("CP_OTP_DELIVERY", "log")   # "log": code goes to the log + OtpChallenge.dev_code, no SMS
 EVENT_LOOKUP_PER_MIN = 30   # public event lookups per IP
 
+# KVKK consent document (design/core.md, "Consent"). The pair kvkk/kvkk_tr_<v>.pdf + kvkk_en_<v>.pdf;
+# a user has consent when User.kvkk_version equals this. Changing it = everyone consents again.
+KVKK_VERSION = env("CP_KVKK_VERSION", "000")
+KVKK_DIR = BASE_DIR / "kvkk"
+KVKK_LOCALES = ("tr", "en")
+
 WORKER_TOKEN = env("CP_WORKER_TOKEN", "")
 WORKER_LEASE = 120          # seconds a claimed job belongs to its worker
 WORKER_MAX_ATTEMPTS = 3
