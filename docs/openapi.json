@@ -691,9 +691,9 @@
             }
           },
           "200": {
-            "description": "The PDF",
+            "description": "The page",
             "content": {
-              "application/pdf": {
+              "text/html; charset=utf-8": {
                 "schema": {
                   "type": "string",
                   "format": "binary"
@@ -702,7 +702,7 @@
             }
           }
         },
-        "description": "A KVKK document PDF, current or older (what earlier consents refer to). Public.\nThe current files: `user.kvkk.urls`. Errors: 404 not_found.",
+        "description": "A KVKK document (HTML page), current or older (what earlier consents refer to). Public.\nThe current files: `user.kvkk.urls`. Errors: 404 not_found.",
         "tags": [
           "kvkk"
         ]
@@ -733,9 +733,9 @@
             }
           },
           "200": {
-            "description": "The PDF",
+            "description": "The page",
             "content": {
-              "application/pdf": {
+              "text/html; charset=utf-8": {
                 "schema": {
                   "type": "string",
                   "format": "binary"
@@ -744,7 +744,7 @@
             }
           }
         },
-        "description": "A KVKK document PDF, current or older (what earlier consents refer to). Public.\nThe current files: `user.kvkk.urls`. Errors: 404 not_found.",
+        "description": "A KVKK document (HTML page), current or older (what earlier consents refer to). Public.\nThe current files: `user.kvkk.urls`. Errors: 404 not_found.",
         "tags": [
           "kvkk"
         ]
@@ -2873,6 +2873,192 @@
         ]
       }
     },
+    "/api/shop/obf": {
+      "get": {
+        "operationId": "shop_api_obf",
+        "summary": "Obf",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "product",
+            "schema": {
+              "title": "Product",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "default": "tr",
+              "enum": [
+                "tr",
+                "en"
+              ],
+              "title": "Locale",
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "The filled form",
+            "content": {
+              "text/html; charset=utf-8": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "description": "Ön Bilgilendirme Formu (preliminary information form), filled for the signed-in user's billing\nprofile and this product, as an HTML page: show it before the purchase, next to its checkbox.\nOrder number \"–\", date now. The text version: `documentsVersion` in GET /api/shop/products.\n\nErrors: 403 organizer_access_required · 404 not_found (product not on sale) · 422 billing_profile_required.",
+        "tags": [
+          "shop"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/shop/mss": {
+      "get": {
+        "operationId": "shop_api_mss",
+        "summary": "Mss",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "product",
+            "schema": {
+              "title": "Product",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "default": "tr",
+              "enum": [
+                "tr",
+                "en"
+              ],
+              "title": "Locale",
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "The filled agreement",
+            "content": {
+              "text/html; charset=utf-8": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "description": "Mesafeli Satış Sözleşmesi (distance sales agreement), filled like GET /api/shop/obf.\n\nErrors: 403 organizer_access_required · 404 not_found (product not on sale) · 422 billing_profile_required.",
+        "tags": [
+          "shop"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
     "/api/shop/purchases": {
       "get": {
         "operationId": "shop_api_purchases",
@@ -2996,7 +3182,7 @@
             }
           }
         },
-        "description": "Buy one product: checks it is on sale and the price version, then starts the payment.\nWith iyzico: the purchase is `pending` and `paymentPageUrl` is iyzico's payment page; send the\nbrowser there. After paying, iyzico brings the browser back to us, we settle the purchase and\nredirect to the shop page (`/organizer/credits?purchase=<id>&status=paid|failed|pending`); read\nthe result with GET /api/shop/purchases/{id}. Simulated (dev servers): `paid` at once,\n`paymentPageUrl` null.\n\nNeeds a complete billing profile (`PUT /api/me/billing`); it is copied into the purchase.\n\nErrors: 403 organizer_access_required · 404 not_found (product not on sale) ·\n409 pricing_changed (reload the products) · 422 billing_profile_required ·\n502 payment_provider_error, payment_provider_unreachable (iyzico refused or can't be reached).",
+        "description": "Buy one product: checks it is on sale and the price version, then starts the payment.\nWith iyzico: the purchase is `pending` and `paymentPageUrl` is iyzico's payment page; send the\nbrowser there. After paying, iyzico brings the browser back to us, we settle the purchase and\nredirect to the shop page (`/organizer/credits?purchase=<id>&status=paid|failed|pending`); read\nthe result with GET /api/shop/purchases/{id}. Simulated (dev servers): `paid` at once,\n`paymentPageUrl` null.\n\nNeeds a complete billing profile (`PUT /api/me/billing`); it is copied into the purchase. The buyer\nmust have ticked both checkboxes (ÖBF and MSS, GET /api/shop/obf and /mss): `acceptedObf` and\n`acceptedMss` true, `documentsVersion` as in GET /api/shop/products. The four filled texts are\nstored with the purchase (`documentsUrl`).\n\nErrors: 403 organizer_access_required · 404 not_found (product not on sale) ·\n409 pricing_changed (reload the products) · 422 billing_profile_required ·\n409 documents_changed (the texts changed: reload the products and show them again) ·\n422 documents_not_accepted ·\n502 payment_provider_error, payment_provider_unreachable (iyzico refused or can't be reached).",
         "tags": [
           "shop"
         ],
@@ -3075,6 +3261,75 @@
           }
         },
         "description": "One of this account's purchases: the result page after iyzico's return reads `status` here\n(`pending` can still turn into `paid` or `failed`; ask again in a few seconds).\n\nErrors: 403 organizer_access_required · 404 not_found.",
+        "tags": [
+          "shop"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/shop/purchases/{purchase_id}/documents": {
+      "get": {
+        "operationId": "shop_api_purchase_documents",
+        "summary": "Purchase Documents",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "purchase_id",
+            "schema": {
+              "title": "Purchase Id",
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "The stored page",
+            "content": {
+              "text/html; charset=utf-8": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "description": "The ÖBF + MSS (TR, then EN) as the buyer accepted them for this purchase: the stored HTML page,\nnever regenerated. Printable; the browser can save it as PDF.\n\nErrors: 403 organizer_access_required · 404 not_found (not this account's, or a purchase from\nbefore the documents existed).",
         "tags": [
           "shop"
         ],
@@ -3612,7 +3867,7 @@
           "version": {
             "description": "Current KVKK document version.",
             "examples": [
-              "001"
+              "002"
             ],
             "title": "Version",
             "type": "string"
@@ -3621,11 +3876,11 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "PDF per language.",
+            "description": "HTML page per language.",
             "examples": [
               {
-                "en": "/api/kvkk/kvkk_en_001.pdf",
-                "tr": "/api/kvkk/kvkk_tr_001.pdf"
+                "en": "/api/kvkk/kvkk_en_002.html",
+                "tr": "/api/kvkk/kvkk_tr_002.html"
               }
             ],
             "propertyNames": {
@@ -4298,7 +4553,7 @@
           },
           "version": {
             "examples": [
-              "001"
+              "002"
             ],
             "title": "Version",
             "type": "string"
@@ -6802,12 +7057,21 @@
             },
             "title": "Products",
             "type": "array"
+          },
+          "documentsVersion": {
+            "description": "Version of the ÖBF + MSS texts (GET /api/shop/obf, /mss); send back with a purchase.",
+            "examples": [
+              "001"
+            ],
+            "title": "Documentsversion",
+            "type": "string"
           }
         },
         "required": [
           "creditBalance",
           "pricingVersion",
-          "products"
+          "products",
+          "documentsVersion"
         ],
         "title": "CatalogOut",
         "type": "object"
@@ -7116,6 +7380,21 @@
               "2026-10-19T08:30:05+00:00"
             ],
             "title": "Paidat"
+          },
+          "documentsUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ÖBF + MSS the buyer accepted (HTML page); null on purchases made before the documents existed.",
+            "examples": [
+              "/api/shop/purchases/7/documents"
+            ],
+            "title": "Documentsurl"
           }
         },
         "required": [
@@ -7127,7 +7406,8 @@
           "currency",
           "status",
           "purchasedAt",
-          "paidAt"
+          "paidAt",
+          "documentsUrl"
         ],
         "title": "PurchaseOut",
         "type": "object"
@@ -7285,6 +7565,21 @@
           "pricingVersion": {
             "title": "Pricingversion",
             "type": "string"
+          },
+          "documentsVersion": {
+            "default": "",
+            "title": "Documentsversion",
+            "type": "string"
+          },
+          "acceptedObf": {
+            "default": false,
+            "title": "Acceptedobf",
+            "type": "boolean"
+          },
+          "acceptedMss": {
+            "default": false,
+            "title": "Acceptedmss",
+            "type": "boolean"
           }
         },
         "required": [

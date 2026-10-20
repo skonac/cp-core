@@ -12,10 +12,10 @@ Matching = Literal["consent_required", "matching_off", "no_selfie", "selfie_proc
 
 
 class KvkkDocumentsOut(Out):
-    version: str = Field(description="Current KVKK document version.", examples=["001"])
+    version: str = Field(description="Current KVKK document version.", examples=["002"])
     urls: dict[Literal["tr", "en"], str] = Field(
-        description="PDF per language.",
-        examples=[{"tr": "/api/kvkk/kvkk_tr_001.pdf", "en": "/api/kvkk/kvkk_en_001.pdf"}])
+        description="HTML page per language.",
+        examples=[{"tr": "/api/kvkk/kvkk_tr_002.html", "en": "/api/kvkk/kvkk_en_002.html"}])
 
 
 class UserOut(Out):
@@ -56,7 +56,7 @@ class SignInOut(Out):
 
 class ConsentOut(Out):
     hasConsent: Literal[True]
-    version: str = Field(examples=["001"])
+    version: str = Field(examples=["002"])
 
 
 class MyEventOut(Out):

@@ -1,0 +1,73 @@
+<h1>Preliminary Information Form</h1>
+<p class="sub">Clever Photos credit package sale · Version 001 · 20 October 2026 · English translation; the Turkish text prevails</p>
+
+<p>This form is provided under Consumer Protection Law No. 6502 and the Regulation on Distance Contracts to inform the Buyer before the agreement is concluded and before payment.</p>
+
+<h2>1. Seller</h2>
+<table class="kv">
+<tr><th>Name / trade name</th><td>Sabiha Pınar Gesli – Clever Photos</td></tr>
+<tr><th>Address</th><td>Güvenlik Caddesi No: 36A, Ayrancı, Çankaya / Ankara, Türkiye</td></tr>
+<tr><th>Tax office / tax number</th><td>Hitit Tax Office / 23252752794</td></tr>
+<tr><th>Phone</th><td>+90 538 417 56 84</td></tr>
+<tr><th>Email</th><td>pinar@slothcoffeeshop.com</td></tr>
+<tr><th>Website</th><td>cleverphotos.org</td></tr>
+</table>
+
+<h2>2. Buyer</h2>
+<table class="kv">
+<tr><th>Name / company name</th><td>{{ buyer.name }}</td></tr>
+<tr><th>Address</th><td>{{ buyer.address }}</td></tr>
+<tr><th>Email</th><td>{{ buyer.email }}</td></tr>
+<tr><th>Phone</th><td>{{ buyer.phone }}</td></tr>
+</table>
+
+<h2>3. Product and main characteristics</h2>
+<table class="kv">
+<tr><th>Product</th><td>{{ order.product }}</td></tr>
+<tr><th>Credits</th><td>{{ order.credits }}</td></tr>
+<tr><th>Total price (VAT included)</th><td>{{ order.amount }}</td></tr>
+<tr><th>Delivery cost</th><td>None</td></tr>
+</table>
+<ul>
+<li>A credit is a digital usage unit used to upload event photos to the Clever Photos Platform. 1 credit entitles the holder to upload 1 photo.</li>
+<li>1 credit is deducted for each photo uploaded to and accepted by the Platform. Credits are not returned for photos that are later deleted or that contain no faces.</li>
+<li>Credits cannot be exchanged for cash or transferred to another account.</li>
+<li>If no credit is used and no new credit package is bought on the account for 3 (three) years, the remaining credits expire at the end of that period.</li>
+</ul>
+
+<h2>4. Payment and delivery</h2>
+<ul>
+<li>Prices are in Turkish lira and include VAT.</li>
+<li>Payment is taken by credit or debit card in a single payment through İyzi Ödeme ve Elektronik Para Hizmetleri A.Ş. (iyzico). Card details are not passed to or stored by the Seller.</li>
+<li>Credits are added electronically to the Buyer’s Platform account as soon as the payment is approved. There is no physical delivery.</li>
+<li>The invoice is issued as an e-Fatura for Buyers registered for e-Fatura, otherwise as an e-Arşiv invoice, and is sent to the Buyer’s email address.</li>
+</ul>
+
+<h2>5. Right of withdrawal</h2>
+<ul>
+<li>Because credits are added to the account as soon as the payment is approved, and performance of the service begins immediately with the Buyer’s approval, there is no right of withdrawal under Article 15(1)(g) and (ğ) of the Regulation on Distance Contracts.</li>
+<li>Nevertheless, the Seller grants a Buyer who is a consumer the following option: if no credit has been used on the account since the purchase (no photo uploaded), the Buyer may withdraw from the agreement within 14 (fourteen) days of its conclusion, without giving a reason and without penalty.</li>
+<li>Notice of withdrawal is given within that period by email to pinar@slothcoffeeshop.com, stating the order number.</li>
+<li>Within 14 (fourteen) days of receiving the notice, the Seller refunds the full amount to the card used for payment, at no cost, and removes the related credits from the account.</li>
+<li>Once credits start being used on the account after the purchase, this withdrawal option ends. No partial refunds are made.</li>
+</ul>
+
+<h2>6. Functionality and compatibility of the digital service</h2>
+<p>The Platform is used with a current web browser on any device with an internet connection; no software needs to be installed. Access is by signing in with a one-time code sent by SMS to the user’s mobile phone number.</p>
+
+<h2>7. Placing the order and keeping the agreement</h2>
+<ul>
+<li>The order is placed by choosing a credit package on the Platform, entering billing details, approving this form and the Distance Sales Agreement, and completing the payment on the iyzico payment page.</li>
+<li>Before going to the payment page, the Buyer can see and correct the chosen package and the billing details.</li>
+<li>This form and the Distance Sales Agreement are sent to the Buyer’s email address and kept available in the Buyer’s Platform account. The Seller keeps order records for the period required by law.</li>
+<li>The language of the agreement is Turkish. The English translation is for information only.</li>
+<li>Personal data is processed in accordance with the Privacy Notice published on the Platform.</li>
+</ul>
+
+<h2>8. Complaints and disputes</h2>
+<p>The Buyer can send requests and complaints to the Seller using the contact details in Section 1. A Buyer who is a consumer may apply, within the monetary limits announced each year by the Ministry of Trade, to the Consumer Arbitration Committee where they live or where the consumer transaction took place, and to the Consumer Court for disputes above those limits. Applications to the Consumer Arbitration Committee can also be made on e-Devlet through the Consumer Information System (TÜBİS).</p>
+
+<div class="box">
+<p style="margin:0">The Buyer confirms having read this Preliminary Information Form, that the information above was given to them electronically before the agreement was concluded and before payment, and that they approve the credits being added to their account as soon as the payment is approved.</p>
+<p class="small" style="margin:6pt 0 0">Date: {{ order.date }} · Order no: {{ order.number }}</p>
+</div>

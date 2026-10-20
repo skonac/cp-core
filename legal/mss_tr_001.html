@@ -1,0 +1,109 @@
+<h1>Mesafeli Satış Sözleşmesi</h1>
+<p class="sub">Clever Photos kontör paketi satışı · Sürüm 001 · 20 Ekim 2026</p>
+
+<h2>Madde 1 — Taraflar</h2>
+<p><strong>1.1 Satıcı</strong></p>
+<table class="kv">
+<tr><th>Ad soyad / ticaret unvanı</th><td>Sabiha Pınar Gesli – Clever Photos</td></tr>
+<tr><th>Adres</th><td>Güvenlik Caddesi No: 36A, Ayrancı, Çankaya / Ankara</td></tr>
+<tr><th>Vergi dairesi / vergi no</th><td>Hitit Vergi Dairesi / 23252752794</td></tr>
+<tr><th>Telefon</th><td>+90 538 417 56 84</td></tr>
+<tr><th>E-posta</th><td>pinar@slothcoffeeshop.com</td></tr>
+<tr><th>İnternet sitesi</th><td>cleverphotos.org</td></tr>
+</table>
+<p><strong>1.2 Alıcı</strong></p>
+<table class="kv">
+<tr><th>Ad soyad / unvan</th><td>{{ buyer.name }}</td></tr>
+<tr><th>T.C. kimlik no / vergi no</th><td>{{ buyer.tax_id }}</td></tr>
+<tr><th>Vergi dairesi</th><td>{{ buyer.tax_office }}</td></tr>
+<tr><th>Adres</th><td>{{ buyer.address }}</td></tr>
+<tr><th>E-posta</th><td>{{ buyer.email }}</td></tr>
+<tr><th>Telefon</th><td>{{ buyer.phone }}</td></tr>
+</table>
+
+<h2>Madde 2 — Tanımlar</h2>
+<ul>
+<li><strong>Platform:</strong> cleverphotos.org internet sitesi ve ona bağlı uygulamalar üzerinden sunulan Clever Photos hizmeti.</li>
+<li><strong>Kontör:</strong> Platform’a etkinlik fotoğrafı yüklemek için kullanılan dijital kullanım birimi. 1 kontör, 1 fotoğraf yükleme hakkı verir.</li>
+<li><strong>Kontör paketi:</strong> Platform’da satışa sunulan, belirli sayıda kontör içeren paket.</li>
+<li><strong>Tüketici:</strong> 6502 sayılı Tüketicinin Korunması Hakkında Kanun’da tanımlanan, ticari veya mesleki olmayan amaçlarla hareket eden gerçek veya tüzel kişi.</li>
+<li><strong>Yönetmelik:</strong> Mesafeli Sözleşmeler Yönetmeliği.</li>
+</ul>
+
+<h2>Madde 3 — Sözleşmenin konusu</h2>
+<p>Bu sözleşme, Alıcı’nın Platform üzerinden elektronik ortamda sipariş verdiği ve aşağıda nitelikleri ile satış fiyatı belirtilen kontör paketinin satışına ve Alıcı’nın hesabına tanımlanmasına ilişkin olarak tarafların hak ve yükümlülüklerini, 6502 sayılı Kanun ve Yönetmelik hükümleri çerçevesinde düzenler.</p>
+
+<h2>Madde 4 — Sipariş bilgileri</h2>
+<table class="kv">
+<tr><th>Sipariş no</th><td>{{ order.number }}</td></tr>
+<tr><th>Sipariş tarihi</th><td>{{ order.date }}</td></tr>
+<tr><th>Ürün</th><td>{{ order.product }}</td></tr>
+<tr><th>Kontör miktarı</th><td>{{ order.credits }}</td></tr>
+<tr><th>Toplam bedel (KDV dahil)</th><td>{{ order.amount }}</td></tr>
+<tr><th>Ödeme şekli</th><td>Kredi kartı / banka kartı (iyzico), tek çekim</td></tr>
+<tr><th>Teslim şekli</th><td>Elektronik ortamda, Alıcı’nın Platform hesabına</td></tr>
+<tr><th>Teslim masrafı</th><td>Yoktur</td></tr>
+</table>
+
+<h2>Madde 5 — Teslim ve kontörlerin kullanımı</h2>
+<ol>
+<li>Ödeme, ödeme kuruluşu tarafından onaylandığı anda kontörler Alıcı’nın Platform hesabına tanımlanır. Fiziksel teslimat yapılmaz.</li>
+<li>Platform’a yüklenen ve Platform tarafından kabul edilen her fotoğraf için Alıcı’nın hesabından 1 kontör düşülür. Sonradan silinen fotoğraflar ve içinde yüz bulunmayan fotoğraflar için kontör iade edilmez.</li>
+<li>Kontörler nakde çevrilemez ve başka bir hesaba devredilemez. Madde 7 ve Madde 8’de belirtilen durumlar dışında kontör bedeli iade edilmez.</li>
+<li>Hesapta 3 (üç) yıl boyunca hiç kontör kullanılmaz ve yeni kontör paketi satın alınmazsa, hesapta kalan kontörler bu sürenin sonunda geçerliliğini yitirir.</li>
+<li>Platform’un kullanımı için güncel bir web tarayıcısı ve internet bağlantısı yeterlidir. Platform’un kullanımına ilişkin kurallar Platform’da yayımlanan Kullanım Koşulları’nda yer alır.</li>
+</ol>
+
+<h2>Madde 6 — Fiyat, ödeme ve fatura</h2>
+<ol>
+<li>Fiyatlar Türk lirası cinsindendir ve KDV dahildir. Siparişin verildiği andaki fiyat geçerlidir.</li>
+<li>Ödeme, İyzi Ödeme ve Elektronik Para Hizmetleri A.Ş. (iyzico) altyapısı ile kartla tek seferde alınır. Kart bilgileri Satıcı’ya iletilmez ve Satıcı tarafından saklanmaz.</li>
+<li>Fatura, Alıcı’nın beyan ettiği fatura bilgileri ile e-Fatura mükellefi Alıcı’lar için e-Fatura, diğer Alıcı’lar için e-Arşiv fatura olarak düzenlenir ve Alıcı’nın e-posta adresine gönderilir. Fatura bilgilerinin doğruluğundan Alıcı sorumludur.</li>
+</ol>
+
+<h2>Madde 7 — Cayma hakkı</h2>
+<ol>
+<li>Kontörler, Alıcı’nın ödeme sırasında verdiği onayla, ödemenin onaylandığı anda hesabına tanımlanır ve hizmetin ifasına başlanır. Yönetmelik’in 15. maddesinin birinci fıkrasının (g) ve (ğ) bentleri uyarınca, elektronik ortamda anında ifa edilen hizmetlerde ve tüketicinin onayı ile ifasına başlanan hizmetlerde cayma hakkı bulunmamaktadır.</li>
+<li>Bununla birlikte Satıcı, tüketici olan Alıcı’ya şu imkânı tanır: Satın alma tarihinden sonra Alıcı’nın hesabında hiç kontör kullanılmamışsa (fotoğraf yüklenmemişse), Alıcı sözleşmenin kurulduğu tarihten itibaren 14 (on dört) gün içinde, gerekçe göstermeksizin ve cezai şart ödemeksizin sözleşmeden cayabilir.</li>
+<li>Cayma bildirimi, bu süre içinde sipariş numarası belirtilerek pinar@slothcoffeeshop.com adresine e-posta ile yapılır.</li>
+<li>Satıcı, cayma bildiriminin kendisine ulaştığı tarihten itibaren 14 (on dört) gün içinde, tahsil edilen bedelin tamamını ödemenin yapıldığı kart aracılığıyla, Alıcı’ya herhangi bir masraf yüklemeden iade eder ve ilgili paketin kontörlerini hesaptan düşer. İadenin karta yansıma süresi Alıcı’nın bankasına bağlıdır.</li>
+<li>Satın almadan sonra hesapta kontör kullanılmaya başlandığında, kullanılan kontör sayısından bağımsız olarak bu maddedeki cayma imkânı sona erer; kısmi iade yapılmaz.</li>
+</ol>
+
+<h2>Madde 8 — Hizmetin sona ermesi</h2>
+<ol>
+<li>Satıcı, Platform’u kalıcı olarak kapatmaya karar verirse bunu en az 30 (otuz) gün önceden Platform’da ve Alıcı’nın e-posta adresine bildirerek duyurur. Bu durumda Alıcı’nın hesabında kalan, kullanılmamış ve geçerliliğini yitirmemiş kontörlerin bedeli, satın alındıkları birim fiyat üzerinden Alıcı’ya iade edilir.</li>
+<li>Alıcı hesabını kendi isteğiyle kapatırsa, hesapta kalan kontörler için iade yapılmaz.</li>
+</ol>
+
+<h2>Madde 9 — Tarafların yükümlülükleri</h2>
+<ol>
+<li>Satıcı, Platform’u makul özen ile ve sözleşmeye uygun şekilde sunar. Planlı bakım çalışmaları, altyapı sağlayıcılarından kaynaklanan arızalar ve mücbir sebepler nedeniyle oluşan geçici kesintiler sözleşmeye aykırılık sayılmaz.</li>
+<li>Alıcı, siparişte verdiği bilgilerin doğru olduğunu, Platform’a yüklediği fotoğraflar üzerinde gerekli hak ve izinlere sahip olduğunu ve fotoğraflarda yer alan kişileri fotoğrafların Platform’da paylaşılacağı konusunda bilgilendirmekle yükümlü olduğunu kabul eder.</li>
+</ol>
+
+<h2>Madde 10 — Kişisel veriler</h2>
+<p>Alıcı’nın kişisel verileri, Platform’da yayımlanan Aydınlatma Metni’ne uygun olarak işlenir.</p>
+
+<h2>Madde 11 — Şikâyet ve uyuşmazlıklar</h2>
+<ol>
+<li>Alıcı, talep ve şikâyetlerini Madde 1.1’deki iletişim bilgileri üzerinden Satıcı’ya iletebilir.</li>
+<li>Tüketici olan Alıcı, Ticaret Bakanlığı’nca her yıl ilan edilen parasal sınırlar dahilinde yerleşim yerinin bulunduğu veya tüketici işlemini yaptığı yerdeki Tüketici Hakem Heyeti’ne, bu sınırları aşan uyuşmazlıklarda Tüketici Mahkemesi’ne başvurabilir. Tüketici Hakem Heyeti başvuruları e-Devlet üzerinden Tüketici Bilgi Sistemi (TÜBİS) aracılığıyla da yapılabilir.</li>
+<li>Tüketici sıfatı taşımayan Alıcı’lar ile çıkacak uyuşmazlıklarda Ankara Mahkemeleri ve İcra Daireleri yetkilidir.</li>
+</ol>
+
+<h2>Madde 12 — Yürürlük</h2>
+<ol>
+<li>Bu sözleşme, Alıcı’nın Ön Bilgilendirme Formu’nu ve bu sözleşmeyi Platform’da elektronik ortamda onaylaması ve ödemenin tamamlanması ile kurulur.</li>
+<li>Sözleşme ve Ön Bilgilendirme Formu, Alıcı’nın e-posta adresine gönderilir ve Alıcı’nın Platform hesabından erişilebilir durumda tutulur. Satıcı sipariş kayıtlarını mevzuatta öngörülen süre boyunca saklar.</li>
+<li>Bu sözleşmenin Türkçe metni esastır. İngilizce çevirisi bilgi amaçlıdır.</li>
+</ol>
+
+<div class="box">
+<table class="kv" style="margin:0">
+<tr><th>Sözleşme tarihi</th><td>{{ order.date }}</td></tr>
+<tr><th>Satıcı</th><td>Sabiha Pınar Gesli – Clever Photos</td></tr>
+<tr><th>Alıcı</th><td>{{ buyer.name }}</td></tr>
+</table>
+<p class="small" style="margin:6pt 0 0">Bu sözleşme Alıcı tarafından Platform üzerinde elektronik ortamda onaylanmıştır.</p>
+</div>

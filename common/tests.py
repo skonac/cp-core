@@ -62,9 +62,10 @@ class ApiContractTests(TempMedia, TestCase):
         self.assertCode(c.post_json("/api/auth/otp-requests", {"phoneNumber": "+905550000002", "eventCode": "zzzzz"}),
                         404, "event_not_found")
         self.assertCode(c.post_json("/api/auth/otp-requests", {}), 422, "validation_error")
-        self.assertEqual(c.get("/api/kvkk/" + f"kvkk_tr_{settings.KVKK_VERSION}.pdf")["Content-Type"], "application/pdf")
-        self.assertEqual(c.head(f"/api/kvkk/kvkk_en_{settings.KVKK_VERSION}.pdf").status_code, 200)
-        self.assertCode(c.get("/api/kvkk/kvkk_xx_001.pdf"), 404, "not_found")
+        self.assertEqual(c.get("/api/kvkk/" + f"kvkk_tr_{settings.KVKK_VERSION}.html")["Content-Type"],
+                         "text/html; charset=utf-8")
+        self.assertEqual(c.head(f"/api/kvkk/kvkk_en_{settings.KVKK_VERSION}.html").status_code, 200)
+        self.assertCode(c.get("/api/kvkk/kvkk_xx_001.html"), 404, "not_found")
 
         # --- OTP errors
         r = c.post_json("/api/auth/otp-requests", {"phoneNumber": "+905550000003"})

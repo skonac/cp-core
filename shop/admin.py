@@ -32,7 +32,8 @@ class PurchaseAdmin(admin.ModelAdmin):
                     "provider", "provider_payment_id")
     list_filter = ("status", "provider")
     search_fields = ("user__phone", "conversation_id", "provider_payment_id")
-    readonly_fields = [f.name for f in Purchase._meta.fields]
+    exclude = ("docs_html",)          # the stored page: staff user page -> "docs"
+    readonly_fields = [f.name for f in Purchase._meta.fields if f.name != "docs_html"]
 
     def has_add_permission(self, request):
         return False

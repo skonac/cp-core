@@ -32,6 +32,8 @@ class CatalogOut(Out):
     pricingVersion: str = Field(description="Send back with a purchase; changes with any product or price change.",
                                 examples=["3f9a1c0b2d4e"])
     products: list[ProductOut] = Field(description="On sale, in display order.")
+    documentsVersion: str = Field(description="Version of the ÖBF + MSS texts (GET /api/shop/obf, /mss); send back "
+                                              "with a purchase.", examples=["001"])
 
 
 class PurchaseOut(Out):
@@ -44,6 +46,9 @@ class PurchaseOut(Out):
     status: Literal["pending", "paid", "failed"]
     purchasedAt: str = Field(description="When the purchase was started.", examples=["2026-10-19T08:30:00+00:00"])
     paidAt: str | None = Field(examples=["2026-10-19T08:30:05+00:00"])
+    documentsUrl: str | None = Field(description="The ÖBF + MSS the buyer accepted (HTML page); null on purchases "
+                                                 "made before the documents existed.",
+                                     examples=["/api/shop/purchases/7/documents"])
 
 
 class PurchaseListOut(Out):

@@ -38,8 +38,8 @@ class KvkkConsentTests(TestCase):
         d = self.me()
         self.assertFalse(d["hasConsent"])
         self.assertIsNone(d["consentVersion"])
-        self.assertEqual(d["kvkk"], {"version": V, "urls": {"tr": f"/api/kvkk/kvkk_tr_{V}.pdf",
-                                                             "en": f"/api/kvkk/kvkk_en_{V}.pdf"}})
+        self.assertEqual(d["kvkk"], {"version": V, "urls": {"tr": f"/api/kvkk/kvkk_tr_{V}.html",
+                                                             "en": f"/api/kvkk/kvkk_en_{V}.html"}})
 
     def test_consent_marks_user_and_logs(self):
         user = self.sign_in()
@@ -88,19 +88,18 @@ class KvkkConsentTests(TestCase):
         self.assertEqual(log.phone, "+905550000009")
 
     def test_documents_served(self):
-        r = self.c.get(f"/api/kvkk/kvkk_tr_{V}.pdf")   # public
+        r = self.c.get(f"/api/kvkk/kvkk_tr_{V}.html")   # public
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r["Content-Type"], "application/pdf")
-        self.assertTrue(b"".join(r.streaming_content).startswith(b"%PDF"))
-        self.assertEqual(self.c.head(f"/api/kvkk/kvkk_tr_{V}.pdf").status_code, 200)   # curl -I
-        self.assertEqual(self.c.get("/api/kvkk/kvkk_tr_000.pdf").status_code, 200)    # older versions stay
-        for bad in ("kvkk_tr_999.pdf", "kvkk_de_000.pdf", "..%2Fsettings.py", "x.pdf"):
+        self.assertEqual(r["Content-Type"], "text/html; charset=utf-8")
+        self.assertIn("Aydınlatma Metni".encode(), b"".join(r.streaming_content))
+        self.assertEqual(self.c.head(f"/api/kvkk/kvkk_tr_{V}.html").status_code, 200)   # curl -I
+        for bad in ("kvkk_tr_999.html", "kvkk_de_002.html", "kvkk_tr_002.pdf", "..%2Fsettings.py", "x.html"):
             self.assertEqual(self.c.get(f"/api/kvkk/{bad}").status_code, 404, bad)
 
     def test_django_consent_page(self):
         user = self.sign_in()
         r = self.c.get("/dj/consent/")
-        self.assertContains(r, f"/api/kvkk/kvkk_en_{V}.pdf")
+        self.assertContains(r, f"/api/kvkk/kvkk_en_{V}.html")
         token = r.cookies["csrftoken"].value if "csrftoken" in r.cookies else self.c.cookies["csrftoken"].value
         r = self.c.post("/dj/consent/", {"agree": "yes", "version": V, "locale": "en", "next": "/dj/me/",
                                       "csrfmiddlewaretoken": token})

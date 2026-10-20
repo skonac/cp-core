@@ -131,7 +131,7 @@ The event context comes from the challenge; `eventCode` in this body is not need
   "user": { "id": "69", "phoneNumber": "+905551234567", "fullName": null, "email": null,
             "profileCompleted": false, "accountRoles": ["participant"], "hasConsent": false,
             "consentVersion": null,
-            "kvkk": { "version": "001", "urls": { "tr": "/api/kvkk/kvkk_tr_001.pdf", "en": "/api/kvkk/kvkk_en_001.pdf" } },
+            "kvkk": { "version": "002", "urls": { "tr": "/api/kvkk/kvkk_tr_002.html", "en": "/api/kvkk/kvkk_en_002.html" } },
             "selfieState": "no_selfie", "selfieThumbnailUrl": null },
   "nextStep": "consent",
   "isNewUser": true,
@@ -164,7 +164,7 @@ Errors: `422 invalid_otp` (wrong code, unknown or already used challenge), `410 
 | `accountRoles` | Any of `participant`, `organizer`, `photographer`, `admin`. UI visibility only; the server checks everything. `participant` = has joined at least one event. |
 | `hasConsent` | KVKK explicit consent given **to the current document version**. A new version makes it `false` for everyone until they consent again. |
 | `consentVersion` | The version the user last consented to (`null` = never). Differs from `kvkk.version` when the text was updated since. |
-| `kvkk` | The current KVKK document: `version` and one PDF URL per language (`tr`, `en`). Show these on the consent screen. |
+| `kvkk` | The current KVKK document: `version` and one HTML page URL per language (`tr`, `en`). Show these on the consent screen. |
 | `selfieState` | `no_selfie` · `selfie_processing` · `selfie_rejected` · `ready` (see 3.4) |
 | `profileCompleted` | `true` when `fullName` is set |
 | `selfieThumbnailUrl` | The primary selfie's thumbnail, or `null` |
@@ -187,14 +187,14 @@ Errors: `422 invalid_otp` (wrong code, unknown or already used challenge), `410 
 
 ### 3.3 Consent
 
-The KVKK notice and explicit consent text is a PDF, one per language, versioned as a pair
-(`kvkk_tr_001.pdf` + `kvkk_en_001.pdf`). The current version and its URLs are in the user object
+The KVKK notice and explicit consent text is an HTML page, one per language, versioned as a pair
+(`kvkk_tr_002.html` + `kvkk_en_002.html`; no PDFs). The current version and its URLs are in the user object
 (`user.kvkk`, from `GET /api/me` or the OTP verification).
 
-**`GET /api/kvkk/{file}`** (no session needed) → the PDF (`application/pdf`), e.g. `/api/kvkk/kvkk_tr_001.pdf`.
-Older versions stay available. Unknown file → `404 not_found`.
+**`GET /api/kvkk/{file}`** (no session needed) → the page (`text/html`), e.g. `/api/kvkk/kvkk_tr_002.html`. Show it in
+an `iframe` or a new tab. Older versions stay available. Unknown file → `404 not_found`.
 
-**`POST /api/me/consent`** `{ "granted": true, "version": "001", "locale": "tr" }` → `201 consent_recorded` `{ "hasConsent": true, "version": "001" }`.
+**`POST /api/me/consent`** `{ "granted": true, "version": "002", "locale": "tr" }` → `201 consent_recorded` `{ "hasConsent": true, "version": "002" }`.
 
 - `version`: required, the `user.kvkk.version` the screen showed. If the document was updated meanwhile →
   `409 consent_version_outdated`: re-fetch `GET /api/me` and show the new text.
@@ -448,11 +448,31 @@ not filled in (fall back to the other language, or hide it).
                   "title": { "tr": "Mini paket", "en": "Small pack" },
                   "description": { "tr": "Küçük düğünler için", "en": "For small weddings" },
                   "creditAmount": 2000, "price": 3600.0, "currency": "TRY",
-                  "unitPrice": 1.8, "discountPercent": 10, "featured": true } ] }
+                  "unitPrice": 1.8, "discountPercent": 10, "featured": true } ],
+  "documentsVersion": "001" }
 ```
 
 No session needed. `creditBalance` is `null` when signed out. `products`: the ones on sale, in display order. `discountPercent` is against the product with the highest unit price.
-`pricingVersion` changes whenever a product or price changes; send it back with a purchase.
+`pricingVersion` changes whenever a product or price changes; send it back with a purchase. `documentsVersion` is the
+version of the sales documents below; send it back with a purchase too.
+
+**Sales documents.** Before paying, the buyer must read and accept two texts: the **Ön Bilgilendirme Formu** (ÖBF,
+preliminary information form) and the **Mesafeli Satış Sözleşmesi** (MSS, distance sales agreement). Near the pay
+button show two checkboxes, unticked, each with a link to its text:
+
+- ☐ [Ön Bilgilendirme Formu](#)'nu okudum ve onaylıyorum. / I have read and accept the [Preliminary Information Form](#).
+- ☐ [Mesafeli Satış Sözleşmesi](#)'ni okudum ve onaylıyorum. / I have read and accept the [Distance Sales Agreement](#).
+
+The pay button stays disabled until both are ticked. A link opens the text in a popup (or a new tab) with a TR / EN
+switch; the text is an HTML page filled for the signed-in user and the chosen product:
+
+**`GET /api/shop/obf?product=<id>&locale=tr|en`**, **`GET /api/shop/mss?product=<id>&locale=tr|en`** →
+`200 text/html` (a complete page; show it in an `iframe` with `src` = the URL, or fetch it and use `srcdoc`). The
+order number shows as "–" and the date is now; the stored copy gets both. Errors (JSON): `404 not_found` (product not
+on sale), `422 billing_profile_required` (fill the billing profile first: the texts show the buyer's details).
+
+When the purchase is created (below), the four texts (ÖBF and MSS, Turkish and English) are stored with it, with the
+time, IP and browser: that is the legal record. The buyer can open it later from `documentsUrl`.
 
 **`GET /api/shop/purchases`** → `200 purchases_retrieved`:
 
@@ -460,14 +480,17 @@ No session needed. `creditBalance` is `null` when signed out. `products`: the on
 { "purchases": [ { "id": "7", "productId": "2", "productName": { "tr": "2000cr", "en": "2000cr" },
                    "creditAmount": 2000, "amount": 3600.0,
                    "currency": "TRY", "status": "paid", "purchasedAt": "2026-10-19T08:30:00+00:00",
-                   "paidAt": "2026-10-19T08:30:05+00:00" } ],
+                   "paidAt": "2026-10-19T08:30:05+00:00", "documentsUrl": "/api/shop/purchases/7/documents" } ],
   "total": 1 }
 ```
 
 This account's purchases, newest first (max 100). `productName`, `creditAmount` and `amount` are as they were at
-purchase time. `status`: `pending` (payment not finished), `paid` (credits added), `failed`.
+purchase time. `status`: `pending` (payment not finished), `paid` (credits added), `failed`. `documentsUrl`: the ÖBF + MSS
+the buyer accepted for this purchase (`null` on purchases from before the documents existed); show it as a link
+("Sözleşme" / "Agreement") in the purchase history.
 
-**`POST /api/shop/purchases`** `{ "productId": "2", "pricingVersion": "3f9a1c0b2d4e" }` →
+**`POST /api/shop/purchases`** `{ "productId": "2", "pricingVersion": "3f9a1c0b2d4e", "documentsVersion": "001",
+"acceptedObf": true, "acceptedMss": true }` →
 `201 purchase_started` `{ "purchase": {…}, "paymentPageUrl": "https://sandbox-cpp.iyzipay.com?token=…", "creditBalance": 1840 }`.
 
 The payment runs on iyzico's page (card data never reaches us):
@@ -484,12 +507,18 @@ The payment runs on iyzico's page (card data never reaches us):
 On development servers the payment can also be **simulated**: then the purchase is `paid` at once, the credits are
 added, and `paymentPageUrl` is `null`; skip the redirect. Handle both: `paymentPageUrl` null → done, else redirect.
 Errors: `404 not_found` (product not on sale), `409 pricing_changed` (reload the products), `422 validation_error`,
-`422 billing_profile_required` (show the billing form, §3.8, then buy again), `502 payment_provider_error` /
+`422 billing_profile_required` (show the billing form, §3.8, then buy again), `409 documents_changed` (the texts
+changed: reload the products, untick both boxes, show the texts again), `422 documents_not_accepted` (a checkbox not
+ticked), `502 payment_provider_error` /
 `502 payment_provider_unreachable` (iyzico refused the request or can't be reached; `message` says why).
 The billing profile at purchase time is kept with the purchase.
 
 **`GET /api/shop/purchases/{id}`** → `200 purchase_retrieved` `{ "purchase": {…}, "creditBalance": 3840 }`: one of this
 account's purchases (`404 not_found` otherwise).
+
+**`GET /api/shop/purchases/{id}/documents`** → `200 text/html`: the stored page, ÖBF-TR, MSS-TR, ÖBF-EN, MSS-EN, exactly
+as accepted (printable; the browser can save it as PDF). `404 not_found` when it is not this account's purchase or has
+no documents.
 
 ### 3.8 Billing profile
 
@@ -527,7 +556,7 @@ Errors: `422 validation_error` with `errors` per field, e.g. `{"identityNumber":
 2. `GET /api/me`: `401` → sign-in; `200` → skip to step 5.
 3. `POST /api/auth/otp-requests {phoneNumber, eventCode}` → code screen with countdown.
 4. `POST /api/auth/otp-verifications {challengeId, code}` → follow `nextStep`.
-5. `consent` → show the PDF from `user.kvkk.urls[locale]` + `POST /api/me/consent {granted: true, version: user.kvkk.version, locale}`.
+5. `consent` → show the page from `user.kvkk.urls[locale]` + `POST /api/me/consent {granted: true, version: user.kvkk.version, locale}`.
 6. `selfie` → `POST /api/me/selfies` → poll `GET /api/me/selfies` until `ready` / `rejected`.
 7. `gallery` → `GET /api/events/RK238/gallery` (+ `view=all` tab when `canBrowseAll`).
 
@@ -549,7 +578,7 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 | 5 | `user` = `{id, phoneNumber, profileCompleted, accountRoles}` | Adds `fullName`, `email`, `hasConsent`, `consentVersion`, `kvkk`, `selfieState`, `selfieThumbnailUrl`; `accountRoles` lists `participant`, `organizer`, `photographer`, `admin` | `AccountRole` type: add `participant`, `photographer`, `admin` |
 | 6 | `nextStep: consent \| account_home \| organizer_home` | Adds `selfie`, `gallery` | Handle the two new values |
 | 7 | `POST /api/events/{code}/biometric-consents {noticeVersion, granted}` | `POST /api/me/consent {granted, version, locale}`; consent is per account and per document version; `409 consent_version_outdated` | Change path/body; skip the consent screen when `user.hasConsent` |
-| 8 | `GET /api/legal/biometric-consent/current?locale=` (JSON sections) | Removed. The text is a PDF per language: `user.kvkk.urls.tr` / `.en` → `GET /api/kvkk/{file}` | Show/link the PDF instead of rendering sections; drop the notice fetch and its types/mocks |
+| 8 | `GET /api/legal/biometric-consent/current?locale=` (JSON sections) | Removed. The text is an HTML page per language: `user.kvkk.urls.tr` / `.en` → `GET /api/kvkk/{file}` | Show/link the page instead of rendering sections; drop the notice fetch and its types/mocks |
 | 9 | `POST /api/events/{code}/face-profile/uploads` (sync `faceCount`, `face_not_detected`…) | `POST /api/me/selfies` (async); results via `GET /api/me/selfies` `status`/`reason` | Upload, then poll; map `reason` to messages |
 | 10 | `PUT /api/me/face-profile` | `POST /api/me/selfies` with `slot=primary` | Same endpoint as #9 |
 | 11 | `POST/GET /api/events/{code}/match-jobs` | Removed. The gallery is always current; `matching` + `photosPending` tell the state | Delete match-job calls/types/mocks; after the selfie is `ready`, load the gallery |

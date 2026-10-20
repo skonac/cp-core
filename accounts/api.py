@@ -129,14 +129,14 @@ def sign_out(request):
 # ---------------------------------------------------------------------------- kvkk
 
 @kvkk_router.api_operation(["GET", "HEAD"], "/{filename}", auth=None, response=errors(404),
-                           openapi_extra=file_doc("application/pdf", "The PDF"))
+                           openapi_extra=file_doc("text/html; charset=utf-8", "The page"))
 def kvkk_document(request, filename: str):
-    """A KVKK document PDF, current or older (what earlier consents refer to). Public.
+    """A KVKK document (HTML page), current or older (what earlier consents refer to). Public.
     The current files: `user.kvkk.urls`. Errors: 404 not_found."""
-    path = settings.KVKK_DIR / filename
+    path = settings.LEGAL_DIR / filename
     if not kvkk.FILENAME_RE.match(filename) or not path.is_file():
         raise ApiError(404, "not_found", "Belge bulunamadı.")
-    return FileResponse(path.open("rb"), content_type="application/pdf", filename=filename)
+    return FileResponse(path.open("rb"), content_type="text/html; charset=utf-8")
 
 
 # ---------------------------------------------------------------------------- me

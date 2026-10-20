@@ -22,7 +22,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import BooleanField, Count, ExpressionWrapper, Q
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from PIL import Image as PILImage
@@ -281,3 +281,12 @@ def worker(request):
         "had_errors": live.filter(status=Image.Status.DONE).exclude(error="").select_related("event", "owner")
                           .order_by("-processed_at")[:50],
         "lease_s": settings.WORKER_LEASE})
+
+
+@staff_required
+def purchase_documents(request, purchase_id: int):
+    """The ÖBF + MSS page stored with a purchase (shop/documents.py), as the buyer accepted it."""
+    purchase = get_object_or_404(Purchase.objects.exclude(docs_html=""), pk=purchase_id)
+    response = HttpResponse(purchase.docs_html, content_type="text/html; charset=utf-8")
+    response["Cache-Control"] = "private, no-store"
+    return response

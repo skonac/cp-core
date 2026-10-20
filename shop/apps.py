@@ -7,6 +7,7 @@ class ShopConfig(AppConfig):
 
     def ready(self):
         checks.register(check_payment_provider)
+        checks.register(check_sales_documents)
 
 
 PROVIDERS = ("simulated", "iyzico-sandbox", "iyzico-production")
@@ -27,3 +28,14 @@ def check_payment_provider(app_configs=None, **kwargs):
         return [checks.Error(f"CP_PAYMENT_PROVIDER={provider} needs {prefix}_API_KEY and {prefix}_SECRET_KEY",
                              id="cp.E007")]
     return []
+
+
+def check_sales_documents(app_configs=None, **kwargs):
+    """manage.py check (run by deploy.sh) fails when the current sales document templates are missing."""
+    from django.conf import settings
+
+    from .documents import missing_templates
+    version = settings.SALES_DOCS_VERSION
+    if not version.isdigit() or len(version) != 3:
+        return [checks.Error(f"CP_SALES_DOCS_VERSION={version!r}: expected 3 digits, e.g. 001", id="cp.E008")]
+    return [checks.Error(f"Sales document template missing: {path}", id="cp.E009") for path in missing_templates(version)]

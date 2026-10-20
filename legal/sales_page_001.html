@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="{{ lang }}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+@page { size: A4; margin: 18mm 18mm 20mm 18mm; }
+* { box-sizing: border-box; }
+body { max-width: 190mm; margin: 0 auto; padding: 16px; font-family: "Inter", "DejaVu Sans", Arial, sans-serif; font-size: 10.5pt; line-height: 1.5; color: #1a1a1a; background: #fff; }
+h1 { font-size: 17pt; margin: 0 0 2pt; letter-spacing: -0.01em; }
+.sub { color: #666; font-size: 9.5pt; margin: 0 0 14pt; }
+h2 { font-size: 11pt; margin: 14pt 0 4pt; break-after: avoid; }
+p { margin: 0 0 6pt; }
+ol, ul { margin: 0 0 6pt; padding-left: 18pt; }
+li { margin-bottom: 3pt; }
+table.kv { width: 100%; border-collapse: collapse; margin: 0 0 8pt; font-size: 10pt; break-inside: avoid; }
+table.kv th { text-align: left; font-weight: 600; width: 34%; padding: 3pt 8pt 3pt 0; vertical-align: top; color: #333; }
+table.kv td { padding: 3pt 0; vertical-align: top; }
+table.kv tr + tr th, table.kv tr + tr td { border-top: 1px solid #e6e6e6; }
+.box { background: #f4f4f4; border-radius: 4pt; padding: 8pt 10pt; margin: 8pt 0; break-inside: avoid; }
+.small { font-size: 9pt; color: #555; }
+section.doc + section.doc { break-before: page; margin-top: 32pt; padding-top: 24pt; border-top: 2px solid #ddd; }
+@media print { body { max-width: none; padding: 0; } section.doc + section.doc { margin-top: 0; padding-top: 0; border-top: 0; } }
+</style></head>
+<body>
+{% for body in bodies %}<section class="doc">
+{{ body }}</section>
+{% endfor %}</body></html>

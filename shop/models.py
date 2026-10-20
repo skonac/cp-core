@@ -64,9 +64,21 @@ class Purchase(models.Model):
     ip = models.GenericIPAddressField(null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     paid_at = models.DateTimeField(null=True, blank=True)
+    # Sales documents (shop/documents.py): what the buyer accepted before paying, written once when the
+    # purchase is created, never changed. docs_html = ÖBF-TR, MSS-TR, ÖBF-EN, MSS-EN in one page.
+    docs_version = models.CharField(max_length=3, blank=True)       # e.g. "001"; empty on older purchases
+    docs_html = models.TextField(blank=True)
+    docs_sha256 = models.CharField(max_length=64, blank=True)       # of docs_html (UTF-8)
+    docs_accepted_at = models.DateTimeField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True)
 
     class Meta:
         indexes = [models.Index(fields=["user", "created_at"], name="shop_purchase_user")]
+
+    @property
+    def number(self) -> str:
+        """The order number on the documents."""
+        return f"CP-{self.pk:06d}"
 
     def __str__(self):
         return f"{self.user} {self.product_name_tr} {self.status}"

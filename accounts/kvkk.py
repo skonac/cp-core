@@ -1,6 +1,6 @@
 """KVKK consent documents and the consent record (design/core.md, "Consent").
 
-Documents are PDFs in cp-core/kvkk/, one pair per version: kvkk_tr_001.pdf + kvkk_en_001.pdf.
+Documents are HTML pages in cp-core/legal/, one pair per version: kvkk_tr_002.html + kvkk_en_002.html.
 settings.KVKK_VERSION names the current pair. A published file is never edited: a change is a
 new version, and changing the setting voids every user's consent (User.is_consent).
 """
@@ -13,11 +13,11 @@ from django.db import transaction
 
 from .models import ConsentLog, User
 
-FILENAME_RE = re.compile(r"^kvkk_(tr|en)_(\d{3})\.pdf$")
+FILENAME_RE = re.compile(r"^kvkk_(tr|en)_(\d{3})\.html$")
 
 
 def filename(locale: str, version: str | None = None) -> str:
-    return f"kvkk_{locale}_{version or settings.KVKK_VERSION}.pdf"
+    return f"kvkk_{locale}_{version or settings.KVKK_VERSION}.html"
 
 
 def url(locale: str, version: str | None = None) -> str:
@@ -32,7 +32,7 @@ def documents() -> dict:
 @lru_cache(maxsize=32)
 def sha256(name: str) -> str:
     # Cached per file name: published files never change.
-    return hashlib.sha256((settings.KVKK_DIR / name).read_bytes()).hexdigest()
+    return hashlib.sha256((settings.LEGAL_DIR / name).read_bytes()).hexdigest()
 
 
 def record_consent(user: User, locale: str, ip: str | None, user_agent: str) -> bool:

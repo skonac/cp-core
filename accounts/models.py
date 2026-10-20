@@ -131,7 +131,7 @@ class ConsentLog(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     phone = models.CharField(max_length=16)
     full_name = models.CharField(max_length=150, blank=True)
-    version = models.CharField(max_length=8)                  # e.g. "001" = kvkk_tr_001.pdf + kvkk_en_001.pdf
+    version = models.CharField(max_length=8)                  # e.g. "002" = kvkk_tr_002.html + kvkk_en_002.html
     locale = models.CharField(max_length=2)                   # the language shown: tr | en
     sha256 = models.CharField(max_length=64)                  # of the shown file: proves the exact text
     ip = models.GenericIPAddressField(null=True, blank=True)

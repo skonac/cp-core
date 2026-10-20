@@ -26,7 +26,7 @@ Test data: `cp-core-manage import_photos`, `import_selfie`, `show_matches` (see 
 | Path | What |
 | --- | --- |
 | `config/` | settings, root URLs, the API object, WSGI, version |
-| `kvkk/` | KVKK documents, one pair per version: `kvkk_tr_001.pdf` + `kvkk_en_001.pdf`; current = `CP_KVKK_VERSION`. Never edit a published file: add a new version |
+| `legal/` | Legal documents, flat. KVKK: one HTML pair per version, `kvkk_tr_002.html` + `kvkk_en_002.html`, current = `CP_KVKK_VERSION`. Sales documents (ÖBF + MSS): `obf_tr_001.html`, `mss_tr_001.html`, `obf_en_001.html`, `mss_en_001.html` (bodies) + `sales_page_001.html` (the page around them), current = `CP_SALES_DOCS_VERSION`. Never edit a published file: add a new version |
 | `common/` | API envelope and errors, middleware, rate limiter |
 | `accounts/` | User, OTP sign-in, profile API |
 | `events/` | events, memberships, organizer and participant pages, event API |

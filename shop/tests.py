@@ -1,6 +1,8 @@
 """Shop: the API contract (every /api/shop/ endpoint, responses checked against their schemas),
 credits added once, product data copied at purchase time, production guard."""
+import hashlib
 import re
+from decimal import Decimal
 
 from django.core.cache import cache
 from unittest import mock
@@ -12,9 +14,10 @@ from common.testing import ApiClient
 from config.api import api
 from credits.models import CreditTransaction
 
-from .apps import check_payment_provider
+from .apps import check_payment_provider, check_sales_documents
 from .billing import tckn_valid, vkn_valid
 from .models import BillingProfile, Product, Purchase
+from .documents import attach
 from .payments import complete, finish_iyzico, start
 
 PERSON = {"type": "individual", "firstName": "Ece", "lastName": "Yılmaz", "identityNumber": "10000000146",
@@ -112,7 +115,25 @@ class ShopApiTests(TestCase):
                   content_type="application/json", **c.csrf_headers())
         self.assertCode(r, 200, "billing_saved")
 
-        r = c.post_json("/api/shop/purchases", {"productId": pid, "pricingVersion": version})
+        # --- the two documents, read before buying, then the purchase stores them
+        self.assertCode(c.get("/api/shop/obf", {"product": str(old.pk)}), 404, "not_found")
+        r = c.get("/api/shop/obf", {"product": pid, "locale": "tr"})
+        self.assertEqual((r.status_code, r["Content-Type"]), (200, "text/html; charset=utf-8"))
+        self.assertContains(r, "Ön Bilgilendirme Formu")
+        self.assertContains(r, "Foto Ltd.")
+        self.assertContains(r, "4.000,00 TL")
+        r = c.get("/api/shop/mss", {"product": pid, "locale": "en"})
+        self.assertContains(r, "Distance Sales Agreement")
+        self.assertContains(r, "TRY 4,000.00")
+        self.assertEqual(cat["documentsVersion"], "001")
+        buy = {"productId": pid, "pricingVersion": version}
+        self.assertCode(c.post_json("/api/shop/purchases", buy), 409, "documents_changed")
+        buy["documentsVersion"] = cat["documentsVersion"]
+        self.assertCode(c.post_json("/api/shop/purchases", {**buy, "acceptedObf": True}), 422, "documents_not_accepted")
+        buy.update(acceptedObf=True, acceptedMss=True)
+        self.assertFalse(Purchase.objects.exists())
+
+        r = c.post_json("/api/shop/purchases", buy)
         self.assertCode(r, 201, "purchase_started")
         data = r.json()["data"]
         self.assertIsNone(data["paymentPageUrl"])                                    # simulated: paid at once
@@ -123,13 +144,21 @@ class ShopApiTests(TestCase):
         self.assertEqual((history["total"], history["purchases"][0]["id"]), (1, data["purchase"]["id"]))
         r = c.get(f"/api/shop/purchases/{data['purchase']['id']}")
         self.assertCode(r, 200, "purchase_retrieved")
+        url = r.json()["data"]["purchase"]["documentsUrl"]
+        self.assertEqual(url, f"/api/shop/purchases/{data['purchase']['id']}/documents")
+        page = c.get(url)
+        self.assertEqual(page.status_code, 200)
+        stored = Purchase.objects.get()
+        self.assertEqual(page.content.decode(), stored.docs_html)
+        self.assertEqual((stored.docs_version, stored.user_agent, stored.ip), ("001", "TestBrowser/1.0", "127.0.0.1"))
+        self.assertCode(c.get("/api/shop/purchases/99999/documents"), 404, "not_found")
         self.assertEqual(r.json()["data"]["purchase"]["status"], "paid")
         self.assertCode(c.get("/api/shop/purchases/99999"), 404, "not_found")
 
         # --- iyzico (sandbox), the call to iyzico faked: start -> payment page URL, pending
         fake = FakeIyzico()
         with self.settings(PAYMENT_PROVIDER="iyzico-sandbox"), mock.patch("shop.iyzico._send", fake):
-            r = c.post_json("/api/shop/purchases", {"productId": pid, "pricingVersion": version})
+            r = c.post_json("/api/shop/purchases", buy)
             self.assertCode(r, 201, "purchase_started")
             data = r.json()["data"]
             self.assertEqual((data["purchase"]["status"], data["paymentPageUrl"]), ("pending", fake.PAGE))
@@ -139,8 +168,7 @@ class ShopApiTests(TestCase):
                              ("4000.00", "4000.00", "VIRTUAL", "+905550000302", "Foto Ltd."))
             self.assertTrue(body["callbackUrl"].endswith("/api/shop/iyzico/callback"))
             fake.fail_next = True
-            self.assertCode(c.post_json("/api/shop/purchases", {"productId": pid, "pricingVersion": version}),
-                            502, "payment_provider_error")
+            self.assertCode(c.post_json("/api/shop/purchases", buy), 502, "payment_provider_error")
 
         called = {(m, _norm(route)) for m, route, _ in c.checked}
         documented = {(m.upper(), _norm(path)) for path, ops in api.get_openapi_schema()["paths"].items() for m in ops
@@ -235,3 +263,59 @@ class BillingChecksTests(TestCase):
         self.assertTrue(vkn_valid("1234567890"))
         self.assertEqual(sum(vkn_valid("123456789" + str(d)) for d in range(10)), 1)   # one check digit per prefix
         self.assertFalse(vkn_valid("123456789"))
+
+
+class DocumentsTests(TestCase):
+    """The stored ÖBF + MSS: filled from the purchase's copies, four texts, hash, never changed."""
+    def setUp(self):
+        self.user = User.objects.create_user("+905550000401", is_organizer=True)
+        self.product = Product.objects.create(name_tr="2000cr", name_en="2000cr", title_tr="Mini paket",
+                                              title_en="Small pack", credits=2000, price=Decimal("12345.5"))
+        self.profile = BillingProfile.objects.create(
+            user=self.user, first_name="Ece", last_name="<b>Yılmaz</b>", identity_number="10000000146",
+            email="e@x.co", address="Cad. 1", district="Çankaya", city="Ankara")
+
+    @override_settings(PAYMENT_PROVIDER="simulated")
+    def test_stored_page(self):
+        from .api import billing_json
+        purchase = start(self.user, self.product, "10.0.0.1", billing_json(self.profile)["billing"], self.profile, "",
+                         "Mozilla/5.0 (iPhone)")[0]
+        html = purchase.docs_html
+        heads = [h for h in ("Ön Bilgilendirme Formu", "Mesafeli Satış Sözleşmesi", "Preliminary Information Form",
+                             "Distance Sales Agreement")]
+        self.assertEqual([html.index("<h1>" + h) for h in heads], sorted(html.index("<h1>" + h) for h in heads))
+        self.assertEqual(html.count('<section class="doc">'), 4)
+        for text in (purchase.number, "CP-%06d" % purchase.pk, "12.345,50 TL", "TRY 12,345.50", "2.000",
+                     "Mini paket", "Small pack", "10000000146", "Cad. 1, Çankaya / Ankara, Türkiye",
+                     "+905550000401", "&lt;b&gt;Yılmaz&lt;/b&gt;", "Sabiha Pınar Gesli"):
+            self.assertIn(text, html)
+        self.assertNotIn("{{", html)
+        self.assertEqual(purchase.docs_sha256, hashlib.sha256(html.encode()).hexdigest())
+        self.assertEqual((purchase.user_agent, purchase.docs_version), ("Mozilla/5.0 (iPhone)", "001"))
+        self.assertIsNotNone(purchase.docs_accepted_at)
+        self.product.title_tr = "Yeni ad"                    # later product changes don't touch the stored page
+        self.product.save()
+        self.assertEqual(Purchase.objects.get(pk=purchase.pk).docs_html, html)
+
+    @override_settings(PAYMENT_PROVIDER="simulated")
+    def test_no_purchase_without_documents(self):
+        with mock.patch("shop.payments.documents.attach", side_effect=RuntimeError("render failed")):
+            with self.assertRaises(RuntimeError):
+                start(self.user, self.product, None, {}, self.profile, "")
+        self.assertFalse(Purchase.objects.exists())
+
+    def test_staff_page(self):
+        with self.settings(PAYMENT_PROVIDER="simulated"):
+            purchase = start(self.user, self.product, None, {}, self.profile, "")[0]
+        staff = User.objects.create_user("+905550000499", is_staff=True)
+        self.client.force_login(staff)
+        r = self.client.get(f"/dj/staff/purchases/{purchase.pk}/documents/")
+        self.assertEqual(r.content.decode(), Purchase.objects.get(pk=purchase.pk).docs_html)
+        self.assertContains(self.client.get(f"/dj/staff/users/{self.user.pk}/"), f"/dj/staff/purchases/{purchase.pk}/documents/")
+
+    def test_check(self):
+        self.assertEqual(check_sales_documents(), [])
+        with self.settings(SALES_DOCS_VERSION="1"):
+            self.assertEqual([e.id for e in check_sales_documents()], ["cp.E008"])
+        with self.settings(SALES_DOCS_VERSION="999"):
+            self.assertEqual([e.id for e in check_sales_documents()], ["cp.E009"] * 5)

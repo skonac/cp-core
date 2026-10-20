@@ -4,6 +4,7 @@ The last check fails when an organizer endpoint exists that this test never call
 import json
 import re
 
+from django.conf import settings
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
@@ -117,7 +118,7 @@ class OrganizerApiTests(TempMedia, TestCase):
         p1, p2, p3 = Image.objects.filter(event=event, kind="photo").order_by("seq")
         process(p1, [face_of(GUEST, 1), face_of(person(8), 2)])
         process(p2, [face_of(person(9), 3)])
-        guest = User.objects.create_user("+905550000103", full_name="Ece", kvkk_version="001")
+        guest = User.objects.create_user("+905550000103", full_name="Ece", kvkk_version=settings.KVKK_VERSION)
         add_selfie(guest, GUEST)
         EventMember.objects.create(user=guest, event=event)
         EventMember.objects.create(user=User.objects.create_user("+905550000104"), event=event)

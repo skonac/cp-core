@@ -4,13 +4,16 @@ One product per purchase, no cart. Payment: shop/payments.py (simulated until iy
 import hashlib
 from typing import Literal
 
+from django.conf import settings
+from django.http import HttpResponse
 from ninja import Router
 from ninja.security import django_auth
 from pydantic import Field
 
 from accounts.models import User
-from common.api import ApiError, CamelSchema, errors, respond
+from common.api import ApiError, CamelSchema, errors, file_doc, respond
 
+from . import documents
 from . import schemas as S
 from .billing import billing_errors
 from .models import BillingProfile, Product, Purchase
@@ -43,7 +46,8 @@ def purchase_json(p: Purchase) -> dict:
     return {"id": str(p.pk), "productId": str(p.product_id),
             "productName": {"tr": p.product_name_tr, "en": p.product_name_en},
             "creditAmount": p.credits, "amount": float(p.amount), "currency": p.currency, "status": p.status,
-            "purchasedAt": p.created_at.isoformat(), "paidAt": p.paid_at.isoformat() if p.paid_at else None}
+            "purchasedAt": p.created_at.isoformat(), "paidAt": p.paid_at.isoformat() if p.paid_at else None,
+            "documentsUrl": f"/api/shop/purchases/{p.pk}/documents" if p.docs_html else None}
 
 
 @shop_router.get("/products", auth=None, response={200: S.CatalogResponse})
@@ -64,7 +68,47 @@ def products(request):
                     "featured": p.is_featured})
     balance = _balance(request.user) if request.user.is_authenticated else None
     return respond(request, "products_retrieved", {
-        "creditBalance": balance, "pricingVersion": _pricing_version(on_sale), "products": out})
+        "creditBalance": balance, "pricingVersion": _pricing_version(on_sale), "products": out,
+        "documentsVersion": settings.SALES_DOCS_VERSION})
+
+
+HTML = "text/html; charset=utf-8"
+
+
+def _html(text: str) -> HttpResponse:
+    response = HttpResponse(text, content_type=HTML)
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _document(request, kind: str, product_id: str, locale: str) -> HttpResponse:
+    user = _organizer(request)
+    product = next((p for p in _on_sale() if str(p.pk) == product_id), None)
+    if product is None:
+        raise ApiError(404, "not_found", "Ürün bulunamadı.")
+    profile = _profile(user)
+    if profile is None or not profile.is_complete:
+        raise ApiError(422, "billing_profile_required", "Önce fatura bilgilerini doldur.")
+    return _html(documents.preview(kind, locale, user, billing_json(profile)["billing"], product))
+
+
+@shop_router.get("/obf", response=errors(401, 403, 404, 422), openapi_extra=file_doc(HTML, "The filled form"))
+def obf(request, product: str, locale: Literal["tr", "en"] = "tr"):
+    """Ön Bilgilendirme Formu (preliminary information form), filled for the signed-in user's billing
+    profile and this product, as an HTML page: show it before the purchase, next to its checkbox.
+    Order number "–", date now. The text version: `documentsVersion` in GET /api/shop/products.
+
+    Errors: 403 organizer_access_required · 404 not_found (product not on sale) · 422 billing_profile_required."""
+    return _document(request, "obf", product, locale)
+
+
+@shop_router.get("/mss", response=errors(401, 403, 404, 422), openapi_extra=file_doc(HTML, "The filled agreement"))
+def mss(request, product: str, locale: Literal["tr", "en"] = "tr"):
+    """Mesafeli Satış Sözleşmesi (distance sales agreement), filled like GET /api/shop/obf.
+
+    Errors: 403 organizer_access_required · 404 not_found (product not on sale) · 422 billing_profile_required."""
+    return _document(request, "mss", product, locale)
 
 
 @shop_router.get("/purchases", response={200: S.PurchaseListResponse, **errors(401, 403)})
@@ -81,6 +125,9 @@ def purchases(request):
 class PurchaseIn(CamelSchema):
     product_id: str
     pricing_version: str
+    documents_version: str = ""     # GET /api/shop/products documentsVersion
+    accepted_obf: bool = False      # the two checkboxes
+    accepted_mss: bool = False
 
 
 @shop_router.post("/purchases", response={201: S.PurchaseResponse, **errors(401, 403, 404, 409, 422, 502)})
@@ -92,10 +139,15 @@ def create_purchase(request, data: PurchaseIn):
     the result with GET /api/shop/purchases/{id}. Simulated (dev servers): `paid` at once,
     `paymentPageUrl` null.
 
-    Needs a complete billing profile (`PUT /api/me/billing`); it is copied into the purchase.
+    Needs a complete billing profile (`PUT /api/me/billing`); it is copied into the purchase. The buyer
+    must have ticked both checkboxes (ÖBF and MSS, GET /api/shop/obf and /mss): `acceptedObf` and
+    `acceptedMss` true, `documentsVersion` as in GET /api/shop/products. The four filled texts are
+    stored with the purchase (`documentsUrl`).
 
     Errors: 403 organizer_access_required · 404 not_found (product not on sale) ·
     409 pricing_changed (reload the products) · 422 billing_profile_required ·
+    409 documents_changed (the texts changed: reload the products and show them again) ·
+    422 documents_not_accepted ·
     502 payment_provider_error, payment_provider_unreachable (iyzico refused or can't be reached)."""
     user = _organizer(request)
     on_sale = _on_sale()
@@ -107,9 +159,15 @@ def create_purchase(request, data: PurchaseIn):
     profile = _profile(user)
     if profile is None or not profile.is_complete:
         raise ApiError(422, "billing_profile_required", "Önce fatura bilgilerini doldur.")
+    if data.documents_version != settings.SALES_DOCS_VERSION:
+        raise ApiError(409, "documents_changed", "Sözleşme metinleri güncellendi; yeniden okuyup onayla.")
+    if not (data.accepted_obf and data.accepted_mss):
+        raise ApiError(422, "documents_not_accepted",
+                       "Ön Bilgilendirme Formu ve Mesafeli Satış Sözleşmesi onaylanmalı.")
     try:
         purchase, page_url = start(user, product, request.META.get("REMOTE_ADDR"), billing_json(profile)["billing"],
-                                   profile, request.build_absolute_uri(CALLBACK_PATH))
+                                   profile, request.build_absolute_uri(CALLBACK_PATH),
+                                   request.META.get("HTTP_USER_AGENT", ""))
     except PaymentError as e:
         raise ApiError(502, e.code, e.message) from None
     return respond(request, "purchase_started", {"purchase": purchase_json(purchase), "paymentPageUrl": page_url,
@@ -127,6 +185,21 @@ def get_purchase(request, purchase_id: int):
     if purchase is None:
         raise ApiError(404, "not_found", "Satın alma bulunamadı.")
     return respond(request, "purchase_retrieved", {"purchase": purchase_json(purchase), "creditBalance": _balance(user)})
+
+
+@shop_router.get("/purchases/{purchase_id}/documents", response=errors(401, 403, 404),
+                 openapi_extra=file_doc(HTML, "The stored page"))
+def purchase_documents(request, purchase_id: int):
+    """The ÖBF + MSS (TR, then EN) as the buyer accepted them for this purchase: the stored HTML page,
+    never regenerated. Printable; the browser can save it as PDF.
+
+    Errors: 403 organizer_access_required · 404 not_found (not this account's, or a purchase from
+    before the documents existed)."""
+    user = _organizer(request)
+    purchase = Purchase.objects.filter(pk=purchase_id, user=user).exclude(docs_html="").first()
+    if purchase is None:
+        raise ApiError(404, "not_found", "Belge bulunamadı.")
+    return _html(purchase.docs_html)
 
 
 # ---------------------------------------------------------------------------- billing profile

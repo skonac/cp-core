@@ -4,6 +4,7 @@ import math
 import random
 import tempfile
 
+from django.conf import settings
 from django.test import TestCase, override_settings
 from PIL import Image as PILImage
 
@@ -40,7 +41,7 @@ class StaffPagesTest(TestCase):
         me = vec()
         cls.staff = User.objects.create_superuser("+905550000009", "pw")
         cls.org = User.objects.create_user("+905550000001", "pw", is_organizer=True, credit_balance=10)
-        cls.guest = User.objects.create_user("+905550000002", "pw", is_participant=True, kvkk_version="001")
+        cls.guest = User.objects.create_user("+905550000002", "pw", is_participant=True, kvkk_version=settings.KVKK_VERSION)
         cls.event = Event.objects.create(name="Test", date="2026-10-19", owner=cls.org)
         EventMember.objects.create(user=cls.guest, event=cls.event)
         for color in ("red", "green", "blue"):

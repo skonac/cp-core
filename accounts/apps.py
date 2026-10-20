@@ -30,7 +30,7 @@ def check_kvkk_files(app_configs=None, **kwargs):
                                    id="cp.E001"))
     else:
         for loc in settings.KVKK_LOCALES:
-            path = settings.KVKK_DIR / filename(loc)
+            path = settings.LEGAL_DIR / filename(loc)
             if not path.is_file():
                 errors.append(checks.Error(f"KVKK document missing: {path}", id="cp.E002"))
     return errors
