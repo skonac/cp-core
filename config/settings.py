@@ -79,7 +79,7 @@ MIDDLEWARE = [
 # Behind nginx: it terminates HTTPS and passes the scheme and the client IP.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")   # nginx: proxy_set_header X-Forwarded-Proto $scheme
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in env("CP_CSRF_TRUSTED_ORIGINS",
-                        "https://cp.futuruniq.com,https://cp.gesli.net").split(",") if o.strip()]
+                        "https://cleverphotos.org,https://www.cleverphotos.org").split(",") if o.strip()]
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"

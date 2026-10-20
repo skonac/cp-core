@@ -5507,7 +5507,7 @@
           "joinUrl": {
             "description": "Link for participants (QR content).",
             "examples": [
-              "https://cp.futuruniq.com/?event=RK238"
+              "https://cleverphotos.org/?event=RK238"
             ],
             "title": "Joinurl",
             "type": "string"

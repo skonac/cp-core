@@ -5,7 +5,7 @@ frontend, under `/api/`. This document is the contract; the machine-readable com
 [`openapi.json`](openapi.json) (live at `/api/openapi.json`, interactive at `/api/docs`). It describes
 every request and every response: each status with its schema and an example, each endpoint's error
 codes in its description. A test checks every real response against it, so it does not drift.
-TypeScript types can be generated from it: `npx openapi-typescript https://cp.futuruniq.com/api/openapi.json -o src/api/schema.d.ts`
+TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
 Last updated: 2026-10-19 · API version 0.2 (organizer API §3.6; event types, city/venue)
@@ -330,7 +330,7 @@ allows an overdraft down to a floor, so a balance of −12 is shown as −12.
   "photoCount": 684, "processedPhotoCount": 680, "pendingPhotoCount": 4, "failedPhotoCount": 0,
   "participantCount": 213,
   "coverThumbnailUrl": "/api/organizer/events/RK238/cover/thumb.jpg", "coverIsUploaded": true,
-  "joinUrl": "https://cp.futuruniq.com/?event=RK238", "createdAt": "2026-10-19T08:30:00+00:00" }
+  "joinUrl": "https://cleverphotos.org/?event=RK238", "createdAt": "2026-10-19T08:30:00+00:00" }
 ```
 
 | Field | Notes |

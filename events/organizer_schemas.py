@@ -30,7 +30,7 @@ class OrganizerEventOut(Out):
     coverThumbnailUrl: str | None = Field(description="Uploaded cover, else the first photo; null when neither.",
                                           examples=["/api/organizer/events/RK238/cover/thumb.jpg"])
     coverIsUploaded: bool = Field(description="False: the cover shown is the first photo.")
-    joinUrl: str = Field(description="Link for participants (QR content).", examples=["https://cp.futuruniq.com/?event=RK238"])
+    joinUrl: str = Field(description="Link for participants (QR content).", examples=["https://cleverphotos.org/?event=RK238"])
     createdAt: str = Field(examples=["2026-10-19T08:30:00+00:00"])
 
 
