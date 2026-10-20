@@ -30,9 +30,12 @@ class ShopApiTests(TestCase):
     def test_shop_flow_and_contract(self):
         cache.clear()
         c = ApiClient()
-        self.assertCode(c.get("/api/shop/products"), 401, "authentication_required")
+        r = c.get("/api/shop/products")                                   # public, no session
+        self.assertCode(r, 200, "products_retrieved")
+        self.assertIsNone(r.json()["data"]["creditBalance"])
+        self.assertCode(c.get("/api/shop/purchases"), 401, "authentication_required")
         c.sign_in("+905550000301")                                        # a participant
-        self.assertCode(c.get("/api/shop/products"), 403, "organizer_access_required")
+        self.assertCode(c.get("/api/shop/purchases"), 403, "organizer_access_required")
         org = User.objects.create_user("+905550000302", is_organizer=True, credit_balance=-12)
         c.force_login(org)
         c.get("/api/auth/csrf")

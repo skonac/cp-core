@@ -27,7 +27,8 @@ class ProductOut(Out):
 
 
 class CatalogOut(Out):
-    creditBalance: int = Field(description="May be negative (overdraft).", examples=[1840])
+    creditBalance: int | None = Field(description="Signed in: the balance (may be negative). Signed out: null.",
+                                      examples=[1840])
     pricingVersion: str = Field(description="Send back with a purchase; changes with any product or price change.",
                                 examples=["3f9a1c0b2d4e"])
     products: list[ProductOut] = Field(description="On sale, in display order.")

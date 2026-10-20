@@ -2865,36 +2865,11 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error401"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error403"
-                }
-              }
-            }
           }
         },
-        "description": "The products on sale (managed in the admin), the balance and the price version to buy with.\n\nErrors: 403 organizer_access_required.",
+        "description": "The products on sale (managed in the admin) and the price version to buy with. Public: also for\nthe landing/pricing pages. `creditBalance` only with a session (null otherwise).",
         "tags": [
           "shop"
-        ],
-        "security": [
-          {
-            "SessionAuth": []
-          }
         ]
       }
     },
@@ -6730,12 +6705,19 @@
         "additionalProperties": false,
         "properties": {
           "creditBalance": {
-            "description": "May be negative (overdraft).",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Signed in: the balance (may be negative). Signed out: null.",
             "examples": [
               1840
             ],
-            "title": "Creditbalance",
-            "type": "integer"
+            "title": "Creditbalance"
           },
           "pricingVersion": {
             "description": "Send back with a purchase; changes with any product or price change.",

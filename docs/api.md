@@ -434,7 +434,8 @@ processing. No phone numbers, selfies or face data are returned.
 ### 3.7 Shop
 
 What organizers buy: today every product adds credits to the account (`2000cr` = 2000 credits). One product per
-purchase, no cart. For organizer accounts (`403 organizer_access_required` otherwise). Products are managed in the
+purchase, no cart. The product list is public (landing/pricing pages); purchases need an organizer account
+(`401` signed out, `403 organizer_access_required` otherwise). Products are managed in the
 admin: name, title, description (subtitle) in Turkish and English, credits, price, currency, on sale, featured, order.
 Shown texts come in both languages, `{"tr": "…", "en": "…"}`; pick by the interface language. An empty string means
 not filled in (fall back to the other language, or hide it).
@@ -450,7 +451,7 @@ not filled in (fall back to the other language, or hide it).
                   "unitPrice": 1.8, "discountPercent": 10, "featured": true } ] }
 ```
 
-`products`: the ones on sale, in display order. `discountPercent` is against the product with the highest unit price.
+No session needed. `creditBalance` is `null` when signed out. `products`: the ones on sale, in display order. `discountPercent` is against the product with the highest unit price.
 `pricingVersion` changes whenever a product or price changes; send it back with a purchase.
 
 **`GET /api/shop/purchases`** → `200 purchases_retrieved`:

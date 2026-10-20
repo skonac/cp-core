@@ -1,5 +1,5 @@
-"""Shop API (/api/shop/…): the products on sale, buying one, the purchase history.
-For organizer accounts (credits are spent on photo uploads). Shapes and codes: docs/api.md §3.7.
+"""Shop API (/api/shop/…): the products on sale (public), buying one and the purchase history
+(organizer accounts: credits are spent on photo uploads). Shapes and codes: docs/api.md §3.7.
 One product per purchase, no cart. Payment: shop/payments.py (simulated until iyzico is connected)."""
 import hashlib
 from typing import Literal
@@ -45,12 +45,10 @@ def purchase_json(p: Purchase) -> dict:
             "purchasedAt": p.created_at.isoformat(), "paidAt": p.paid_at.isoformat() if p.paid_at else None}
 
 
-@shop_router.get("/products", response={200: S.CatalogResponse, **errors(401, 403)})
+@shop_router.get("/products", auth=None, response={200: S.CatalogResponse})
 def products(request):
-    """The products on sale (managed in the admin), the balance and the price version to buy with.
-
-    Errors: 403 organizer_access_required."""
-    user = _organizer(request)
+    """The products on sale (managed in the admin) and the price version to buy with. Public: also for
+    the landing/pricing pages. `creditBalance` only with a session (null otherwise)."""
     on_sale = _on_sale()
     top_unit = max((float(p.price) / p.credits for p in on_sale if p.credits), default=0)
     out = []
@@ -63,8 +61,9 @@ def products(request):
                     "unitPrice": round(unit, 4),
                     "discountPercent": round((1 - unit / top_unit) * 100) if top_unit else 0,
                     "featured": p.is_featured})
+    balance = _balance(request.user) if request.user.is_authenticated else None
     return respond(request, "products_retrieved", {
-        "creditBalance": _balance(user), "pricingVersion": _pricing_version(on_sale), "products": out})
+        "creditBalance": balance, "pricingVersion": _pricing_version(on_sale), "products": out})
 
 
 @shop_router.get("/purchases", response={200: S.PurchaseListResponse, **errors(401, 403)})
