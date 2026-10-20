@@ -3,6 +3,8 @@ Shapes and codes: docs/api.md. Access rules: events/participant.py (same as the 
 from datetime import timedelta
 
 from django.conf import settings
+from django.db.models import Count
+from django.http import StreamingHttpResponse
 from django.utils import timezone
 from ninja import Router
 from ninja.security import django_auth
@@ -11,7 +13,8 @@ from common.api import ApiError, errors, file_doc, respond
 from common.ratelimit import allow
 from media.matching import my_photos
 from media.models import DownloadLog, Image
-from media.storage import file_response
+from media.storage import abspath, file_response
+from media.zipstream import stream_zip
 
 from . import schemas as S
 from .codes import normalize_code
@@ -190,3 +193,46 @@ def photo_download(request, code: str, photo_id: str):
     DownloadLog.objects.create(user=request.user, image=image, ip=request.META.get("REMOTE_ADDR"))
     return file_response(image.relpath("m"),
                          download_name=settings.DOWNLOAD_NAME.format(code=event.code, seq=image.seq))
+
+
+@events_router.get("/{code}/download.zip", response=errors(401, 403, 404, 410, 422, 423, 429),
+                   openapi_extra=file_doc("application/zip", "The selected photos, full size, as one ZIP "
+                                                             "(stored, streamed). Headers X-Photos-Included, X-Photos-Skipped"))
+def download_zip(request, code: str, view: str = "mine", photos: str = "", all: bool = False):
+    """Several photos at once, full size, as a ZIP. `photos` = comma-separated photo ids of the current
+    `view` (e.g. `00012,00017`), or `all=true` for the whole view. Use it as a plain link (`<a href>`):
+    the browser streams it to disk. Max `CP_ZIP_MAX_FILES` photos per request (50); split larger selections.
+    Every photo counts against the 3-downloads-per-day cap; photos outside the view or already at the cap
+    are left out (X-Photos-Skipped tells how many).
+
+    Errors: 403 consent_required, browse_all_not_allowed · 404 photo_not_found (none of them visible) ·
+    410 event_expired · 422 validation_error (no photos given), too_many_files · 423 event_access_closed ·
+    429 download_limit_reached (all of them at the cap)."""
+    event, access = _member_access(request, code)
+    in_view = _view_photos(request, event, access, view)
+    if all:
+        requested, chosen = len(in_view), in_view
+    else:
+        ids = {int(p) for p in photos.split(",") if p.strip().isdigit()}
+        if not ids:
+            raise ApiError(422, "validation_error", "photos: comma-separated photo ids, or all=true.")
+        requested, chosen = len(ids), [p for p in in_view if p.seq in ids]
+    if len(chosen) > settings.ZIP_MAX_FILES:
+        raise ApiError(422, "too_many_files", f"En fazla {settings.ZIP_MAX_FILES} fotoğraf seç; daha fazlasını parça parça indir.")
+    if not chosen:
+        raise ApiError(404, "photo_not_found", "Fotoğraf bulunamadı.")
+    since = timezone.now() - timedelta(days=1)
+    used = dict(DownloadLog.objects.filter(user=request.user, image__in=chosen, downloaded_at__gte=since)
+                .values_list("image_id").annotate(n=Count("id")))
+    allowed = [p for p in chosen if used.get(p.id, 0) < settings.DOWNLOAD_CAP_PER_PHOTO_PER_DAY
+               and abspath(p.relpath("m")).is_file()]
+    if not allowed:
+        raise ApiError(429, "download_limit_reached", "Bu fotoğrafları bugün yeterince indirdin. Yarın tekrar dene.")
+    ip = request.META.get("REMOTE_ADDR")
+    DownloadLog.objects.bulk_create([DownloadLog(user=request.user, image=p, ip=ip) for p in allowed])
+    entries = [(settings.DOWNLOAD_NAME.format(code=event.code, seq=p.seq), abspath(p.relpath("m"))) for p in allowed]
+    response = StreamingHttpResponse(stream_zip(entries), content_type="application/zip")
+    response["Content-Disposition"] = f'attachment; filename="{settings.ZIP_NAME.format(code=event.code, view=view)}"'
+    response["X-Photos-Included"] = str(len(allowed))
+    response["X-Photos-Skipped"] = str(requested - len(allowed))
+    return response

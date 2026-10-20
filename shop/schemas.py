@@ -58,3 +58,28 @@ class PurchaseResultOut(Out):
 CatalogResponse = envelope("ShopCatalogResponse", CatalogOut, "products_retrieved")
 PurchaseListResponse = envelope("PurchaseListResponse", PurchaseListOut, "purchases_retrieved")
 PurchaseResponse = envelope("PurchaseResponse", PurchaseResultOut, "purchase_completed")
+
+
+class BillingOut(Out):
+    type: Literal["individual", "company"]
+    firstName: str = Field(description="The buyer; for a company, the contact person.", examples=["Ece"])
+    lastName: str = Field(examples=["Yılmaz"])
+    identityNumber: str = Field(description="TC kimlik no; required for individuals.", examples=["10000000146"])
+    companyName: str = Field(description="Unvan; companies only.", examples=[""])
+    taxOffice: str = Field(description="Vergi dairesi; companies only.", examples=[""])
+    taxNumber: str = Field(description="VKN, 10 digits; companies only.", examples=[""])
+    email: str = Field(examples=["ece@example.com"])
+    address: str = Field(examples=["Atatürk Cad. No: 1 D: 2"])
+    district: str = Field(description="İlçe.", examples=["Çankaya"])
+    city: str = Field(description="İl.", examples=["Ankara"])
+    postalCode: str = Field(examples=["06680"])
+    country: str = Field(examples=["Türkiye"])
+
+
+class BillingDataOut(Out):
+    billing: BillingOut | None = Field(description="null until saved once.")
+    isComplete: bool = Field(description="Purchases need a complete billing profile.")
+
+
+BillingResponse = envelope("BillingResponse", BillingDataOut, "billing_retrieved")
+BillingSavedResponse = envelope("BillingSavedResponse", BillingDataOut, "billing_saved")

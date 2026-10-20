@@ -30,7 +30,7 @@ from pgvector.django import CosineDistance
 
 from accounts.models import ConsentLog, OtpChallenge, User
 from credits.models import CreditTransaction
-from shop.models import Purchase
+from shop.models import BillingProfile, Purchase
 from events.codes import normalize_code
 from events.models import Event, EventMember
 from media.ingest import event_cover
@@ -250,6 +250,7 @@ def user(request, user_id):
         "selfies": Image.objects.filter(owner=u, kind=Image.Kind.SELFIE).order_by("deleted_at", "slot", "-created_at"),
         "consents": ConsentLog.objects.filter(user=u).order_by("-created_at"),
         "purchases": Purchase.objects.filter(user=u).order_by("-created_at")[:50],
+        "billing": BillingProfile.objects.filter(user=u).first(),
         "credits": CreditTransaction.objects.filter(user=u).select_related("actor").order_by("-created_at")[:50],
         "uploads": Image.objects.filter(owner=u, kind=Image.Kind.PHOTO, deleted_at__isnull=True).count(),
         "downloads": DownloadLog.objects.filter(user=u).select_related("image__event").order_by("-downloaded_at")[:20],

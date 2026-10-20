@@ -2,15 +2,18 @@
 For organizer accounts (credits are spent on photo uploads). Shapes and codes: docs/api.md §3.7.
 One product per purchase, no cart. Payment: shop/payments.py (simulated until iyzico is connected)."""
 import hashlib
+from typing import Literal
 
 from ninja import Router
 from ninja.security import django_auth
+from pydantic import Field
 
 from accounts.models import User
 from common.api import ApiError, CamelSchema, errors, respond
 
 from . import schemas as S
-from .models import Product, Purchase
+from .billing import billing_errors
+from .models import BillingProfile, Product, Purchase
 from .payments import PaymentError, buy
 
 shop_router = Router(tags=["shop"], auth=django_auth)
@@ -87,8 +90,10 @@ def create_purchase(request, data: PurchaseIn):
     payment provider (iyzico, not connected yet) this step will hand back a payment page instead;
     the credits then arrive after the payment.
 
+    Needs a complete billing profile (`PUT /api/me/billing`); it is copied into the purchase.
+
     Errors: 403 organizer_access_required · 404 not_found (product not on sale) ·
-    409 pricing_changed (reload the products) · 501 payment_not_available."""
+    409 pricing_changed (reload the products) · 422 billing_profile_required · 501 payment_not_available."""
     user = _organizer(request)
     on_sale = _on_sale()
     product = next((p for p in on_sale if str(p.pk) == data.product_id), None)
@@ -96,9 +101,76 @@ def create_purchase(request, data: PurchaseIn):
         raise ApiError(404, "not_found", "Ürün bulunamadı.")
     if data.pricing_version != _pricing_version(on_sale):
         raise ApiError(409, "pricing_changed", "Fiyatlar güncellendi; ürünleri yeniden yükle.")
+    profile = _profile(user)
+    if profile is None or not profile.is_complete:
+        raise ApiError(422, "billing_profile_required", "Önce fatura bilgilerini doldur.")
     try:
-        purchase = buy(user, product, request.META.get("REMOTE_ADDR"))
+        purchase = buy(user, product, request.META.get("REMOTE_ADDR"), billing=billing_json(profile)["billing"])
     except PaymentError as e:
         raise ApiError(501, e.code, e.message) from None
     return respond(request, "purchase_completed",
                    {"purchase": purchase_json(purchase), "creditBalance": _balance(user)}, status=201)
+
+
+# ---------------------------------------------------------------------------- billing profile
+
+billing_router = Router(tags=["shop"], auth=django_auth)   # mounted at /api/me/billing
+
+BILLING_FIELDS = {   # API name -> model field
+    "type": "type", "firstName": "first_name", "lastName": "last_name", "identityNumber": "identity_number",
+    "companyName": "company_name", "taxOffice": "tax_office", "taxNumber": "tax_number", "email": "email",
+    "address": "address", "district": "district", "city": "city", "postalCode": "postal_code", "country": "country",
+}
+
+
+def billing_json(profile) -> dict:
+    if profile is None:
+        return {"billing": None, "isComplete": False}
+    return {"billing": {api: getattr(profile, field) or "" for api, field in BILLING_FIELDS.items()},
+            "isComplete": profile.is_complete}
+
+
+def _profile(user):
+    return BillingProfile.objects.filter(user=user).first()
+
+
+@billing_router.get("", response={200: S.BillingResponse, **errors(401)})
+def get_billing(request):
+    """The account's billing profile (who pays), or null before the first save."""
+    return respond(request, "billing_retrieved", billing_json(_profile(request.user)))
+
+
+class BillingIn(CamelSchema):
+    type: Literal["individual", "company"] = "individual"
+    first_name: str = Field("", max_length=80)
+    last_name: str = Field("", max_length=80)
+    identity_number: str = Field("", max_length=11)
+    company_name: str = Field("", max_length=200)
+    tax_office: str = Field("", max_length=80)
+    tax_number: str = Field("", max_length=10)
+    email: str = Field("", max_length=254)
+    address: str = Field("", max_length=300)
+    district: str = Field("", max_length=80)
+    city: str = Field("", max_length=80)
+    postal_code: str = Field("", max_length=10)
+    country: str = Field("Türkiye", max_length=60)
+
+
+@billing_router.put("", response={200: S.BillingSavedResponse, **errors(401, 422)})
+def put_billing(request, data: BillingIn):
+    """Save the whole billing profile. Individuals: name, TC kimlik no, email, address, district, city.
+    Companies: name of the contact person, company name (unvan), tax office, VKN, email, address,
+    district, city (TC kimlik no optional). Checked with the official TC kimlik / VKN checksums.
+
+    Errors: 422 validation_error with `errors` per field (e.g. {"identityNumber": ["invalid TC kimlik no"]})."""
+    values = {field: getattr(data, field).strip() for field in BILLING_FIELDS.values()}
+    profile = _profile(request.user) or BillingProfile(user=request.user)
+    for field, value in values.items():
+        setattr(profile, field, value)
+    problems = billing_errors(profile)
+    if problems:
+        api_names = {field: api for api, field in BILLING_FIELDS.items()}
+        raise ApiError(422, "validation_error", "Fatura bilgileri eksik veya hatalı.",
+                       errors={api_names[f]: [m] for f, m in problems.items()})
+    profile.save()
+    return respond(request, "billing_saved", billing_json(profile))

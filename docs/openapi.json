@@ -1370,6 +1370,145 @@
         ]
       }
     },
+    "/api/events/{code}/download.zip": {
+      "get": {
+        "operationId": "events_api_download_zip",
+        "summary": "Download Zip",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "schema": {
+              "default": "mine",
+              "title": "View",
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "photos",
+            "schema": {
+              "default": "",
+              "title": "Photos",
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "all",
+            "schema": {
+              "default": false,
+              "title": "All",
+              "type": "boolean"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error423"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "The selected photos, full size, as one ZIP (stored, streamed). Headers X-Photos-Included, X-Photos-Skipped",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "description": "Several photos at once, full size, as a ZIP. `photos` = comma-separated photo ids of the current\n`view` (e.g. `00012,00017`), or `all=true` for the whole view. Use it as a plain link (`<a href>`):\nthe browser streams it to disk. Max `CP_ZIP_MAX_FILES` photos per request (50); split larger selections.\nEvery photo counts against the 3-downloads-per-day cap; photos outside the view or already at the cap\nare left out (X-Photos-Skipped tells how many).\n\nErrors: 403 consent_required, browse_all_not_allowed · 404 photo_not_found (none of them visible) ·\n410 event_expired · 422 validation_error (no photos given), too_many_files · 423 event_access_closed ·\n429 download_limit_reached (all of them at the cap).",
+        "tags": [
+          "events"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
     "/api/organizer/dashboard": {
       "get": {
         "operationId": "events_organizer_api_dashboard",
@@ -2882,7 +3021,7 @@
             }
           }
         },
-        "description": "Buy one product: checks it is on sale and the price version, takes the payment, adds the\ncredits. Development servers simulate the payment: it always succeeds at once. With the real\npayment provider (iyzico, not connected yet) this step will hand back a payment page instead;\nthe credits then arrive after the payment.\n\nErrors: 403 organizer_access_required · 404 not_found (product not on sale) ·\n409 pricing_changed (reload the products) · 501 payment_not_available.",
+        "description": "Buy one product: checks it is on sale and the price version, takes the payment, adds the\ncredits. Development servers simulate the payment: it always succeeds at once. With the real\npayment provider (iyzico, not connected yet) this step will hand back a payment page instead;\nthe credits then arrive after the payment.\n\nNeeds a complete billing profile (`PUT /api/me/billing`); it is copied into the purchase.\n\nErrors: 403 organizer_access_required · 404 not_found (product not on sale) ·\n409 pricing_changed (reload the products) · 422 billing_profile_required · 501 payment_not_available.",
         "tags": [
           "shop"
         ],
@@ -2891,6 +3030,100 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/PurchaseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/me/billing": {
+      "get": {
+        "operationId": "shop_api_get_billing",
+        "summary": "Get Billing",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          }
+        },
+        "description": "The account's billing profile (who pays), or null before the first save.",
+        "tags": [
+          "shop"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      },
+      "put": {
+        "operationId": "shop_api_put_billing",
+        "summary": "Put Billing",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSavedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "Save the whole billing profile. Individuals: name, TC kimlik no, email, address, district, city.\nCompanies: name of the contact person, company name (unvan), tax office, VKN, email, address,\ndistrict, city (TC kimlik no optional). Checked with the official TC kimlik / VKN checksums.\n\nErrors: 422 validation_error with `errors` per field (e.g. {\"identityNumber\": [\"invalid TC kimlik no\"]}).",
+        "tags": [
+          "shop"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingIn"
               }
             }
           },
@@ -6993,6 +7226,321 @@
           "pricingVersion"
         ],
         "title": "PurchaseIn",
+        "type": "object"
+      },
+      "BillingDataOut": {
+        "additionalProperties": false,
+        "properties": {
+          "billing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BillingOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null until saved once."
+          },
+          "isComplete": {
+            "description": "Purchases need a complete billing profile.",
+            "title": "Iscomplete",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "billing",
+          "isComplete"
+        ],
+        "title": "BillingDataOut",
+        "type": "object"
+      },
+      "BillingOut": {
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "enum": [
+              "individual",
+              "company"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "firstName": {
+            "description": "The buyer; for a company, the contact person.",
+            "examples": [
+              "Ece"
+            ],
+            "title": "Firstname",
+            "type": "string"
+          },
+          "lastName": {
+            "examples": [
+              "Yılmaz"
+            ],
+            "title": "Lastname",
+            "type": "string"
+          },
+          "identityNumber": {
+            "description": "TC kimlik no; required for individuals.",
+            "examples": [
+              "10000000146"
+            ],
+            "title": "Identitynumber",
+            "type": "string"
+          },
+          "companyName": {
+            "description": "Unvan; companies only.",
+            "examples": [
+              ""
+            ],
+            "title": "Companyname",
+            "type": "string"
+          },
+          "taxOffice": {
+            "description": "Vergi dairesi; companies only.",
+            "examples": [
+              ""
+            ],
+            "title": "Taxoffice",
+            "type": "string"
+          },
+          "taxNumber": {
+            "description": "VKN, 10 digits; companies only.",
+            "examples": [
+              ""
+            ],
+            "title": "Taxnumber",
+            "type": "string"
+          },
+          "email": {
+            "examples": [
+              "ece@example.com"
+            ],
+            "title": "Email",
+            "type": "string"
+          },
+          "address": {
+            "examples": [
+              "Atatürk Cad. No: 1 D: 2"
+            ],
+            "title": "Address",
+            "type": "string"
+          },
+          "district": {
+            "description": "İlçe.",
+            "examples": [
+              "Çankaya"
+            ],
+            "title": "District",
+            "type": "string"
+          },
+          "city": {
+            "description": "İl.",
+            "examples": [
+              "Ankara"
+            ],
+            "title": "City",
+            "type": "string"
+          },
+          "postalCode": {
+            "examples": [
+              "06680"
+            ],
+            "title": "Postalcode",
+            "type": "string"
+          },
+          "country": {
+            "examples": [
+              "Türkiye"
+            ],
+            "title": "Country",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "firstName",
+          "lastName",
+          "identityNumber",
+          "companyName",
+          "taxOffice",
+          "taxNumber",
+          "email",
+          "address",
+          "district",
+          "city",
+          "postalCode",
+          "country"
+        ],
+        "title": "BillingOut",
+        "type": "object"
+      },
+      "BillingResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "billing_retrieved",
+            "default": "billing_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BillingDataOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "BillingResponse",
+        "type": "object"
+      },
+      "BillingSavedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "billing_saved",
+            "default": "billing_saved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BillingDataOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "BillingSavedResponse",
+        "type": "object"
+      },
+      "BillingIn": {
+        "properties": {
+          "type": {
+            "default": "individual",
+            "enum": [
+              "individual",
+              "company"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "firstName": {
+            "default": "",
+            "maxLength": 80,
+            "title": "Firstname",
+            "type": "string"
+          },
+          "lastName": {
+            "default": "",
+            "maxLength": 80,
+            "title": "Lastname",
+            "type": "string"
+          },
+          "identityNumber": {
+            "default": "",
+            "maxLength": 11,
+            "title": "Identitynumber",
+            "type": "string"
+          },
+          "companyName": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Companyname",
+            "type": "string"
+          },
+          "taxOffice": {
+            "default": "",
+            "maxLength": 80,
+            "title": "Taxoffice",
+            "type": "string"
+          },
+          "taxNumber": {
+            "default": "",
+            "maxLength": 10,
+            "title": "Taxnumber",
+            "type": "string"
+          },
+          "email": {
+            "default": "",
+            "maxLength": 254,
+            "title": "Email",
+            "type": "string"
+          },
+          "address": {
+            "default": "",
+            "maxLength": 300,
+            "title": "Address",
+            "type": "string"
+          },
+          "district": {
+            "default": "",
+            "maxLength": 80,
+            "title": "District",
+            "type": "string"
+          },
+          "city": {
+            "default": "",
+            "maxLength": 80,
+            "title": "City",
+            "type": "string"
+          },
+          "postalCode": {
+            "default": "",
+            "maxLength": 10,
+            "title": "Postalcode",
+            "type": "string"
+          },
+          "country": {
+            "default": "Türkiye",
+            "maxLength": 60,
+            "title": "Country",
+            "type": "string"
+          }
+        },
+        "title": "BillingIn",
         "type": "object"
       }
     },

@@ -158,6 +158,8 @@ CREDIT_FLOOR_DEFAULT = -50  # a user's balance may go down to this; per-user ove
 MATCH_THRESHOLD = 0.363     # SFace cosine similarity; tune on a real event
 DOWNLOAD_CAP_PER_PHOTO_PER_DAY = 3
 DOWNLOAD_NAME = "cleverphotos_{code}_{seq:05d}.jpg"
+ZIP_MAX_FILES = int(env("CP_ZIP_MAX_FILES", "50"))   # photos per ZIP download request
+ZIP_NAME = "cleverphotos_{code}_{view}.zip"
 
 EVENT_CODE_LENGTH = 5
 EVENT_CODE_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz"   # 31 symbols: no 0/1, no i/l/o

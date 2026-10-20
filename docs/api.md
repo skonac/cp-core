@@ -14,7 +14,7 @@ Last updated: 2026-10-19 · API version 0.2 (organizer API §3.6; event types, c
 > "Changes from cp-web's draft contract" section, which lists every place where this API
 > differs from `cp-web/docs/api/*.md` and the current MSW mocks. Update `src/features/*/api/*`
 > and `src/mocks/handlers.ts` to match. Do not keep `accessToken`, `match-jobs`, or the
-> event-scoped selfie/consent paths. For the organizer screens: §3.6, §3.7 and §5b.
+> event-scoped selfie/consent paths. For the organizer screens: §3.6, §3.7, §3.8 and §5b. Multi-photo download: §3.5 `download.zip`.
 
 ## 1. Basics
 
@@ -79,6 +79,7 @@ Every response except files and `204` is:
 | 409 | `consent_version_outdated` | Consent sent for a KVKK version that is no longer current |
 | 409 | `pricing_changed` | Purchase with an old `pricingVersion` |
 | 410 | `event_expired`, `otp_expired` | |
+| 422 | `billing_profile_required` | Purchase before the billing profile is complete (§3.8) |
 | 422 | `validation_error`, `invalid_phone_number`, `invalid_role`, `invalid_otp`, `explicit_consent_required`, `unsupported_file_type`, `unreadable_image`, `file_too_large`, `file_required`, `invalid_slot`, `invalid_event_settings`, `too_many_files` | |
 | 423 | `event_access_closed` | The organizer closed access |
 | 429 | `rate_limit_exceeded`, `download_limit_reached` | |
@@ -295,6 +296,14 @@ Navigation follows the same view. A photo outside the view → `404 photo_not_fo
 | `GET /api/events/{code}/photos/{photoId}/display.jpg` | ~1600 px, for viewing |
 | `GET /api/events/{code}/photos/{photoId}/download` | full size (≤ 4000 px), `Content-Disposition: attachment; filename="cleverphotos_rk238_00017.jpg"` |
 
+**`GET /api/events/{code}/download.zip?view=mine&photos=00012,00017`** (or `&all=true` for the whole view): several
+photos at once, full size, as one ZIP (`cleverphotos_rk238_mine.zip`; inside, the same names as single downloads).
+Use it as a plain link (`<a href>` / `window.location`), not `fetch`: the browser streams it to disk. Max **50** photos per
+request (server setting); split larger selections into several links. Each photo counts against the per-photo cap below;
+photos outside the view or already at the cap are left out, and the response headers `X-Photos-Included` /
+`X-Photos-Skipped` tell how many. Errors (JSON): `422 validation_error` (no photos given), `422 too_many_files`,
+`404 photo_not_found` (none visible), `429 download_limit_reached` (all at the cap), plus the event errors above.
+
 Downloads are logged and capped: the same user may download the same photo **3 times per 24 h**;
 the 4th answers `429 download_limit_reached` (JSON envelope). Show `downloadsLeftToday` from the photo detail and hide the button at 0.
 A photo the user may not see answers `404 photo_not_found`.
@@ -463,7 +472,36 @@ Pick a product, pay, the credits are added. **On development servers the payment
 once** (`status: "paid"`, credits added). With the real provider (iyzico, not connected yet) this call will answer with
 a payment page to open instead, and the credits arrive after the payment; that shape will be added here.
 Errors: `404 not_found` (product not on sale), `409 pricing_changed` (reload the products), `422 validation_error`,
-`501 payment_not_available`.
+`422 billing_profile_required` (show the billing form, §3.8, then buy again), `501 payment_not_available`.
+The billing profile at purchase time is kept with the purchase.
+
+### 3.8 Billing profile
+
+Who pays, as the payment provider and the invoice need it: an **individual** (TC kimlik no) or a **company** (unvan, vergi
+dairesi, VKN). One per account; asked at the first purchase (`422 billing_profile_required`), editable in the profile.
+The phone number is the account's.
+
+**`GET /api/me/billing`** → `200 billing_retrieved` `{ "billing": {…} | null, "isComplete": false }` (`null` before the first save).
+
+**`PUT /api/me/billing`** (the whole profile) → `200 billing_saved` `{ "billing": {…}, "isComplete": true }`:
+
+```json
+{ "type": "company", "firstName": "Ece", "lastName": "Yılmaz", "identityNumber": "",
+  "companyName": "Foto Ltd. Şti.", "taxOffice": "Çankaya", "taxNumber": "1234567890",
+  "email": "ece@example.com", "address": "Atatürk Cad. No: 1 D: 2", "district": "Çankaya", "city": "Ankara",
+  "postalCode": "06680", "country": "Türkiye" }
+```
+
+| Field | Rule |
+| --- | --- |
+| `type` | `individual` or `company` |
+| `firstName`, `lastName` | always; for a company, the contact person |
+| `identityNumber` | TC kimlik no, 11 digits with the official checksum; required for individuals, optional for companies |
+| `companyName`, `taxOffice`, `taxNumber` | companies only, all required; `taxNumber` = VKN, 10 digits with the official checksum |
+| `email`, `address`, `district` (ilçe), `city` (il) | always required |
+| `postalCode` | optional; `country` defaults to `Türkiye` |
+
+Errors: `422 validation_error` with `errors` per field, e.g. `{"identityNumber": ["invalid TC kimlik no"], "city": ["required"]}`.
 
 ## 4. Flows
 
@@ -508,6 +546,8 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 | 18 | `GET /api/me/events` | Same; adds `matching`; `coverThumbnailUrl` always `null` for now | — |
 | 19 | `DELETE /api/auth/session` | Same | — |
 | 20 | Error `code` values | See §2 table | Map codes to messages |
+| 21 | "Download selected" fires one download per photo (`downloadUrl`, saved as `.svg`) | `GET /api/events/{code}/download.zip?view=…&photos=…` (max 50 per request) | One link per batch of ≤ 50; read `X-Photos-Skipped` if you want to tell the user |
+| 22 | Credit purchase without buyer data | `422 billing_profile_required` → `GET`/`PUT /api/me/billing` (§3.8), individual or company | Billing form at the first purchase; editable in the profile |
 
 ### 5b. Organizer API vs cp-web's draft (`docs/api/organizer-dashboard.md`, 2026-10-19)
 
@@ -531,5 +571,5 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 ## 6. Not yet in this API
 
 Real payment (iyzico; simulated on dev servers), account-based discounts, organizer activity feed, participant access revoke, choosing the cover from
-the event's photos, covers for participants (`coverThumbnailUrl` in `/api/me/events`), ZIP download of
-several photos, real SMS delivery, email login. Ask before building screens that need them.
+the event's photos, covers for participants (`coverThumbnailUrl` in `/api/me/events`),
+real SMS delivery, email login. Ask before building screens that need them.

@@ -54,6 +54,19 @@
   <td class="n">{{ e.photos.failed|default:"" }}</td><td class="n">{{ e.member_count }}</td><td>{{ e.created_at|date:"Y-m-d H:i" }}</td>
 </tr>{% endfor %}</table></div>{% else %}<p class="muted">None.</p>{% endif %}{% endif %}
 
+{% if billing %}<h2>Billing profile <span class="pill {% if billing.is_complete %}done{% else %}pending{% endif %}">{{ billing.is_complete|yesno:"complete,incomplete" }}</span></h2>
+<div class="card"><table class="kv t">
+  <tr><td>Type</td><td>{{ billing.type }} · <a href="/admin/shop/billingprofile/{{ billing.id }}/change/">admin</a></td></tr>
+  <tr><td>Name</td><td>{{ billing.first_name }} {{ billing.last_name }}</td></tr>
+  <tr><td>TC kimlik no</td><td><code>{{ billing.identity_number|default:"—" }}</code></td></tr>
+  {% if billing.type == "company" %}<tr><td>Company</td><td>{{ billing.company_name }}</td></tr>
+  <tr><td>Tax office / VKN</td><td>{{ billing.tax_office }} / <code>{{ billing.tax_number }}</code></td></tr>{% endif %}
+  <tr><td>Email</td><td>{{ billing.email }}</td></tr>
+  <tr><td>Address</td><td class="wrap">{{ billing.address }}, {{ billing.district }} / {{ billing.city }} {{ billing.postal_code }}, {{ billing.country }}</td></tr>
+  <tr><td>Updated</td><td>{{ billing.updated_at|date:"Y-m-d H:i" }}</td></tr>
+</table></div>
+{% endif %}
+
 {% if purchases %}<h2>Purchases</h2>
 <div class="scroll"><table class="t"><tr><th>Id</th><th>Started</th><th>Product</th><th class="n">Credits</th><th class="n">Amount</th><th>Status</th><th>Provider</th><th>Payment id</th><th>Paid</th><th>Error</th></tr>
 {% for p in purchases %}<tr><td><a href="/admin/shop/purchase/{{ p.id }}/change/">{{ p.id }}</a></td><td>{{ p.created_at|date:"Y-m-d H:i" }}</td><td>{{ p.product_name_tr }}</td><td class="n">{{ p.credits }}</td>

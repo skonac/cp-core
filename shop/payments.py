@@ -30,12 +30,13 @@ class PaymentError(Exception):
         self.code, self.message = code, message
 
 
-def _new(user, product: Product, ip: str | None) -> Purchase:
+def _new(user, product: Product, ip: str | None, billing: dict | None) -> Purchase:
     return Purchase.objects.create(
         user=user, product=product, product_name_tr=product.name_tr, product_name_en=product.name_en,
         credits=product.credits,
         list_price=product.price, amount=product.price, currency=product.currency,
-        provider=settings.PAYMENT_PROVIDER, conversation_id="cp_" + secrets.token_hex(12), ip=ip or None)
+        provider=settings.PAYMENT_PROVIDER, conversation_id="cp_" + secrets.token_hex(12), ip=ip or None,
+        billing=billing)
 
 
 def complete(purchase: Purchase, payment_id: str, response: dict | None = None) -> Purchase:
@@ -64,8 +65,9 @@ def fail(purchase: Purchase, code: str, message: str = "", response: dict | None
     return purchase
 
 
-def buy(user, product: Product, ip: str | None = None) -> Purchase:
+def buy(user, product: Product, ip: str | None = None, billing: dict | None = None) -> Purchase:
+    """billing: the buyer's billing profile (API shape), kept with the purchase."""
     if settings.PAYMENT_PROVIDER == "simulated":
-        purchase = _new(user, product, ip)
+        purchase = _new(user, product, ip, billing)
         return complete(purchase, payment_id=f"SIM-{purchase.pk}", response={"simulated": True, "status": "success"})
     raise PaymentError("payment_not_available", "Ödeme henüz kullanılamıyor.")

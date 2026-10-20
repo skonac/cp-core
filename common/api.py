@@ -94,9 +94,9 @@ def file_doc(content_type: str, description: str) -> dict:
 class ApiError(Exception):
     """Raise anywhere below an endpoint: ApiError(404, "event_not_found", "Etkinlik bulunamadı.")"""
 
-    def __init__(self, status: int, code: str, message: str = ""):
+    def __init__(self, status: int, code: str, message: str = "", errors: dict | None = None):
         super().__init__(message or code)
-        self.status, self.code, self.message = status, code, message
+        self.status, self.code, self.message, self.errors = status, code, message, errors
 
 
 def _request_id(request) -> str:
@@ -121,6 +121,8 @@ def make_api(**kwargs) -> NinjaAPI:
 
     @api.exception_handler(ApiError)
     def on_api_error(request, exc: ApiError):
+        if exc.errors:   # field errors, same shape as 422 validation_error
+            return error(request, exc.status, exc.code, exc.message, errors=exc.errors)
         return error(request, exc.status, exc.code, exc.message)
 
     @api.exception_handler(Http404)

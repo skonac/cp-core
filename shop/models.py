@@ -1,4 +1,5 @@
-"""Shop: Product (what we sell) and Purchase (one buy of one product, with the payment provider's ids).
+"""Shop: Product (what we sell), Purchase (one buy of one product, with the payment provider's ids),
+BillingProfile (who pays: what the payment provider and the invoice need).
 Paying for a product adds credits through credits.CreditTransaction (shop/payments.py). design/core.md."""
 from django.conf import settings
 from django.db import models
@@ -57,6 +58,7 @@ class Purchase(models.Model):
     provider_token = models.CharField(max_length=200, blank=True)   # iyzico checkout form token
     provider_payment_id = models.CharField(max_length=64, blank=True)   # iyzico paymentId once paid
     provider_response = models.JSONField(null=True, blank=True)     # last raw answer from the provider
+    billing = models.JSONField(null=True, blank=True)               # the billing profile at purchase time
     error_code = models.CharField(max_length=64, blank=True)
     error_message = models.CharField(max_length=500, blank=True)
     ip = models.GenericIPAddressField(null=True, blank=True)
@@ -68,3 +70,38 @@ class Purchase(models.Model):
 
     def __str__(self):
         return f"{self.user} {self.product_name_tr} {self.status}"
+
+
+class BillingProfile(models.Model):
+    """Who pays: an individual (TC kimlik no) or a company (unvan, vergi dairesi, VKN). Asked at the
+    first purchase, editable in the profile. The payment provider needs a buyer name, identity number,
+    email, phone (the account's) and an address; an invoice needs the company data. Checks:
+    shop/billing.py."""
+    class Type(models.TextChoices):
+        INDIVIDUAL = "individual"
+        COMPANY = "company"
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="billing")
+    type = models.CharField(max_length=10, choices=Type.choices, default=Type.INDIVIDUAL)
+    first_name = models.CharField(max_length=80)            # the buyer; for a company, the contact person
+    last_name = models.CharField(max_length=80)
+    identity_number = models.CharField(max_length=11, blank=True)   # TC kimlik no: required for individuals
+    company_name = models.CharField(max_length=200, blank=True)   # unvan
+    tax_office = models.CharField(max_length=80, blank=True)      # vergi dairesi
+    tax_number = models.CharField(max_length=10, blank=True)      # VKN, 10 digits
+    email = models.EmailField()
+    address = models.CharField(max_length=300)
+    district = models.CharField(max_length=80)              # ilçe
+    city = models.CharField(max_length=80)                  # il
+    postal_code = models.CharField(max_length=10, blank=True)
+    country = models.CharField(max_length=60, default="Türkiye")
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def is_complete(self) -> bool:
+        from .billing import billing_errors
+        return not billing_errors(self)
+
+    def __str__(self):
+        return f"{self.user} {self.company_name or (self.first_name + ' ' + self.last_name)}"

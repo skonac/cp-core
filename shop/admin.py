@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Product, Purchase
+from .models import BillingProfile, Product, Purchase
 
 
 @admin.register(Product)
@@ -15,6 +15,14 @@ class ProductAdmin(admin.ModelAdmin):
         ("English", {"fields": ("name_en", "title_en", "description_en")}),
         (None, {"fields": ("credits", "price", "currency", "is_active", "is_featured", "sort_order")}),
     )
+
+
+@admin.register(BillingProfile)
+class BillingProfileAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "type", "first_name", "last_name", "company_name", "city", "updated_at")
+    list_filter = ("type",)
+    search_fields = ("user__phone", "first_name", "last_name", "company_name", "tax_number", "email")
+    raw_id_fields = ("user",)
 
 
 @admin.register(Purchase)

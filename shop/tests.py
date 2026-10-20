@@ -11,8 +11,12 @@ from config.api import api
 from credits.models import CreditTransaction
 
 from .apps import check_payment_provider
-from .models import Product, Purchase
+from .billing import tckn_valid, vkn_valid
+from .models import BillingProfile, Product, Purchase
 from .payments import buy, complete
+
+PERSON = {"type": "individual", "firstName": "Ece", "lastName": "Yılmaz", "identityNumber": "10000000146",
+          "email": "ece@example.com", "address": "Atatürk Cad. 1", "district": "Çankaya", "city": "Ankara"}
 
 
 def _norm(route: str) -> str:
@@ -54,11 +58,36 @@ class ShopApiTests(TestCase):
         self.assertCode(c.post_json("/api/shop/purchases", {"productId": str(old.pk), "pricingVersion": version}),
                         404, "not_found")
         self.assertCode(c.post_json("/api/shop/purchases", {"productId": pid}), 422, "validation_error")
+        self.assertCode(c.post_json("/api/shop/purchases", {"productId": pid, "pricingVersion": version}),
+                        422, "billing_profile_required")
+
+        # --- billing profile: individual, then company
+        r = c.get("/api/me/billing")
+        self.assertCode(r, 200, "billing_retrieved")
+        self.assertEqual(r.json()["data"], {"billing": None, "isComplete": False})
+        r = c.put("/api/me/billing", {**PERSON, "identityNumber": "10000000147", "city": ""},
+                  content_type="application/json", **c.csrf_headers())
+        self.assertCode(r, 422, "validation_error")
+        self.assertEqual(set(r.json()["errors"]), {"identityNumber", "city"})
+        r = c.put("/api/me/billing", PERSON, content_type="application/json", **c.csrf_headers())
+        self.assertCode(r, 200, "billing_saved")
+        self.assertEqual((r.json()["data"]["isComplete"], r.json()["data"]["billing"]["identityNumber"]),
+                         (True, "10000000146"))
+        r = c.put("/api/me/billing", {**PERSON, "type": "company", "identityNumber": "", "companyName": "Foto Ltd.",
+                                      "taxOffice": "Çankaya", "taxNumber": "1234567891"},
+                  content_type="application/json", **c.csrf_headers())
+        self.assertEqual(r.json()["errors"], {"taxNumber": ["invalid vergi kimlik no"]})
+        r = c.put("/api/me/billing", {**PERSON, "type": "company", "identityNumber": "", "companyName": "Foto Ltd.",
+                                      "taxOffice": "Çankaya", "taxNumber": "1234567890"},
+                  content_type="application/json", **c.csrf_headers())
+        self.assertCode(r, 200, "billing_saved")
+
         r = c.post_json("/api/shop/purchases", {"productId": pid, "pricingVersion": version})
         self.assertCode(r, 201, "purchase_completed")
         data = r.json()["data"]
         self.assertEqual((data["purchase"]["status"], data["purchase"]["productName"]["tr"], data["purchase"]["creditAmount"],
                           data["purchase"]["amount"], data["creditBalance"]), ("paid", "2000cr", 2000, 4000.0, 1988))
+        self.assertEqual(Purchase.objects.get().billing["companyName"], "Foto Ltd.")   # copied into the purchase
         history = c.get("/api/shop/purchases").json()["data"]
         self.assertEqual((history["total"], history["purchases"][0]["id"]), (1, data["purchase"]["id"]))
         with self.settings(PAYMENT_PROVIDER="iyzico"):
@@ -67,7 +96,7 @@ class ShopApiTests(TestCase):
 
         called = {(m, _norm(route)) for m, route, _ in c.checked}
         documented = {(m.upper(), _norm(path)) for path, ops in api.get_openapi_schema()["paths"].items() for m in ops
-                      if path.startswith("/api/shop/")}
+                      if path.startswith(("/api/shop/", "/api/me/billing"))}
         self.assertEqual(documented - called, set(), "shop endpoints never called by this test")
 
 
@@ -97,3 +126,15 @@ class PurchaseTests(TestCase):
     @override_settings(PAYMENT_PROVIDER="simulated", IS_DEV=False)
     def test_check_refuses_simulated_in_production(self):
         self.assertEqual([e.id for e in check_payment_provider()], ["cp.E005"])
+
+
+class BillingChecksTests(TestCase):
+    def test_tckn(self):
+        self.assertTrue(tckn_valid("10000000146"))
+        for bad in ("10000000147", "00000000146", "1000000014", "1000000014a"):
+            self.assertFalse(tckn_valid(bad), bad)
+
+    def test_vkn(self):
+        self.assertTrue(vkn_valid("1234567890"))
+        self.assertEqual(sum(vkn_valid("123456789" + str(d)) for d in range(10)), 1)   # one check digit per prefix
+        self.assertFalse(vkn_valid("123456789"))

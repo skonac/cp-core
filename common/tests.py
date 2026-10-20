@@ -2,7 +2,9 @@
 checked against the schema the endpoint declares (what /api/docs shows). common.testing.ApiClient
 does the checking; this file drives one realistic guest flow plus the error cases.
 The last check fails when an endpoint exists that this test never called."""
+import io
 import re
+import zipfile
 from datetime import timedelta
 
 from django.conf import settings
@@ -154,6 +156,24 @@ class ApiContractTests(TempMedia, TestCase):
         self.assertCode(c.get(f"{base}/download"), 429, "download_limit_reached")
         self.assertEqual(c.get(f"{ev}/gallery/photos/{self.p_me.seq_str}").json()["data"]["downloadsLeftToday"], 0)
 
+        # --- ZIP download: photos outside the view and photos at the cap are left out
+        ids = ",".join(p.seq_str for p in (self.p_me, self.p_me2, self.p_other))
+        r = c.get(f"{ev}/download.zip", {"photos": ids})
+        self.assertEqual((r.status_code, r["Content-Type"]), (200, "application/zip"))
+        self.assertEqual((r["X-Photos-Included"], r["X-Photos-Skipped"]), ("1", "2"))
+        self.assertIn(f'filename="cleverphotos_{self.event.code}_mine.zip"', r["Content-Disposition"])
+        with zipfile.ZipFile(io.BytesIO(b"".join(r.streaming_content))) as zf:
+            self.assertEqual(zf.namelist(), [f"cleverphotos_{self.event.code}_{self.p_me2.seq:05d}.jpg"])
+            self.assertEqual(zf.read(zf.namelist()[0])[:2], b"\xff\xd8")   # a JPEG
+        r = c.get(f"{ev}/download.zip", {"all": "true"})
+        self.assertEqual((r["X-Photos-Included"], r["X-Photos-Skipped"]), ("1", "1"))
+        b"".join(r.streaming_content)
+        self.assertCode(c.get(f"{ev}/download.zip"), 422, "validation_error")
+        self.assertCode(c.get(f"{ev}/download.zip", {"photos": self.p_me.seq_str}), 429, "download_limit_reached")
+        self.assertCode(c.get(f"{ev}/download.zip", {"photos": self.p_other.seq_str}), 404, "photo_not_found")
+        with self.settings(ZIP_MAX_FILES=1):
+            self.assertCode(c.get(f"{ev}/download.zip", {"all": "true"}), 422, "too_many_files")
+
         # --- my events
         r = c.get("/api/me/events")
         self.assertCode(r, 200, "user_events_retrieved")
@@ -169,7 +189,7 @@ class ApiContractTests(TempMedia, TestCase):
         # --- every API endpoint was called (add new endpoints to this test)
         called = {(m, _norm(route)) for m, route, _ in c.checked}
         documented = {(m.upper(), _norm(path)) for path, ops in api.get_openapi_schema()["paths"].items() for m in ops
-                      if not path.startswith(("/api/organizer/", "/api/shop/"))}   # events/tests_organizer.py, shop/tests.py
+                      if not path.startswith(("/api/organizer/", "/api/shop/", "/api/me/billing"))}   # events/tests_organizer.py, shop/tests.py
         self.assertEqual(documented - called, set(), "endpoints never called by this test")
 
 
