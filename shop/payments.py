@@ -1,15 +1,17 @@
 """Buying a product (design/core.md, "Shop").
 
-    buy(user, product, ip) -> Purchase     the one place where a purchase adds credits
+    start(user, product, ip, billing, profile, callback_url) -> (Purchase, page URL)
+    finish_iyzico(token) -> Purchase       after iyzico's return
+    complete(purchase, ...)                the one place where a purchase adds credits
 
-PAYMENT_PROVIDER = "simulated" (non-production only; `manage.py check` refuses it with DEBUG off):
-every purchase succeeds at once, as if the provider had answered "paid". "iyzico" is not connected
-yet; its flow will be: create the Purchase (pending) -> initialize the checkout form with the
-conversation_id -> the organizer pays on iyzico's page -> iyzico calls our callback with the token ->
-we retrieve the result -> complete() or fail(). Credits are added only by complete().
+PAYMENT_PROVIDER = "simulated" (non-production only): every purchase succeeds at once. "iyzico-sandbox" /
+"iyzico-production": create the Purchase (pending) -> initialize iyzico's checkout form (shop/iyzico.py)
+-> the organizer pays on iyzico's page -> iyzico sends the browser to our callback with the token ->
+finish_iyzico() asks iyzico for the result -> complete() or fail(). Credits are added only by complete().
 """
 import logging
 import secrets
+from decimal import Decimal
 
 from django.conf import settings
 from django.db import transaction
@@ -19,6 +21,7 @@ from django.utils import timezone
 from accounts.models import User
 from credits.models import CreditTransaction
 
+from . import iyzico
 from .models import Product, Purchase
 
 log = logging.getLogger("cp.payments")
@@ -65,9 +68,48 @@ def fail(purchase: Purchase, code: str, message: str = "", response: dict | None
     return purchase
 
 
-def buy(user, product: Product, ip: str | None = None, billing: dict | None = None) -> Purchase:
-    """billing: the buyer's billing profile (API shape), kept with the purchase."""
-    if settings.PAYMENT_PROVIDER == "simulated":
-        purchase = _new(user, product, ip, billing)
-        return complete(purchase, payment_id=f"SIM-{purchase.pk}", response={"simulated": True, "status": "success"})
-    raise PaymentError("payment_not_available", "Ödeme henüz kullanılamıyor.")
+def start(user, product: Product, ip: str | None, billing: dict, profile, callback_url: str) -> tuple[Purchase, str | None]:
+    """Begin a purchase. -> (purchase, payment page URL or None).
+    simulated: paid at once, no page. iyzico-*: pending, the browser goes to iyzico's page; the
+    callback (finish_iyzico) completes or fails it. Raises PaymentError when iyzico refuses or can't be reached."""
+    provider = settings.PAYMENT_PROVIDER
+    purchase = _new(user, product, ip, billing)
+    if provider == "simulated":
+        return complete(purchase, payment_id=f"SIM-{purchase.pk}", response={"simulated": True, "status": "success"}), None
+    try:
+        answer = iyzico.initialize(purchase, user, profile, callback_url)
+    except iyzico.IyzicoError as e:
+        log.warning("purchase %s: iyzico initialize failed: %s", purchase.pk, e)
+        fail(purchase, e.code, e.message, e.response)
+        raise PaymentError(e.code, f"Ödeme başlatılamadı: {e.message}") from None
+    Purchase.objects.filter(pk=purchase.pk).update(provider_token=answer.get("token", "")[:200],
+                                                   provider_response=answer)
+    purchase.refresh_from_db()
+    return purchase, answer.get("paymentPageUrl")
+
+
+def finish_iyzico(token: str) -> Purchase | None:
+    """iyzico sent the browser back with this token: ask iyzico for the result, then paid or failed.
+    Safe to call again (a finished purchase is returned as it is). If iyzico can't be asked right now
+    the purchase stays pending (the payment may have gone through) and the error is noted."""
+    purchase = Purchase.objects.filter(provider_token=token).first() if token else None
+    if purchase is None or purchase.status != Purchase.Status.PENDING:
+        return purchase
+    try:
+        answer = iyzico.retrieve(purchase, token)
+    except iyzico.IyzicoError as e:
+        log.warning("purchase %s: iyzico retrieve failed: %s", purchase.pk, e)
+        Purchase.objects.filter(pk=purchase.pk).update(error_code=e.code, error_message=e.message[:500],
+                                                       provider_response=e.response)
+        purchase.refresh_from_db()
+        return purchase
+    ok = (answer.get("paymentStatus") == "SUCCESS"
+          and answer.get("conversationId") == purchase.conversation_id
+          and Decimal(str(answer.get("paidPrice", "0"))) == purchase.amount
+          and answer.get("fraudStatus", 1) != -1)
+    if ok:
+        return complete(purchase, payment_id=str(answer.get("paymentId", "")), response=answer)
+    log.warning("purchase %s: payment not accepted: %s %s", purchase.pk, answer.get("paymentStatus"),
+                answer.get("errorMessage"))
+    return fail(purchase, answer.get("errorCode") or "payment_failed",
+                answer.get("errorMessage") or f"paymentStatus {answer.get('paymentStatus')}", answer)

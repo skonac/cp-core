@@ -14,9 +14,10 @@ from common.api import ApiError, CamelSchema, errors, respond
 from . import schemas as S
 from .billing import billing_errors
 from .models import BillingProfile, Product, Purchase
-from .payments import PaymentError, buy
+from .payments import PaymentError, start
 
 shop_router = Router(tags=["shop"], auth=django_auth)
+CALLBACK_PATH = "/api/shop/iyzico/callback"   # shop/views.py; iyzico sends the browser here after paying
 
 
 def _organizer(request) -> User:
@@ -82,17 +83,20 @@ class PurchaseIn(CamelSchema):
     pricing_version: str
 
 
-@shop_router.post("/purchases", response={201: S.PurchaseResponse, **errors(401, 403, 404, 409, 422, 501)})
+@shop_router.post("/purchases", response={201: S.PurchaseResponse, **errors(401, 403, 404, 409, 422, 502)})
 def create_purchase(request, data: PurchaseIn):
-    """Buy one product: checks it is on sale and the price version, takes the payment, adds the
-    credits. Development servers simulate the payment: it always succeeds at once. With the real
-    payment provider (iyzico, not connected yet) this step will hand back a payment page instead;
-    the credits then arrive after the payment.
+    """Buy one product: checks it is on sale and the price version, then starts the payment.
+    With iyzico: the purchase is `pending` and `paymentPageUrl` is iyzico's payment page; send the
+    browser there. After paying, iyzico brings the browser back to us, we settle the purchase and
+    redirect to the shop page (`/organizer/credits?purchase=<id>&status=paid|failed|pending`); read
+    the result with GET /api/shop/purchases/{id}. Simulated (dev servers): `paid` at once,
+    `paymentPageUrl` null.
 
     Needs a complete billing profile (`PUT /api/me/billing`); it is copied into the purchase.
 
     Errors: 403 organizer_access_required · 404 not_found (product not on sale) ·
-    409 pricing_changed (reload the products) · 422 billing_profile_required · 501 payment_not_available."""
+    409 pricing_changed (reload the products) · 422 billing_profile_required ·
+    502 payment_provider_error, payment_provider_unreachable (iyzico refused or can't be reached)."""
     user = _organizer(request)
     on_sale = _on_sale()
     product = next((p for p in on_sale if str(p.pk) == data.product_id), None)
@@ -104,11 +108,25 @@ def create_purchase(request, data: PurchaseIn):
     if profile is None or not profile.is_complete:
         raise ApiError(422, "billing_profile_required", "Önce fatura bilgilerini doldur.")
     try:
-        purchase = buy(user, product, request.META.get("REMOTE_ADDR"), billing=billing_json(profile)["billing"])
+        purchase, page_url = start(user, product, request.META.get("REMOTE_ADDR"), billing_json(profile)["billing"],
+                                   profile, request.build_absolute_uri(CALLBACK_PATH))
     except PaymentError as e:
-        raise ApiError(501, e.code, e.message) from None
-    return respond(request, "purchase_completed",
-                   {"purchase": purchase_json(purchase), "creditBalance": _balance(user)}, status=201)
+        raise ApiError(502, e.code, e.message) from None
+    return respond(request, "purchase_started", {"purchase": purchase_json(purchase), "paymentPageUrl": page_url,
+                                                 "creditBalance": _balance(user)}, status=201)
+
+
+@shop_router.get("/purchases/{purchase_id}", response={200: S.PurchaseDetailResponse, **errors(401, 403, 404)})
+def get_purchase(request, purchase_id: int):
+    """One of this account's purchases: the result page after iyzico's return reads `status` here
+    (`pending` can still turn into `paid` or `failed`; ask again in a few seconds).
+
+    Errors: 403 organizer_access_required · 404 not_found."""
+    user = _organizer(request)
+    purchase = Purchase.objects.filter(pk=purchase_id, user=user).first()
+    if purchase is None:
+        raise ApiError(404, "not_found", "Satın alma bulunamadı.")
+    return respond(request, "purchase_retrieved", {"purchase": purchase_json(purchase), "creditBalance": _balance(user)})
 
 
 # ---------------------------------------------------------------------------- billing profile

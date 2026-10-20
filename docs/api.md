@@ -84,7 +84,7 @@ Every response except files and `204` is:
 | 423 | `event_access_closed` | The organizer closed access |
 | 429 | `rate_limit_exceeded`, `download_limit_reached` | |
 | 500 | `internal_error` | Bug; quote the `requestId` |
-| 501 | `payment_not_available` | Purchase: no payment provider configured on this server |
+| 502 | `payment_provider_error`, `payment_provider_unreachable` | Purchase: iyzico refused the request or can't be reached |
 
 ## 3. Endpoints
 
@@ -468,13 +468,28 @@ This account's purchases, newest first (max 100). `productName`, `creditAmount` 
 purchase time. `status`: `pending` (payment not finished), `paid` (credits added), `failed`.
 
 **`POST /api/shop/purchases`** `{ "productId": "2", "pricingVersion": "3f9a1c0b2d4e" }` →
-`201 purchase_completed` `{ "purchase": {…same shape as above…}, "creditBalance": 3840 }`.
-Pick a product, pay, the credits are added. **On development servers the payment is simulated: it always succeeds at
-once** (`status: "paid"`, credits added). With the real provider (iyzico, not connected yet) this call will answer with
-a payment page to open instead, and the credits arrive after the payment; that shape will be added here.
+`201 purchase_started` `{ "purchase": {…}, "paymentPageUrl": "https://sandbox-cpp.iyzipay.com?token=…", "creditBalance": 1840 }`.
+
+The payment runs on iyzico's page (card data never reaches us):
+
+1. This call creates the purchase (`status: "pending"`) and returns iyzico's `paymentPageUrl`. Send the browser there
+   (`window.location.href = paymentPageUrl`).
+2. The organizer pays (or cancels) on iyzico's page.
+3. iyzico sends the browser back to us; we ask iyzico for the result, settle the purchase (credits are added when paid)
+   and redirect the browser to **`/organizer/credits?purchase=<id>&status=paid|failed|pending`**.
+4. On that page, read the result with `GET /api/shop/purchases/{id}` (and refresh the balance). `pending` means we could
+   not confirm with iyzico yet; ask again after a few seconds. `status=unknown` (no id) means the return could not be
+   matched to a purchase.
+
+On development servers the payment can also be **simulated**: then the purchase is `paid` at once, the credits are
+added, and `paymentPageUrl` is `null`; skip the redirect. Handle both: `paymentPageUrl` null → done, else redirect.
 Errors: `404 not_found` (product not on sale), `409 pricing_changed` (reload the products), `422 validation_error`,
-`422 billing_profile_required` (show the billing form, §3.8, then buy again), `501 payment_not_available`.
+`422 billing_profile_required` (show the billing form, §3.8, then buy again), `502 payment_provider_error` /
+`502 payment_provider_unreachable` (iyzico refused the request or can't be reached; `message` says why).
 The billing profile at purchase time is kept with the purchase.
+
+**`GET /api/shop/purchases/{id}`** → `200 purchase_retrieved` `{ "purchase": {…}, "creditBalance": 3840 }`: one of this
+account's purchases (`404 not_found` otherwise).
 
 ### 3.8 Billing profile
 
@@ -565,12 +580,12 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 | O9 | `POST …/photos/retry` | Removed: a failed photo is rare and fixed on our side | Remove the retry action |
 | O10 | Participants: `joinMethod`, `accessStatus`, `DELETE …/participants/{id}/access` (revoke) | Not in v1 (no revoke); `matchStatus` adds `consent_pending`, drops `matching_pending`; adds `hasConsent`; `counts` has no `active` | Remove revoke and those fields |
 | O11 | `GET /api/organizer/credits` → `{availableCredits, pricingVersion, packages, purchases}` | Split (§3.7): `GET /api/shop/products` → `{creditBalance, pricingVersion, products}` and `GET /api/shop/purchases` → `{purchases, total}`. A product adds `name`, `title`, `description`, each `{tr, en}`; amounts from the admin, not fixed to 500/1000/3000 | Change the URLs; `packages` → `products`; type `creditAmount` as `number`; pick texts by language |
-| O12 | `POST /api/organizer/credit-purchases {packageId, pricingVersion}` → `{purchase, availableCredits}` | `POST /api/shop/purchases {productId, pricingVersion}` → `201 purchase_completed` `{purchase, creditBalance}`; simulated `paid` on dev servers; purchase has `productId`, `productName` (`{tr, en}`), `paidAt`; `404`/`409 pricing_changed` checked first; `501` if no provider | Change the URL; `packageId` → `productId`; `creditBalance` |
+| O12 | `POST /api/organizer/credit-purchases {packageId, pricingVersion}` → `{purchase, availableCredits}`, paid at once | `POST /api/shop/purchases {productId, pricingVersion}` → `201 purchase_started` `{purchase, paymentPageUrl, creditBalance}`: with iyzico the purchase is `pending` and the browser goes to `paymentPageUrl`, then comes back to `/organizer/credits?purchase=<id>&status=…`; read it with `GET /api/shop/purchases/{id}`. Simulated: `paid`, `paymentPageUrl` null | Change the URL; `packageId` → `productId`; redirect to `paymentPageUrl` when set; result handling on `/organizer/credits` |
 | O13 | Cover: only at create, max 8 MB | Also `POST …/cover` / `DELETE …/cover` any time; cover URL is same-origin | — |
 | O14 | Plain `fetch` for POST/PUT/DELETE in `organizer-service.ts` | Every unsafe request needs `X-CSRFToken` | Use `apiMutation` for all of them (today they fail with `403 csrf_failed`) |
 
 ## 6. Not yet in this API
 
-Real payment (iyzico; simulated on dev servers), account-based discounts, organizer activity feed, participant access revoke, choosing the cover from
+Live iyzico payments (sandbox now), account-based discounts, organizer activity feed, participant access revoke, choosing the cover from
 the event's photos, covers for participants (`coverThumbnailUrl` in `/api/me/events`),
 real SMS delivery, email login. Ask before building screens that need them.

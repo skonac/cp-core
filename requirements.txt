@@ -4,3 +4,4 @@ django-ninja>=1.7,<2
 pgvector>=0.4
 Pillow>=11
 pillow-heif>=0.22
+iyzipay==1.0.46

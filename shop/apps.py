@@ -9,12 +9,21 @@ class ShopConfig(AppConfig):
         checks.register(check_payment_provider)
 
 
+PROVIDERS = ("simulated", "iyzico-sandbox", "iyzico-production")
+
+
 def check_payment_provider(app_configs=None, **kwargs):
-    """Simulated payments hand out free credits: never with DEBUG off (= production)."""
+    """simulated and iyzico-sandbox hand out credits without real money: never with DEBUG off
+    (= production). An iyzico provider needs its keys."""
     from django.conf import settings
-    if settings.PAYMENT_PROVIDER not in ("simulated", "iyzico"):
-        return [checks.Error(f"CP_PAYMENT_PROVIDER={settings.PAYMENT_PROVIDER!r}: simulated or iyzico", id="cp.E004")]
-    if settings.PAYMENT_PROVIDER == "simulated" and not settings.IS_DEV:
-        return [checks.Error("CP_PAYMENT_PROVIDER=simulated while CP_DEBUG is off: purchases would be free",
+    provider = settings.PAYMENT_PROVIDER
+    if provider not in PROVIDERS:
+        return [checks.Error(f"CP_PAYMENT_PROVIDER={provider!r}: one of {', '.join(PROVIDERS)}", id="cp.E004")]
+    if provider in ("simulated", "iyzico-sandbox") and not settings.IS_DEV:
+        return [checks.Error(f"CP_PAYMENT_PROVIDER={provider} while CP_DEBUG is off: purchases would be free",
                              id="cp.E005")]
+    if provider.startswith("iyzico") and not (settings.IYZICO_API_KEY and settings.IYZICO_SECRET_KEY):
+        prefix = "CP_IYZICOSANDBOX" if provider == "iyzico-sandbox" else "CP_IYZICOPRODUCTION"
+        return [checks.Error(f"CP_PAYMENT_PROVIDER={provider} needs {prefix}_API_KEY and {prefix}_SECRET_KEY",
+                             id="cp.E007")]
     return []

@@ -51,14 +51,23 @@ class PurchaseListOut(Out):
     total: int
 
 
-class PurchaseResultOut(Out):
+class PurchaseStartedOut(Out):
     purchase: PurchaseOut
-    creditBalance: int = Field(description="After the purchase.", examples=[5840])
+    paymentPageUrl: str | None = Field(description="iyzico's payment page: send the browser here. null when the "
+                                                   "purchase is already paid (simulated payments).",
+                                       examples=["https://sandbox-cpp.iyzipay.com?token=…&lang=tr"])
+    creditBalance: int = Field(description="Now; grows when the payment succeeds.", examples=[1840])
+
+
+class PurchaseDetailOut(Out):
+    purchase: PurchaseOut
+    creditBalance: int = Field(examples=[5840])
 
 
 CatalogResponse = envelope("ShopCatalogResponse", CatalogOut, "products_retrieved")
 PurchaseListResponse = envelope("PurchaseListResponse", PurchaseListOut, "purchases_retrieved")
-PurchaseResponse = envelope("PurchaseResponse", PurchaseResultOut, "purchase_completed")
+PurchaseResponse = envelope("PurchaseResponse", PurchaseStartedOut, "purchase_started")
+PurchaseDetailResponse = envelope("PurchaseDetailResponse", PurchaseDetailOut, "purchase_retrieved")
 
 
 class BillingOut(Out):

@@ -2985,18 +2985,18 @@
               }
             }
           },
-          "501": {
-            "description": "Not Implemented",
+          "502": {
+            "description": "Bad Gateway",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error501"
+                  "$ref": "#/components/schemas/Error502"
                 }
               }
             }
           }
         },
-        "description": "Buy one product: checks it is on sale and the price version, takes the payment, adds the\ncredits. Development servers simulate the payment: it always succeeds at once. With the real\npayment provider (iyzico, not connected yet) this step will hand back a payment page instead;\nthe credits then arrive after the payment.\n\nNeeds a complete billing profile (`PUT /api/me/billing`); it is copied into the purchase.\n\nErrors: 403 organizer_access_required · 404 not_found (product not on sale) ·\n409 pricing_changed (reload the products) · 422 billing_profile_required · 501 payment_not_available.",
+        "description": "Buy one product: checks it is on sale and the price version, then starts the payment.\nWith iyzico: the purchase is `pending` and `paymentPageUrl` is iyzico's payment page; send the\nbrowser there. After paying, iyzico brings the browser back to us, we settle the purchase and\nredirect to the shop page (`/organizer/credits?purchase=<id>&status=paid|failed|pending`); read\nthe result with GET /api/shop/purchases/{id}. Simulated (dev servers): `paid` at once,\n`paymentPageUrl` null.\n\nNeeds a complete billing profile (`PUT /api/me/billing`); it is copied into the purchase.\n\nErrors: 403 organizer_access_required · 404 not_found (product not on sale) ·\n409 pricing_changed (reload the products) · 422 billing_profile_required ·\n502 payment_provider_error, payment_provider_unreachable (iyzico refused or can't be reached).",
         "tags": [
           "shop"
         ],
@@ -3010,6 +3010,74 @@
           },
           "required": true
         },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/shop/purchases/{purchase_id}": {
+      "get": {
+        "operationId": "shop_api_get_purchase",
+        "summary": "Get Purchase",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "purchase_id",
+            "schema": {
+              "title": "Purchase Id",
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          }
+        },
+        "description": "One of this account's purchases: the result page after iyzico's return reads `status` here\n(`pending` can still turn into `paid` or `failed`; ask again in a few seconds).\n\nErrors: 403 organizer_access_required · 404 not_found.",
+        "tags": [
+          "shop"
+        ],
         "security": [
           {
             "SessionAuth": []
@@ -7074,8 +7142,8 @@
             "type": "boolean"
           },
           "code": {
-            "const": "purchase_completed",
-            "default": "purchase_completed",
+            "const": "purchase_started",
+            "default": "purchase_started",
             "title": "Code",
             "type": "string"
           },
@@ -7086,7 +7154,7 @@
             "type": "string"
           },
           "data": {
-            "$ref": "#/components/schemas/PurchaseResultOut"
+            "$ref": "#/components/schemas/PurchaseStartedOut"
           },
           "requestId": {
             "description": "Also in the X-Request-ID header; quote it in bug reports.",
@@ -7104,16 +7172,31 @@
         "title": "PurchaseResponse",
         "type": "object"
       },
-      "PurchaseResultOut": {
+      "PurchaseStartedOut": {
         "additionalProperties": false,
         "properties": {
           "purchase": {
             "$ref": "#/components/schemas/PurchaseOut"
           },
-          "creditBalance": {
-            "description": "After the purchase.",
+          "paymentPageUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "iyzico's payment page: send the browser here. null when the purchase is already paid (simulated payments).",
             "examples": [
-              5840
+              "https://sandbox-cpp.iyzipay.com?token=…&lang=tr"
+            ],
+            "title": "Paymentpageurl"
+          },
+          "creditBalance": {
+            "description": "Now; grows when the payment succeeds.",
+            "examples": [
+              1840
             ],
             "title": "Creditbalance",
             "type": "integer"
@@ -7121,12 +7204,13 @@
         },
         "required": [
           "purchase",
+          "paymentPageUrl",
           "creditBalance"
         ],
-        "title": "PurchaseResultOut",
+        "title": "PurchaseStartedOut",
         "type": "object"
       },
-      "Error501": {
+      "Error502": {
         "additionalProperties": false,
         "properties": {
           "success": {
@@ -7137,7 +7221,7 @@
           },
           "code": {
             "examples": [
-              "payment_not_available"
+              "payment_provider_error"
             ],
             "title": "Code",
             "type": "string"
@@ -7145,7 +7229,7 @@
           "message": {
             "description": "Turkish, safe to show.",
             "examples": [
-              "Ödeme henüz kullanılamıyor."
+              "Ödeme başlatılamadı."
             ],
             "title": "Message",
             "type": "string"
@@ -7189,7 +7273,7 @@
           "message",
           "requestId"
         ],
-        "title": "Error501",
+        "title": "Error502",
         "type": "object"
       },
       "PurchaseIn": {
@@ -7208,6 +7292,67 @@
           "pricingVersion"
         ],
         "title": "PurchaseIn",
+        "type": "object"
+      },
+      "PurchaseDetailOut": {
+        "additionalProperties": false,
+        "properties": {
+          "purchase": {
+            "$ref": "#/components/schemas/PurchaseOut"
+          },
+          "creditBalance": {
+            "examples": [
+              5840
+            ],
+            "title": "Creditbalance",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "purchase",
+          "creditBalance"
+        ],
+        "title": "PurchaseDetailOut",
+        "type": "object"
+      },
+      "PurchaseDetailResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "purchase_retrieved",
+            "default": "purchase_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PurchaseDetailOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "PurchaseDetailResponse",
         "type": "object"
       },
       "BillingDataOut": {

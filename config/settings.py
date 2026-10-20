@@ -174,9 +174,17 @@ EVENT_LOOKUP_PER_MIN = 30   # public event lookups per IP
 # of any active account (accounts.backends.MasterPassBackend). Empty = off. `manage.py check` (and so
 # deploy.sh and runserver) refuses to run with it set while DEBUG is off.
 MASTER_PASS = env("CP_MASTER_PASS", "")
-# Credit purchases (credits/payments.py): "simulated" = every purchase succeeds at once, no money
-# (non-production only; `manage.py check` refuses it with DEBUG off); "iyzico" once connected.
+# Purchases (shop/payments.py): "simulated" = every purchase succeeds at once, no money; "iyzico-sandbox" =
+# iyzico's test system (test cards, no money); "iyzico-production" = real payments. `manage.py check`
+# refuses simulated and iyzico-sandbox with DEBUG off, and an iyzico provider without its keys.
 PAYMENT_PROVIDER = env("CP_PAYMENT_PROVIDER", "simulated")
+_IYZICO_PREFIX = {"iyzico-sandbox": "CP_IYZICOSANDBOX", "iyzico-production": "CP_IYZICOPRODUCTION"}.get(PAYMENT_PROVIDER, "")
+IYZICO_API_KEY = env(f"{_IYZICO_PREFIX}_API_KEY", "") if _IYZICO_PREFIX else ""
+IYZICO_SECRET_KEY = env(f"{_IYZICO_PREFIX}_SECRET_KEY", "") if _IYZICO_PREFIX else ""
+IYZICO_BASE_URL = env(f"{_IYZICO_PREFIX}_BASE_URL", "sandbox-api.iyzipay.com" if PAYMENT_PROVIDER == "iyzico-sandbox"
+                      else "api.iyzipay.com") if _IYZICO_PREFIX else ""
+# Where iyzico's return sends the browser after a payment ({id} = purchase id, {status} = paid / failed / pending).
+SHOP_RETURN_URL = env("CP_SHOP_RETURN_URL", "/organizer/credits?purchase={id}&status={status}")
 
 # KVKK consent document (design/core.md, "Consent"). The pair kvkk/kvkk_tr_<v>.pdf + kvkk_en_<v>.pdf;
 # a user has consent when User.kvkk_version equals this. Changing it = everyone consents again.

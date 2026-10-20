@@ -68,6 +68,7 @@ _ERROR_EXAMPLES = {
     423: ("event_access_closed", "Bu etkinliğe erişim kapatıldı.", None),
     429: ("rate_limit_exceeded", "Çok fazla istek. Biraz sonra tekrar dene.", None),
     501: ("payment_not_available", "Ödeme henüz kullanılamıyor.", None),
+    502: ("payment_provider_error", "Ödeme başlatılamadı.", None),
 }
 _ERROR_MODELS = {
     status: create_model(f"Error{status}", __base__=ErrorOut,
