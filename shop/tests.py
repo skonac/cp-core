@@ -1,6 +1,8 @@
 """Shop: the API contract (every /api/shop/ endpoint, responses checked against their schemas),
 credits added once, product data copied at purchase time, production guard."""
 import hashlib
+import hmac
+import json
 import re
 from decimal import Decimal
 
@@ -230,6 +232,59 @@ class PurchaseTests(TestCase):
             purchase = finish_iyzico(purchase.provider_token)
         self.assertEqual((purchase.status, purchase.error_code), ("pending", "payment_provider_unreachable"))
 
+    def _hook(self, body, **headers):
+        return self.client.post("/api/shop/iyzico/webhook", json.dumps(body) if isinstance(body, dict) else body,
+                                content_type="application/json", **headers)
+
+    def _event(self, purchase, status="SUCCESS"):
+        return {"iyziEventType": "CHECKOUT_FORM_AUTH", "iyziEventTime": 1792500000000, "iyziPaymentId": 28000001,
+                "iyziReferenceCode": "ref-1", "merchantId": 1, "paymentConversationId": purchase.conversation_id,
+                "token": purchase.provider_token, "status": status}
+
+    def test_webhook_completes_once(self):
+        """The browser never came back: iyzico's notification settles the purchase, once."""
+        fake = FakeIyzico()
+        purchase = self._start(fake)
+        with mock.patch("shop.iyzico._send", fake):
+            r = self._hook(self._event(purchase))
+            self.assertEqual((r.status_code, r.json()), (200, {"status": "paid"}))
+            self.assertEqual(self._hook(self._event(purchase)).status_code, 200)            # a retry: nothing changes
+            self.client.post("/api/shop/iyzico/callback", {"token": purchase.provider_token})   # the browser, late
+        self.assertEqual((Purchase.objects.get(pk=purchase.pk).status, self._balance()), ("paid", 1988))
+        self.assertEqual(len(fake.calls), 2)        # initialize + one retrieve: later arrivals ask nobody
+        self.assertEqual(CreditTransaction.objects.count(), 1)
+
+    def test_webhook_body_not_trusted(self):
+        """A notification saying SUCCESS for a declined payment: iyzico's own answer decides."""
+        fake = FakeIyzico(payment_status="FAILURE")
+        purchase = self._start(fake)
+        with mock.patch("shop.iyzico._send", fake):
+            r = self._hook(self._event(purchase, "SUCCESS"))
+        self.assertEqual((r.status_code, r.json()["status"], self._balance()), (200, "failed", -12))
+
+    def test_webhook_unknown_bad_and_unreachable(self):
+        self.assertEqual(self._hook({"token": "nope"}).json(), {"status": "ignored"})     # 200: no retries
+        self.assertEqual(self._hook("not json").status_code, 400)
+        self.assertEqual(self.client.get("/api/shop/iyzico/webhook").status_code, 405)
+        fake = FakeIyzico(unreachable=True)
+        purchase = self._start(fake)
+        with mock.patch("shop.iyzico._send", fake):
+            self.assertEqual(self._hook(self._event(purchase)).status_code, 503)       # iyzico retries later
+        self.assertEqual(Purchase.objects.get(pk=purchase.pk).status, "pending")
+
+    @override_settings(IYZICO_SECRET_KEY="sk-test")
+    def test_webhook_signature(self):
+        fake = FakeIyzico()
+        purchase = self._start(fake)
+        event = self._event(purchase)
+        message = "sk-test" + "CHECKOUT_FORM_AUTH" + "28000001" + purchase.provider_token + purchase.conversation_id + "SUCCESS"
+        good = hmac.new(b"sk-test", message.encode(), hashlib.sha256).hexdigest()
+        with mock.patch("shop.iyzico._send", fake):
+            self.assertEqual(self._hook(event, HTTP_X_IYZ_SIGNATURE_V3="0" * 64).status_code, 401)
+            self.assertEqual(Purchase.objects.get(pk=purchase.pk).status, "pending")
+            self.assertEqual(self._hook(event, HTTP_X_IYZ_SIGNATURE_V3=good).status_code, 200)
+        self.assertEqual(Purchase.objects.get(pk=purchase.pk).status, "paid")
+
     def test_unknown_token(self):
         r = self.client.post("/api/shop/iyzico/callback", {"token": "nope"})
         self.assertRedirects(r, "/organizer/credits?purchase=&status=unknown", fetch_redirect_response=False)
@@ -313,6 +368,10 @@ class DocumentsTests(TestCase):
         r = self.client.get(f"/dj/staff/purchases/{purchase.pk}/documents/")
         self.assertEqual(r.content.decode(), Purchase.objects.get(pk=purchase.pk).docs_html)
         self.assertContains(self.client.get(f"/dj/staff/users/{self.user.pk}/"), f"/dj/staff/purchases/{purchase.pk}/documents/")
+        staff.is_superuser = True
+        staff.save()
+        self.assertContains(self.client.get(f"/admin/shop/purchase/{purchase.pk}/change/"),
+                            f"/dj/staff/purchases/{purchase.pk}/documents/")
 
     def test_check(self):
         self.assertEqual(check_sales_documents(), [])

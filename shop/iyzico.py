@@ -6,6 +6,8 @@
 Flow (design/core.md, "Shop"): POST /api/shop/purchases creates a pending Purchase and calls
 initialize(); the browser goes to paymentPageUrl; after paying, iyzico sends the browser back to
 callback_url with the token; the callback view calls retrieve() and completes or fails the purchase.
+iyzico's server also notifies /api/shop/iyzico/webhook (panel: "İşyeri bildirimleri URL") in case the
+browser never returns; that view does the same retrieve() (shop/views.py).
 
 Keys come from the env per provider: iyzico-sandbox -> CP_IYZICOSANDBOX_API_KEY / _SECRET_KEY / _BASE_URL,
 iyzico-production -> CP_IYZICOPRODUCTION_*. The package's own connect() has no timeout and shares one

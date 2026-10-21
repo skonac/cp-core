@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.utils.html import format_html
+from django.utils.timezone import localtime
 
 from .models import BillingProfile, Product, Purchase
 
@@ -32,8 +34,16 @@ class PurchaseAdmin(admin.ModelAdmin):
                     "provider", "provider_payment_id")
     list_filter = ("status", "provider")
     search_fields = ("user__phone", "conversation_id", "provider_payment_id")
-    exclude = ("docs_html",)          # the stored page: staff user page -> "docs"
-    readonly_fields = [f.name for f in Purchase._meta.fields if f.name != "docs_html"]
+    exclude = ("docs_html",)          # ~40 KB of HTML: opened through the "documents" link instead
+    readonly_fields = ["documents"] + [f.name for f in Purchase._meta.fields if f.name != "docs_html"]
+
+    @admin.display(description="Documents (ÖBF + MSS)")
+    def documents(self, obj):
+        if not obj or not obj.docs_html:
+            return "–"
+        return format_html('<a href="/dj/staff/purchases/{}/documents/" target="_blank">Open the stored page</a> '
+                           '(version {}, accepted {})', obj.pk, obj.docs_version,
+                           localtime(obj.docs_accepted_at).strftime("%Y-%m-%d %H:%M:%S") if obj.docs_accepted_at else "?")
 
     def has_add_permission(self, request):
         return False

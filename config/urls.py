@@ -6,7 +6,7 @@ from django.views.generic import RedirectView
 
 from events.participant_views import home
 
-from shop.views import iyzico_callback
+from shop.views import iyzico_callback, iyzico_webhook
 
 from .api import api
 
@@ -14,6 +14,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/faceworker/", include("worker.urls")),   # before api/: plain views, worker's own JSON
     path("api/shop/iyzico/callback", iyzico_callback),  # before api/: iyzico's return (browser redirect)
+    path("api/shop/iyzico/webhook", iyzico_webhook),    # before api/: iyzico's server notification (JSON)
     path("api/", api.urls),                             # JSON API for cp-web; docs at /api/docs
     # Django pages (fallback UI and staff pages), all under /dj/: the rest of the site belongs to
     # cp-web (React), so nginx routes only /dj/ here. Login is phone + password until SMS sign-in exists.
