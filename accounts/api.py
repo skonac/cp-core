@@ -136,7 +136,9 @@ def kvkk_document(request, filename: str):
     path = settings.LEGAL_DIR / filename
     if not kvkk.FILENAME_RE.match(filename) or not path.is_file():
         raise ApiError(404, "not_found", "Belge bulunamadı.")
-    return FileResponse(path.open("rb"), content_type="text/html; charset=utf-8")
+    response = FileResponse(path.open("rb"), content_type="text/html; charset=utf-8")
+    response["X-Frame-Options"] = "SAMEORIGIN"     # cp-web (same domain) shows the text in an iframe
+    return response
 
 
 # ---------------------------------------------------------------------------- me

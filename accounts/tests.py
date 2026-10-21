@@ -90,7 +90,7 @@ class KvkkConsentTests(TestCase):
     def test_documents_served(self):
         r = self.c.get(f"/api/kvkk/kvkk_tr_{V}.html")   # public
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r["Content-Type"], "text/html; charset=utf-8")
+        self.assertEqual((r["Content-Type"], r["X-Frame-Options"]), ("text/html; charset=utf-8", "SAMEORIGIN"))
         self.assertIn("Aydınlatma Metni".encode(), b"".join(r.streaming_content))
         self.assertEqual(self.c.head(f"/api/kvkk/kvkk_tr_{V}.html").status_code, 200)   # curl -I
         for bad in ("kvkk_tr_999.html", "kvkk_de_002.html", "kvkk_tr_002.pdf", "..%2Fsettings.py", "x.html"):

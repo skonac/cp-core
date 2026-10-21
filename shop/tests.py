@@ -118,7 +118,8 @@ class ShopApiTests(TestCase):
         # --- the two documents, read before buying, then the purchase stores them
         self.assertCode(c.get("/api/shop/obf", {"product": str(old.pk)}), 404, "not_found")
         r = c.get("/api/shop/obf", {"product": pid, "locale": "tr"})
-        self.assertEqual((r.status_code, r["Content-Type"]), (200, "text/html; charset=utf-8"))
+        self.assertEqual((r.status_code, r["Content-Type"], r["X-Frame-Options"]),
+                         (200, "text/html; charset=utf-8", "SAMEORIGIN"))         # cp-web embeds it
         self.assertContains(r, "Ön Bilgilendirme Formu")
         self.assertContains(r, "Foto Ltd.")
         self.assertContains(r, "4.000,00 TL")
@@ -147,7 +148,7 @@ class ShopApiTests(TestCase):
         url = r.json()["data"]["purchase"]["documentsUrl"]
         self.assertEqual(url, f"/api/shop/purchases/{data['purchase']['id']}/documents")
         page = c.get(url)
-        self.assertEqual(page.status_code, 200)
+        self.assertEqual((page.status_code, page["X-Frame-Options"]), (200, "SAMEORIGIN"))
         stored = Purchase.objects.get()
         self.assertEqual(page.content.decode(), stored.docs_html)
         self.assertEqual((stored.docs_version, stored.user_agent, stored.ip), ("001", "TestBrowser/1.0", "127.0.0.1"))

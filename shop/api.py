@@ -79,6 +79,7 @@ def _html(text: str) -> HttpResponse:
     response = HttpResponse(text, content_type=HTML)
     response["Cache-Control"] = "private, no-store"
     response["X-Content-Type-Options"] = "nosniff"
+    response["X-Frame-Options"] = "SAMEORIGIN"     # cp-web (same domain) shows the texts in an iframe
     return response
 
 
