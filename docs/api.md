@@ -8,13 +8,18 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-19 · API version 0.2 (organizer API §3.6; event types, city/venue)
+Last updated: 2026-10-21 · API version 0.3 (shop with iyzico §3.7; ÖBF + MSS sales documents; KVKK as HTML §3.3)
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then the
 > "Changes from cp-web's draft contract" section, which lists every place where this API
 > differs from `cp-web/docs/api/*.md` and the current MSW mocks. Update `src/features/*/api/*`
 > and `src/mocks/handlers.ts` to match. Do not keep `accessToken`, `match-jobs`, or the
 > event-scoped selfie/consent paths. For the organizer screens: §3.6, §3.7, §3.8 and §5b. Multi-photo download: §3.5 `download.zip`.
+>
+> **Changed on 2026-10-21:** KVKK documents are HTML pages, not PDFs (`/api/kvkk/kvkk_tr_002.html`, §3.3). Buying needs
+> the two sales documents: checkboxes + popups from `GET /api/shop/obf` / `GET /api/shop/mss`, and `documentsVersion`,
+> `acceptedObf`, `acceptedMss` in `POST /api/shop/purchases`; each purchase has `documentsUrl` (§3.7). These HTML pages
+> may be shown in an `iframe` (same origin).
 
 ## 1. Basics
 
@@ -615,6 +620,6 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 
 ## 6. Not yet in this API
 
-Live iyzico payments (sandbox now), account-based discounts, organizer activity feed, participant access revoke, choosing the cover from
+Live iyzico payments (sandbox now), emailing the documents after payment, account-based discounts, organizer activity feed, participant access revoke, choosing the cover from
 the event's photos, covers for participants (`coverThumbnailUrl` in `/api/me/events`),
 real SMS delivery, email login. Ask before building screens that need them.
