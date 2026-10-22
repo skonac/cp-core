@@ -53,7 +53,7 @@ class Purchase(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)       # charged (= list_price until discounts exist)
     currency = models.CharField(max_length=3)
     status = models.CharField(max_length=8, choices=Status.choices, default=Status.PENDING)
-    provider = models.CharField(max_length=16)                      # "simulated" | "iyzico"
+    provider = models.CharField(max_length=32)                      # settings.PAYMENT_PROVIDER: simulated | iyzico-sandbox | iyzico-production
     conversation_id = models.CharField(max_length=64, unique=True)  # our id for this attempt, sent to the provider
     provider_token = models.CharField(max_length=200, blank=True)   # iyzico checkout form token
     provider_payment_id = models.CharField(max_length=64, blank=True)   # iyzico paymentId once paid
