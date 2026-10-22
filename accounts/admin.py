@@ -4,7 +4,7 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import Group
 
-from .models import ConsentLog, OtpChallenge, User
+from .models import ConsentLog, ContactMessage, OtpChallenge, User
 
 
 class UserCreateForm(AdminUserCreationForm):
@@ -68,3 +68,12 @@ class ConsentLogAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(ContactMessage)
+class ContactMessageAdmin(admin.ModelAdmin):
+    list_display = ("id", "created_at", "name", "email", "subject", "user", "handled_at")
+    list_filter = ("handled_at", "locale")
+    search_fields = ("name", "email", "phone", "subject", "message")
+    raw_id_fields = ("user", "handled_by")
+    readonly_fields = ("name", "email", "phone", "subject", "message", "locale", "user", "ip", "user_agent", "created_at")

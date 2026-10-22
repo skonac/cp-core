@@ -8,7 +8,7 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-21 · API version 0.3 (shop with iyzico §3.7; ÖBF + MSS sales documents; KVKK as HTML §3.3)
+Last updated: 2026-10-22 · API version 0.4 (contact form §3.9; 0.3: shop with iyzico §3.7, ÖBF + MSS sales documents, KVKK as HTML §3.3)
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then the
 > "Changes from cp-web's draft contract" section, which lists every place where this API
@@ -552,6 +552,23 @@ The phone number is the account's.
 | `postalCode` | optional; `country` defaults to `Türkiye` |
 
 Errors: `422 validation_error` with `errors` per field, e.g. `{"identityNumber": ["invalid TC kimlik no"], "city": ["required"]}`.
+
+### 3.9 Contact form
+
+**`POST /api/contact/messages`** (no session needed; send `X-CSRFToken` as for every POST):
+
+```json
+{ "name": "Ada Yılmaz", "email": "ada@example.com", "phone": "+905551234567", "subject": "Kontör satın alma",
+  "message": "Ödemem tamamlandı ancak bakiyem görünmüyor.", "locale": "tr", "privacyNoticeAccepted": true }
+```
+
+→ `201 contact_message_received` `{ "messageId": "42" }`. Required: `name` (≤ 120), `email` (≤ 254, valid), `subject` (≤ 160),
+`message` (≤ 5000), `privacyNoticeAccepted: true`; `phone` (≤ 32) optional or `null`; `locale` `tr` / `en`. When signed in,
+the message is linked to the account. Anti-spam: max **5 messages per hour per IP**, and an optional hidden honeypot field
+`website`: render it invisible (not `type=hidden`, e.g. off-screen with `tabindex=-1` and `autocomplete=off`) and send its value;
+a filled one is answered like a success but not stored.
+Errors: `422 validation_error` with `errors` per field (`name`, `email`, `subject`, `message`, `privacyNoticeAccepted`),
+`429 rate_limit_exceeded`.
 
 ## 4. Flows
 

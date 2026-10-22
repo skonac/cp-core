@@ -750,6 +750,79 @@
         ]
       }
     },
+    "/api/contact/messages": {
+      "post": {
+        "operationId": "accounts_api_contact_message",
+        "summary": "Contact Message",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactReceivedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error400"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        },
+        "description": "The site's contact form (no session needed; CSRF header as for every POST). name, email, subject,\nmessage and privacyNoticeAccepted=true are required; phone optional. Max 5 messages per hour per IP.\n\nErrors: 422 validation_error (with `errors` per field) · 429 rate_limit_exceeded.",
+        "tags": [
+          "contact"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactIn"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
     "/api/public/events/{code}": {
       "get": {
         "operationId": "events_api_public_event",
@@ -4998,6 +5071,188 @@
           "requestId"
         ],
         "title": "SelfieAcceptedResponse",
+        "type": "object"
+      },
+      "ContactReceivedOut": {
+        "additionalProperties": false,
+        "properties": {
+          "messageId": {
+            "examples": [
+              "42"
+            ],
+            "title": "Messageid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "messageId"
+        ],
+        "title": "ContactReceivedOut",
+        "type": "object"
+      },
+      "ContactReceivedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "contact_message_received",
+            "default": "contact_message_received",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ContactReceivedOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "ContactReceivedResponse",
+        "type": "object"
+      },
+      "Error400": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "bad_request"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Invalid JSON."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              null
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error400",
+        "type": "object"
+      },
+      "ContactIn": {
+        "properties": {
+          "name": {
+            "maxLength": 120,
+            "title": "Name",
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 254,
+            "title": "Email",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "subject": {
+            "maxLength": 160,
+            "title": "Subject",
+            "type": "string"
+          },
+          "message": {
+            "maxLength": 5000,
+            "title": "Message",
+            "type": "string"
+          },
+          "locale": {
+            "default": "tr",
+            "title": "Locale",
+            "type": "string"
+          },
+          "privacyNoticeAccepted": {
+            "default": false,
+            "title": "Privacynoticeaccepted",
+            "type": "boolean"
+          },
+          "website": {
+            "default": "",
+            "title": "Website",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "subject",
+          "message"
+        ],
+        "title": "ContactIn",
         "type": "object"
       },
       "PublicEventOut": {

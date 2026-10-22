@@ -94,6 +94,17 @@ class StaffPagesTest(TestCase):
     def test_admin_links_to_staff(self):
         self.assertContains(self.client.get("/admin/"), 'href="/dj/staff/"')
 
+    def test_messages_page(self):
+        from accounts.models import ContactMessage
+        msg = ContactMessage.objects.create(name="Ada", email="a@b.co", subject="Soru", message="Merhaba")
+        r = self.client.get("/dj/staff/messages/")
+        self.assertContains(r, "Soru")
+        self.client.post("/dj/staff/messages/", {"id": msg.id, "action": "handle"})
+        msg.refresh_from_db()
+        self.assertEqual(msg.handled_by, self.staff)
+        self.assertNotContains(self.client.get("/dj/staff/messages/"), "Soru")
+        self.assertContains(self.client.get("/dj/staff/messages/?all=1"), "Soru")
+
     def test_files(self):
         photo = self.event.images.order_by("seq").first()
         for r in ("t", "d", "m"):

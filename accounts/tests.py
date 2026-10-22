@@ -149,3 +149,51 @@ class MasterPassTest(TestCase):
     def test_check_refuses_production(self):
         from accounts.apps import check_master_pass
         self.assertEqual([e.id for e in check_master_pass()], ["cp.E003"])
+
+
+class ContactApiTests(TestCase):
+    """POST /api/contact/messages: validation, honeypot, rate limit, link to the account; contract-checked."""
+
+    def setUp(self):
+        from django.core.cache import cache
+        from common.testing import ApiClient
+        cache.clear()
+        self.c = ApiClient()
+        self.c.get("/api/auth/csrf")
+        self.ok = {"name": "Ada", "email": "ada@example.com", "phone": None, "subject": "Kontör",
+                   "message": "Merhaba", "locale": "tr", "privacyNoticeAccepted": True}
+
+    def test_contact_flow_and_contract(self):
+        import re
+        from accounts.models import ContactMessage
+        from config.api import api
+        c = self.c
+        r = c.post_json("/api/contact/messages", self.ok)
+        self.assertEqual((r.status_code, r.json()["code"]), (201, "contact_message_received"))
+        msg = ContactMessage.objects.get(pk=int(r.json()["data"]["messageId"]))
+        self.assertEqual((msg.name, msg.phone, msg.user, msg.handled_at), ("Ada", "", None, None))
+
+        r = c.post_json("/api/contact/messages", {**self.ok, "email": "nope", "message": " ", "privacyNoticeAccepted": False})
+        self.assertEqual((r.status_code, r.json()["code"]), (422, "validation_error"))
+        self.assertEqual(set(r.json()["errors"]), {"email", "message", "privacyNoticeAccepted"})
+        self.assertEqual(c.post_json("/api/contact/messages", {"name": "x"}).status_code, 422)
+
+        r = c.post_json("/api/contact/messages", {**self.ok, "website": "http://spam"})     # honeypot
+        self.assertEqual((r.status_code, r.json()["data"]["messageId"]), (201, "0"))
+        self.assertEqual(ContactMessage.objects.count(), 1)
+
+        user = User.objects.create_user("+905550000501")
+        c.force_login(user)
+        c.get("/api/auth/csrf")
+        c.post_json("/api/contact/messages", self.ok)
+        self.assertEqual(ContactMessage.objects.latest("id").user, user)
+        for _ in range(3):
+            c.post_json("/api/contact/messages", self.ok)
+        r = c.post_json("/api/contact/messages", self.ok)                                   # 6th from this IP
+        self.assertEqual((r.status_code, r.json()["code"]), (429, "rate_limit_exceeded"))
+
+        norm = lambda route: re.sub(r"<(?:\w+:)?\w+>|\{\w+\}", "{}", route.strip("/"))   # noqa: E731
+        called = {(m, norm(route)) for m, route, _ in c.checked}
+        documented = {(m.upper(), norm(path)) for path, ops in api.get_openapi_schema()["paths"].items() for m in ops
+                      if path.startswith("/api/contact/")}
+        self.assertEqual(documented - called, set())

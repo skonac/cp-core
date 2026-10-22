@@ -103,3 +103,10 @@ ConsentResponse = envelope("ConsentResponse", ConsentOut, "consent_recorded")
 MyEventsResponse = envelope("MyEventsResponse", MyEventsOut, "user_events_retrieved")
 SelfiesResponse = envelope("SelfiesResponse", SelfiesOut, "selfies_retrieved")
 SelfieAcceptedResponse = envelope("SelfieAcceptedResponse", SelfieOut, "selfie_accepted")
+
+
+class ContactReceivedOut(Out):
+    messageId: str = Field(examples=["42"])
+
+
+ContactReceivedResponse = envelope("ContactReceivedResponse", ContactReceivedOut, "contact_message_received")

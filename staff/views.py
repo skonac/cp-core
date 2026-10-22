@@ -12,6 +12,7 @@ A stopgap until the admin frontend exists in cp-web. Edits stay in the Django ad
     /dj/staff/users/                 all users (?q= phone / name / email)
     /dj/staff/users/<id>/            one user: profile, consent, selfies, credits, events joined and owned
     /dj/staff/worker/                workers, queue, failed images
+    /dj/staff/messages/              contact form messages (?all=1 with handled); mark handled
 """
 from collections import defaultdict
 from datetime import timedelta
@@ -23,12 +24,12 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import BooleanField, Count, ExpressionWrapper, Q
 from django.http import Http404, HttpResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from PIL import Image as PILImage
 from pgvector.django import CosineDistance
 
-from accounts.models import ConsentLog, OtpChallenge, User
+from accounts.models import ConsentLog, ContactMessage, OtpChallenge, User
 from credits.models import CreditTransaction
 from shop.models import BillingProfile, Purchase
 from events.codes import normalize_code
@@ -87,6 +88,7 @@ def index(request):
         "queue": Image.objects.filter(status__in=[Image.Status.PENDING, Image.Status.PROCESSING],
                                       deleted_at__isnull=True).count(),
         "failed": Image.objects.filter(status=Image.Status.FAILED, deleted_at__isnull=True).count(),
+        "messages": ContactMessage.objects.filter(handled_at__isnull=True).count(),
         "workers_live": Worker.objects.filter(last_seen_at__gte=now - timedelta(minutes=1)).count(),
     }
     return render(request, "staff/index.html", {"stats": stats})
@@ -290,3 +292,22 @@ def purchase_documents(request, purchase_id: int):
     response = HttpResponse(purchase.docs_html, content_type="text/html; charset=utf-8")
     response["Cache-Control"] = "private, no-store"
     return response
+
+
+@staff_required
+def messages_page(request):
+    """Contact form messages, newest first; ?all=1 includes handled ones. POST handle/unhandle."""
+    if request.method == "POST":
+        msg = get_object_or_404(ContactMessage, pk=request.POST.get("id"))
+        if request.POST.get("action") == "handle":
+            msg.handled_at, msg.handled_by = timezone.now(), request.user
+        else:
+            msg.handled_at, msg.handled_by = None, None
+        msg.save(update_fields=["handled_at", "handled_by"])
+        return redirect(request.get_full_path())
+    show_all = request.GET.get("all") == "1"
+    rows = ContactMessage.objects.select_related("user", "handled_by").order_by("-created_at")
+    if not show_all:
+        rows = rows.filter(handled_at__isnull=True)
+    page = Paginator(rows, PAGE).get_page(request.GET.get("page"))
+    return render(request, "staff/messages.html", {"page": page, "show_all": show_all})

@@ -143,3 +143,28 @@ class ConsentLog(models.Model):
 
     def __str__(self):
         return f"{self.phone} {self.version}/{self.locale} {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class ContactMessage(models.Model):
+    """A message from the site's contact form (public; linked to the account when signed in).
+    Read and marked handled on the staff pages (/dj/staff/messages/) or in the admin."""
+    name = models.CharField(max_length=120)
+    email = models.EmailField(max_length=254)
+    phone = models.CharField(max_length=32, blank=True)
+    subject = models.CharField(max_length=160)
+    message = models.TextField(max_length=5000)
+    locale = models.CharField(max_length=2, default="tr")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                             related_name="contact_messages")
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    handled_at = models.DateTimeField(null=True, blank=True)
+    handled_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+")
+
+    class Meta:
+        indexes = [models.Index(fields=["created_at"], name="contact_created")]
+
+    def __str__(self):
+        return f"{self.created_at:%Y-%m-%d %H:%M} {self.email}: {self.subject}"

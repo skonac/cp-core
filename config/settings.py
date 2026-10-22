@@ -170,6 +170,7 @@ OTP_MAX_ATTEMPTS = 5        # wrong codes per challenge
 OTP_RESEND_AFTER = 30       # seconds before another code may be requested
 OTP_DELIVERY = env("CP_OTP_DELIVERY", "log")   # "log": code goes to the log + OtpChallenge.dev_code, no SMS
 EVENT_LOOKUP_PER_MIN = 30   # public event lookups per IP
+CONTACT_PER_HOUR = 5        # contact form messages per IP per hour
 # Non-production only: this string is accepted as the code of any OTP challenge and as the password
 # of any active account (accounts.backends.MasterPassBackend). Empty = off. `manage.py check` (and so
 # deploy.sh and runserver) refuses to run with it set while DEBUG is off.

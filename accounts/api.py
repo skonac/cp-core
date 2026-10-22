@@ -1,5 +1,7 @@
 """JSON API: sign-in, session, the signed-in user (profile, consent, selfies, events).
 Shapes and codes: docs/api.md."""
+import logging
+
 from django.conf import settings
 from django.contrib.auth import login, logout
 from django.core.exceptions import ValidationError
@@ -10,8 +12,10 @@ from django.middleware.csrf import get_token
 from ninja import File, Form, Router
 from ninja.files import UploadedFile
 from ninja.security import django_auth
+from pydantic import Field
 
 from common.api import ApiError, CamelSchema, errors, file_doc, respond
+from common.ratelimit import allow
 from events.codes import normalize_code
 from events.models import Event, EventMember
 from events.participant import access_for, public_status
@@ -22,8 +26,10 @@ from media.storage import file_response, soft_delete
 
 from . import kvkk
 from . import schemas as S
-from .models import User
+from .models import ContactMessage, User
 from .otp import mask_phone, request_code, verify_code
+
+log = logging.getLogger("cp.accounts")
 
 auth_router = Router(tags=["auth"])
 me_router = Router(tags=["me"], auth=django_auth)
@@ -267,3 +273,53 @@ def selfie_thumb(request, selfie_id: int):
     if image is None:
         raise ApiError(404, "selfie_not_found", "Selfie bulunamadı.")
     return file_response(image.relpath("t"))
+
+
+# ---------------------------------------------------------------------------- contact form
+
+contact_router = Router(tags=["contact"])
+
+
+class ContactIn(CamelSchema):
+    name: str = Field(max_length=120)
+    email: str = Field(max_length=254)
+    phone: str | None = Field(None, max_length=32)
+    subject: str = Field(max_length=160)
+    message: str = Field(max_length=5000)
+    locale: str = "tr"
+    privacy_notice_accepted: bool = False
+    website: str = ""   # honeypot: a hidden field people never fill in; bots do
+
+
+@contact_router.post("/messages", response={201: S.ContactReceivedResponse, **errors(400, 403, 422, 429)})
+def contact_message(request, data: ContactIn):
+    """The site's contact form (no session needed; CSRF header as for every POST). name, email, subject,
+    message and privacyNoticeAccepted=true are required; phone optional. Max 5 messages per hour per IP.
+
+    Errors: 422 validation_error (with `errors` per field) · 429 rate_limit_exceeded."""
+    problems: dict[str, list[str]] = {}
+    for field in ("name", "subject", "message"):
+        if not getattr(data, field).strip():
+            problems.setdefault(field, []).append("required")
+    try:
+        validate_email(data.email.strip())
+    except ValidationError:
+        problems.setdefault("email", []).append("invalid email")
+    if not data.privacy_notice_accepted:
+        problems.setdefault("privacyNoticeAccepted", []).append("must be true")
+    if problems:
+        raise ApiError(422, "validation_error", "Zorunlu alanları doldurun.", errors=problems)
+    ip = request.META.get("REMOTE_ADDR", "")
+    if not allow(f"contact:{ip}", settings.CONTACT_PER_HOUR, 3600):
+        raise ApiError(429, "rate_limit_exceeded", "Çok fazla mesaj gönderildi. Biraz sonra tekrar dene.")
+    if data.website.strip():   # honeypot filled: answer like a success, store nothing
+        log.info("contact form honeypot from %s", ip)
+        return respond(request, "contact_message_received", {"messageId": "0"}, status=201)
+    msg = ContactMessage.objects.create(
+        name=data.name.strip(), email=data.email.strip(), phone=(data.phone or "").strip(),
+        subject=data.subject.strip(), message=data.message.strip(),
+        locale=data.locale if data.locale in settings.KVKK_LOCALES else "tr",
+        user=request.user if request.user.is_authenticated else None,
+        ip=ip or None, user_agent=request.META.get("HTTP_USER_AGENT", "")[:500])
+    log.info("contact message %s from %s", msg.pk, msg.email)
+    return respond(request, "contact_message_received", {"messageId": str(msg.pk)}, status=201)

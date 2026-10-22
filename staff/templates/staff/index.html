@@ -13,12 +13,14 @@
   <div><b><a href="{% url 'staff:worker' %}">{{ stats.queue }}</a></b>in queue</div>
   <div><b><a href="{% url 'staff:worker' %}" {% if stats.failed %}style="color:var(--bad)"{% endif %}>{{ stats.failed }}</a></b>failed</div>
   <div><b {% if not stats.workers_live %}style="color:var(--bad)"{% endif %}>{{ stats.workers_live }}</b>workers live</div>
+  <div><b><a href="{% url 'staff:messages' %}" {% if stats.messages %}style="color:var(--warn)"{% endif %}>{{ stats.messages }}</a></b>new messages</div>
 </div>
 <div class="row">
   <div class="card"><h2 style="margin-top:0">Staff pages</h2>
     <p><a href="{% url 'staff:events' %}">Events</a> — all events, photos by status, members</p>
     <p><a href="{% url 'staff:users' %}">Users</a> — profiles, roles, selfies, credits, events</p>
     <p><a href="{% url 'staff:worker' %}">Worker &amp; queue</a> — workers, queue per event, failed images</p>
+    <p><a href="{% url 'staff:messages' %}">Messages</a> — contact form, mark handled</p>
     <p><a href="/admin/">Django admin</a> — edit anything; credit adjustments: Credits → Add</p>
   </div>
   <div class="card"><h2 style="margin-top:0">Django pages</h2>
