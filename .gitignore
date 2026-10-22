@@ -4,3 +4,4 @@ __pycache__/
 .env
 /media_root/
 .DS_Store
+/static_root/

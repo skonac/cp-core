@@ -79,5 +79,9 @@ say "check + migrate (as $RUN_USER)"
 as_user cp-core-manage check
 as_user cp-core-manage migrate --noinput
 
+say "collectstatic -> $DEST/static_root"
+cp-core-manage collectstatic --noinput -v 0   # as root: $DEST is root-owned; runserver (DEBUG) serves from static/ directly
+echo "ok"
+
 say "restart runserver in screen 'core' (as $RUN_USER)"
 as_user /usr/local/bin/cp-core-run

@@ -119,6 +119,7 @@ USE_I18N = True
 USE_TZ = True   # timestamps stored in UTC (timestamptz)
 
 STATIC_URL = "static/"
+STATICFILES_DIRS = [BASE_DIR / "static"]   # public files for outside parties (iyzico pulls the logo): /static/<name>
 
 # Django pages: where login sends people (URL names from config/urls.py)
 AUTHENTICATION_BACKENDS = [
