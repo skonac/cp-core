@@ -8,7 +8,7 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-22 · API version 0.4 (contact form §3.9; 0.3: shop with iyzico §3.7, ÖBF + MSS sales documents, KVKK as HTML §3.3)
+Last updated: 2026-10-22 · API version 0.5 ("not me": `matchedFace` and face rejections §3.5; 0.4: contact form §3.9; 0.3: shop with iyzico §3.7, ÖBF + MSS sales documents, KVKK as HTML §3.3)
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then the
 > "Changes from cp-web's draft contract" section, which lists every place where this API
@@ -20,6 +20,10 @@ Last updated: 2026-10-22 · API version 0.4 (contact form §3.9; 0.3: shop with 
 > the two sales documents: checkboxes + popups from `GET /api/shop/obf` / `GET /api/shop/mss`, and `documentsVersion`,
 > `acceptedObf`, `acceptedMss` in `POST /api/shop/purchases`; each purchase has `documentsUrl` (§3.7). These HTML pages
 > may be shown in an `iframe` (same origin).
+>
+> **Changed on 2026-10-22:** every gallery photo has `matchedFace` (the user's face in it: `faceId`, normalized `bbox` and
+> `landmarks`, `score`) to draw a frame, and "not me" is `POST …/photos/{photoId}/face-rejections {faceId}`, undo with
+> `DELETE …/face-rejections/{faceId}` (§3.5 "Not me").
 
 ## 1. Basics
 
@@ -79,7 +83,7 @@ Every response except files and `204` is:
 | 403 | `consent_required` | Event needs consent and the user has not given it; selfie upload without consent |
 | 403 | `browse_all_not_allowed` | `view=all` on an event that doesn't allow it |
 | 403 | `organizer_access_required` | Organizer or shop endpoint, account without the organizer role |
-| 404 | `event_not_found`, `photo_not_found`, `selfie_not_found`, `not_found` | Missing, or not visible to this user (never revealed which) |
+| 404 | `event_not_found`, `photo_not_found`, `selfie_not_found`, `face_not_found`, `not_found` | Missing, or not visible to this user (never revealed which) |
 | 409 | `email_already_in_use` | `PATCH /me` with another account's email |
 | 409 | `consent_version_outdated` | Consent sent for a KVKK version that is no longer current |
 | 409 | `pricing_changed` | Purchase with an old `pricingVersion` |
@@ -264,7 +268,10 @@ No photos or counts are ever returned here. If a session exists, this call also 
   "photos": [ { "id": "00017", "width": 1600, "height": 1200, "takenAt": "2026-06-12T18:14:00+00:00",
                 "thumbnailUrl": "/api/events/rk238/photos/00017/thumb.jpg",
                 "displayUrl": "/api/events/rk238/photos/00017/display.jpg",
-                "downloadUrl": "/api/events/rk238/photos/00017/download" } ] }
+                "downloadUrl": "/api/events/rk238/photos/00017/download",
+                "matchedFace": { "faceId": "5121", "bbox": [0.41234, 0.18012, 0.52871, 0.37455],
+                                 "landmarks": [[0.44, 0.25], [0.5, 0.25], [0.47, 0.29], [0.45, 0.33], [0.5, 0.33]],
+                                 "score": 0.612 } } ] }
 ```
 
 `matching` explains an empty "mine" list:
@@ -279,6 +286,12 @@ No photos or counts are ever returned here. If a session exists, this call also 
 | `matching_off` | The event has no face search | use `view=all` |
 
 `width`/`height` are the display image's pixels (for layout before the image loads).
+`matchedFace`: the user's face in this photo, the reason it is in "mine" (the best-matching face when several match);
+`null` when the photo doesn't match the user (only in `view=all`) or matching isn't running for them. Use it to draw a
+frame and the "not me" button (below). `bbox` is `[x1, y1, x2, y2]` and `landmarks` 5 points `[x, y]` (the eyes, the nose
+tip, the mouth corners), all normalized 0–1: fractions of the image's width and height, valid for the thumbnail, the
+display image and the download alike; place them as CSS percentages. `score` is the similarity to the user's selfie
+(the threshold is 0.363), for debugging, not for display.
 `photosTotal`/`photosPending`: all photos of the event and how many are still being processed.
 Re-fetching is cheap: new photos and selfies show up on the next call (nothing to start or poll besides this).
 
@@ -292,6 +305,25 @@ Errors: `401`, `403 consent_required`, `403 browse_all_not_allowed`, `404 event_
 ```
 
 Navigation follows the same view. A photo outside the view → `404 photo_not_found`.
+
+**Not me.** When the framed face is not the user, they say so; the face becomes a negative example for their matching:
+
+**`POST /api/events/{code}/photos/{photoId}/face-rejections`** `{ "faceId": "5121" }` → `201 face_rejected` `{ "photo": {…} }`
+
+- That face is never matched to the user again, and neither is any face more similar to it than to the user's selfie,
+  in this and every other event. In practice one "not me" on a lookalike (a parent, a sibling) removes most of that
+  person's photos from "mine" while the user's own photos stay. Another "not me" on a different-looking photo of the same
+  person catches the rest.
+- The returned `photo` has its new `matchedFace`: another face of the user in the same photo, or `null` (the photo has
+  left "mine"; remove it from the grid, re-fetch the gallery to see what else went).
+- `faceId` is normally the photo's `matchedFace.faceId`; any face of a photo the user can see is accepted. Idempotent.
+- A "not me" on the user's own face hides their other photos too (it is a negative example of themselves): offer the
+  undo right away (a toast with "Undo").
+- Errors: `403 consent_required` (no consent: no face search), `404 photo_not_found` (not visible to the user),
+  `404 face_not_found` (not a face of this photo), plus the event errors.
+
+**`DELETE /api/events/{code}/photos/{photoId}/face-rejections/{faceId}`** → `200 face_rejection_removed` `{ "photo": {…} }`:
+undo. `404 face_not_found` when the user has no "not me" on that face. There is no list of rejected photos yet.
 
 **Files** (use directly as `<img src>` / `<a href download>`; session cookie required):
 
@@ -615,6 +647,7 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 | 20 | Error `code` values | See §2 table | Map codes to messages |
 | 21 | "Download selected" fires one download per photo (`downloadUrl`, saved as `.svg`) | `GET /api/events/{code}/download.zip?view=…&photos=…` (max 50 per request) | One link per batch of ≤ 50; read `X-Photos-Skipped` if you want to tell the user |
 | 22 | Credit purchase without buyer data | `422 billing_profile_required` → `GET`/`PUT /api/me/billing` (§3.8), individual or company | Billing form at the first purchase; editable in the profile |
+| 23 | No face position, no feedback | `matchedFace` on every gallery photo; `POST`/`DELETE …/photos/{photoId}/face-rejections` ("not me") | Frame the face, "not me" button on the frame, undo toast |
 
 ### 5b. Organizer API vs cp-web's draft (`docs/api/organizer-dashboard.md`, 2026-10-19)
 

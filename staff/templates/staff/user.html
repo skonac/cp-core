@@ -84,6 +84,11 @@
 {% for c in consents %}<tr><td>{{ c.created_at|date:"Y-m-d H:i:s" }}</td><td>{{ c.version }}</td><td>{{ c.locale }}</td><td>{{ c.ip }}</td><td><code class="small">{{ c.sha256|truncatechars:13 }}</code></td><td class="wrap small">{{ c.user_agent|truncatechars:80 }}</td></tr>{% endfor %}
 </table></div>{% else %}<p class="muted">None.</p>{% endif %}
 
+{% if rejections %}<h2>"Not me" (last 50)</h2>
+<div class="scroll"><table class="t"><tr><th>When</th><th>Photo</th><th>Face</th><th class="n">Similarity then</th></tr>
+{% for r in rejections %}<tr><td>{{ r.created_at|date:"Y-m-d H:i" }}</td><td><a href="{% url 'staff:image' r.face.image_id %}#faces">{{ r.event.display_code }} {{ r.face.image.seq_str }}</a></td><td>{{ r.face_id }}</td><td class="n">{{ r.similarity|floatformat:3 }}</td></tr>{% endfor %}
+</table></div>{% endif %}
+
 {% if downloads %}<h2>Downloads (last 20 of {{ download_total }})</h2>
 <div class="scroll"><table class="t"><tr><th>When</th><th>Photo</th><th>IP</th></tr>
 {% for d in downloads %}<tr><td>{{ d.downloaded_at|date:"Y-m-d H:i:s" }}</td><td><a href="{% url 'staff:image' d.image_id %}">{{ d.image.event.display_code }} {{ d.image.seq_str }}</a></td><td>{{ d.ip }}</td></tr>{% endfor %}

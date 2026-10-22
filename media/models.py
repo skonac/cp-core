@@ -1,4 +1,5 @@
-"""Image (event photos, selfies, event covers; also the face-worker queue), Face, DownloadLog. design/core.md."""
+"""Image (event photos, selfies, event covers; also the face-worker queue), Face, FaceRejection, DownloadLog.
+design/core.md."""
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
@@ -117,6 +118,23 @@ class Face(models.Model):
 
     def __str__(self):
         return f"face {self.pk} of {self.image}"
+
+
+class FaceRejection(models.Model):
+    """A user's "not me" on one face. Used by matching as a negative example (media/matching.py):
+    the face, and faces closer to it than to the user, are no longer theirs. Counts in every event.
+    Deleted with the face (photo deleted) or the user."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="face_rejections")
+    face = models.ForeignKey(Face, on_delete=models.CASCADE, related_name="rejections")
+    event = models.ForeignKey("events.Event", on_delete=models.CASCADE, related_name="face_rejections")
+    similarity = models.FloatField(null=True, blank=True)   # to the user's selfie at rejection time (tuning data)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "face"], name="face_rejection_once")]
+
+    def __str__(self):
+        return f"{self.user_id} not face {self.face_id}"
 
 
 class DownloadLog(models.Model):

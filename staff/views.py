@@ -36,7 +36,7 @@ from events.codes import normalize_code
 from events.models import Event, EventMember
 from media.ingest import event_cover
 from media.matching import my_photos, selfie_state, selfie_states
-from media.models import DownloadLog, Face, Image
+from media.models import DownloadLog, Face, FaceRejection, Image
 from media.storage import abspath, file_response
 from worker.models import Worker
 
@@ -257,6 +257,8 @@ def user(request, user_id):
         "uploads": Image.objects.filter(owner=u, kind=Image.Kind.PHOTO, deleted_at__isnull=True).count(),
         "downloads": DownloadLog.objects.filter(user=u).select_related("image__event").order_by("-downloaded_at")[:20],
         "download_total": DownloadLog.objects.filter(user=u).count(),
+        "rejections": FaceRejection.objects.filter(user=u).select_related("face__image", "event")
+                                           .order_by("-created_at")[:50],
         "otps": OtpChallenge.objects.filter(phone=u.phone).select_related("event").order_by("-created_at")[:10],
         "kvkk_version": settings.KVKK_VERSION})
 

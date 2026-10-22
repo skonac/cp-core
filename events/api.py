@@ -1,4 +1,4 @@
-"""JSON API: public event lookup, gallery (photos of me / all photos), photo detail, files.
+"""JSON API: public event lookup, gallery (photos of me / all photos), photo detail, "not me", files.
 Shapes and codes: docs/api.md. Access rules: events/participant.py (same as the Django pages)."""
 from datetime import timedelta
 
@@ -9,10 +9,10 @@ from django.utils import timezone
 from ninja import Router
 from ninja.security import django_auth
 
-from common.api import ApiError, errors, file_doc, respond
+from common.api import ApiError, CamelSchema, errors, file_doc, respond
 from common.ratelimit import allow
-from media.matching import my_photos
-from media.models import DownloadLog, Image
+from media.matching import Match, my_matches, photo_match, similarity_to_user
+from media.models import DownloadLog, FaceRejection, Image
 from media.storage import abspath, file_response
 from media.zipstream import stream_zip
 
@@ -52,18 +52,18 @@ def _photos(event):
     return Image.objects.filter(event=event, kind=Image.Kind.PHOTO, deleted_at__isnull=True)
 
 
-def _view_photos(request, event, access, view: str) -> list[Image]:
-    """The ordered photo list of a view: "mine" (face matches) or "all" (browse-all)."""
-    photos = _photos(event).order_by("taken_at", "seq")
-    if view == "all":
-        if not access.can_browse:
-            raise ApiError(403, "browse_all_not_allowed", "Bu etkinlikte tüm fotoğraflar açık değil.")
-        return list(photos)
-    if view != "mine":
+def _view_photos(request, event, access, view: str) -> tuple[list[Image], dict[int, Match]]:
+    """The ordered photo list of a view, "mine" (face matches) or "all" (browse-all), and the user's
+    matches {image_id: Match} (both views: "all" shows the frame on the user's photos too)."""
+    if view not in ("mine", "all"):
         raise ApiError(422, "validation_error", "view must be 'mine' or 'all'.")
-    if not (access.can_match and access.matching == "ready"):
-        return []
-    return list(photos.filter(pk__in=list(my_photos(request.user, event))))
+    if view == "all" and not access.can_browse:
+        raise ApiError(403, "browse_all_not_allowed", "Bu etkinlikte tüm fotoğraflar açık değil.")
+    matches = my_matches(request.user, event) if access.can_match and access.matching == "ready" else {}
+    photos = _photos(event).order_by("taken_at", "seq")
+    if view == "mine":
+        photos = photos.filter(pk__in=list(matches))
+    return list(photos), matches
 
 
 def _display_size(img: Image) -> tuple[int, int]:
@@ -71,13 +71,14 @@ def _display_size(img: Image) -> tuple[int, int]:
     return round((img.width or 0) * scale), round((img.height or 0) * scale)
 
 
-def photo_json(event: Event, img: Image) -> dict:
+def photo_json(event: Event, img: Image, match: Match | None = None) -> dict:
     base = f"/api/events/{event.code}/photos/{img.seq_str}"
     width, height = _display_size(img)
     return {"id": img.seq_str, "width": width, "height": height,
             "takenAt": img.taken_at.isoformat() if img.taken_at else None,
             "thumbnailUrl": f"{base}/thumb.jpg", "displayUrl": f"{base}/display.jpg",
-            "downloadUrl": f"{base}/download"}
+            "downloadUrl": f"{base}/download",
+            "matchedFace": match.json() if match else None}
 
 
 def _seq(photo_id: str) -> int:
@@ -121,7 +122,7 @@ def gallery(request, code: str, view: str = "mine", cursor: int = 0, limit: int 
 
     Errors: 404 event_not_found · 410 event_expired · 423 event_access_closed · 403 consent_required, browse_all_not_allowed · 422 validation_error (bad view)."""
     event, access = _member_access(request, code)
-    photos = _view_photos(request, event, access, view)
+    photos, matches = _view_photos(request, event, access, view)
     limit = max(1, min(limit, 500))
     page = photos[cursor:cursor + limit]
     all_photos = _photos(event)
@@ -132,7 +133,7 @@ def gallery(request, code: str, view: str = "mine", cursor: int = 0, limit: int 
         "photosTotal": all_photos.count(),
         "photosPending": all_photos.filter(status__in=["pending", "processing"]).count()
         if event.is_processing_faces else 0,
-        "total": len(photos), "photos": [photo_json(event, p) for p in page],
+        "total": len(photos), "photos": [photo_json(event, p, matches.get(p.id)) for p in page],
         "nextCursor": cursor + limit if cursor + limit < len(photos) else None,
     })
 
@@ -143,7 +144,7 @@ def gallery_photo(request, code: str, photo_id: str, view: str = "mine"):
 
     Errors: 404 event_not_found · 410 event_expired · 423 event_access_closed · 403 consent_required, browse_all_not_allowed · 404 photo_not_found (not in this view)."""
     event, access = _member_access(request, code)
-    photos = _view_photos(request, event, access, view)
+    photos, matches = _view_photos(request, event, access, view)
     seq = _seq(photo_id)
     index = next((i for i, p in enumerate(photos) if p.seq == seq), None)
     if index is None:
@@ -151,12 +152,72 @@ def gallery_photo(request, code: str, photo_id: str, view: str = "mine"):
     used = DownloadLog.objects.filter(user=request.user, image=photos[index],
                                       downloaded_at__gte=timezone.now() - timedelta(days=1)).count()
     return respond(request, "gallery_photo_retrieved", {
-        "eventCode": event.display_code, "view": view, "photo": photo_json(event, photos[index]),
+        "eventCode": event.display_code, "view": view, "photo": photo_json(event, photos[index], matches.get(photos[index].id)),
         "position": index + 1, "total": len(photos),
         "previousPhotoId": photos[index - 1].seq_str if index > 0 else None,
         "nextPhotoId": photos[index + 1].seq_str if index + 1 < len(photos) else None,
         "downloadsLeftToday": max(0, settings.DOWNLOAD_CAP_PER_PHOTO_PER_DAY - used),
     })
+
+
+# ---------------------------------------------------------------------------- "not me"
+
+class FaceRejectionIn(CamelSchema):
+    face_id: str
+
+
+def _face_of(image: Image, face_id: str):
+    face = image.faces.filter(pk=int(face_id)).first() if face_id.isdigit() else None
+    if face is None:
+        raise ApiError(404, "face_not_found", "Yüz bulunamadı.")
+    return face
+
+
+def _photo_response(request, code: str, event: Event, image: Image, status: int):
+    return respond(request, code, {"photo": photo_json(event, image, photo_match(request.user, image))}, status=status)
+
+
+@events_router.post("/{code}/photos/{photo_id}/face-rejections",
+                    response={201: S.FaceRejectionResponse, **errors(401, 403, 404, 410, 422, 423)})
+def reject_face(request, code: str, photo_id: str, body: FaceRejectionIn):
+    """"Not me": this face (`faceId`, usually the photo's `matchedFace.faceId`) is not the user. The face and
+    faces closer to it than to the user's selfie are no longer matched to them, in every event; a photo
+    stays in "mine" only if another face in it still matches. Idempotent. Returns the photo with its new
+    `matchedFace` (`null`: no longer in "mine"). Undo: `DELETE …/face-rejections/{faceId}`.
+
+    Errors: 403 consent_required (no consent: no face search) · 404 photo_not_found (not visible to the user),
+    face_not_found (not a face of this photo; also on events without face search) · 410 event_expired ·
+    423 event_access_closed."""
+    event, access = _member_access(request, code)
+    if not access.can_match:
+        if access.matching == "consent_required":
+            raise ApiError(*BLOCKED["consent_required"])
+        raise ApiError(404, "face_not_found", "Yüz bulunamadı.")
+    image = _photos(event).filter(seq=_seq(photo_id)).first()
+    if image is None or not may_see_photo(request.user, event, image, access):
+        raise ApiError(404, "photo_not_found", "Fotoğraf bulunamadı.")
+    face = _face_of(image, body.face_id)
+    FaceRejection.objects.get_or_create(user=request.user, face=face, defaults={
+        "event": event, "similarity": similarity_to_user(request.user, face)})
+    return _photo_response(request, "face_rejected", event, image, 201)
+
+
+@events_router.delete("/{code}/photos/{photo_id}/face-rejections/{face_id}",
+                      response={200: S.FaceRejectionRemovedResponse, **errors(401, 403, 404, 410, 423)})
+def unreject_face(request, code: str, photo_id: str, face_id: str):
+    """Undo a "not me". Returns the photo with its `matchedFace` (it may still be `null`: below the threshold,
+    or covered by another rejection).
+
+    Errors: 404 photo_not_found, face_not_found (no "not me" of this user on this face) · 410 event_expired ·
+    423 event_access_closed · 403 consent_required."""
+    event, _ = _member_access(request, code)
+    image = _photos(event).filter(seq=_seq(photo_id)).first()
+    if image is None:
+        raise ApiError(404, "photo_not_found", "Fotoğraf bulunamadı.")
+    face = _face_of(image, face_id)
+    if not FaceRejection.objects.filter(user=request.user, face=face).delete()[0]:
+        raise ApiError(404, "face_not_found", "Yüz bulunamadı.")
+    return _photo_response(request, "face_rejection_removed", event, image, 200)
 
 
 # ---------------------------------------------------------------------------- files
@@ -209,7 +270,7 @@ def download_zip(request, code: str, view: str = "mine", photos: str = "", all: 
     410 event_expired · 422 validation_error (no photos given), too_many_files · 423 event_access_closed ·
     429 download_limit_reached (all of them at the cap)."""
     event, access = _member_access(request, code)
-    in_view = _view_photos(request, event, access, view)
+    in_view, _ = _view_photos(request, event, access, view)
     if all:
         requested, chosen = len(in_view), in_view
     else:

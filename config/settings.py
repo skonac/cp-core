@@ -156,6 +156,7 @@ THUMB_QUALITY = 80
 
 CREDIT_FLOOR_DEFAULT = -50  # a user's balance may go down to this; per-user override: User.credit_floor
 MATCH_THRESHOLD = 0.363     # SFace cosine similarity; tune on a real event
+MATCH_REJECT_MARGIN = 0.0   # a face is hidden when sim(user) <= sim(closest rejected face) + margin
 DOWNLOAD_CAP_PER_PHOTO_PER_DAY = 3
 DOWNLOAD_NAME = "cleverphotos_{code}_{seq:05d}.jpg"
 ZIP_MAX_FILES = int(env("CP_ZIP_MAX_FILES", "50"))   # photos per ZIP download request

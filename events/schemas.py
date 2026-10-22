@@ -20,6 +20,17 @@ class PublicEventOut(Out):
     requiresConsent: bool
 
 
+class MatchedFaceOut(Out):
+    faceId: str = Field(description="Send it with \"not me\" (face-rejections).", examples=["5121"])
+    bbox: list[float] = Field(description="x1, y1, x2, y2, normalized 0–1 (fractions of the image's width and "
+                                          "height; the same for thumbnail, display and download).",
+                              examples=[[0.41234, 0.18012, 0.52871, 0.37455]])
+    landmarks: list[list[float]] = Field(description="5 points [x, y], normalized: the two eyes, the nose tip, "
+                                                     "the two mouth corners (detector order).",
+                                         examples=[[[0.44, 0.25], [0.5, 0.25], [0.47, 0.29], [0.45, 0.33], [0.5, 0.33]]])
+    score: float = Field(description="Cosine similarity to the user's selfie (threshold 0.363).", examples=[0.612])
+
+
 class PhotoOut(Out):
     id: str = Field(description="Photo number in its event; unique only within the event.", examples=["00017"])
     width: int = Field(description="Display image pixels.", examples=[1600])
@@ -28,6 +39,8 @@ class PhotoOut(Out):
     thumbnailUrl: str = Field(examples=["/api/events/rk238/photos/00017/thumb.jpg"])
     displayUrl: str = Field(examples=["/api/events/rk238/photos/00017/display.jpg"])
     downloadUrl: str = Field(examples=["/api/events/rk238/photos/00017/download"])
+    matchedFace: MatchedFaceOut | None = Field(description="The user's face in this photo, the reason it is in "
+                                                           "\"mine\"; null when it doesn't match (or no face search).")
 
 
 class GalleryOut(Out):
@@ -54,6 +67,12 @@ class GalleryPhotoOut(Out):
     downloadsLeftToday: int = Field(description="Hide the download button at 0.", examples=[3])
 
 
+class FaceRejectionOut(Out):
+    photo: PhotoOut
+
+
 PublicEventResponse = envelope("PublicEventResponse", PublicEventOut, "event_retrieved")
 GalleryResponse = envelope("GalleryResponse", GalleryOut, "gallery_retrieved")
 GalleryPhotoResponse = envelope("GalleryPhotoResponse", GalleryPhotoOut, "gallery_photo_retrieved")
+FaceRejectionResponse = envelope("FaceRejectionResponse", FaceRejectionOut, "face_rejected")
+FaceRejectionRemovedResponse = envelope("FaceRejectionRemovedResponse", FaceRejectionOut, "face_rejection_removed")

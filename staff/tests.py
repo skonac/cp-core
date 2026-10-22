@@ -11,6 +11,7 @@ from PIL import Image as PILImage
 from accounts.models import User
 from events.models import Event, EventMember
 from media.ingest import ingest_photo, ingest_selfie
+from media.models import FaceRejection
 from worker import queue
 
 ENGINE = "yunet-2023mar+sface-2021dec/1400/0.8"
@@ -59,6 +60,8 @@ class StaffPagesTest(TestCase):
                 body = {"engine": ENGINE, "width": 800, "height": 600, "ms": 1, **body}
             queue.store_result(image.id, body)
         cls.selfie_id = cls.guest.images.get(kind="selfie").id
+        photo2 = cls.event.images.get(seq=2)
+        FaceRejection.objects.create(user=cls.guest, face=photo2.faces.get(), event=cls.event, similarity=0.41)
 
     def setUp(self):
         self.client.login(phone="+905550000009", password="pw")
@@ -70,7 +73,8 @@ class StaffPagesTest(TestCase):
                     f"/dj/staff/events/{code}/?status=failed&deleted=1",
                     f"/dj/staff/images/{photo_id}/", f"/dj/staff/images/{self.selfie_id}/", "/dj/staff/users/",
                     "/dj/staff/users/?q=0002", f"/dj/staff/users/{self.guest.id}/", f"/dj/staff/users/{self.org.id}/",
-                    "/dj/staff/worker/", "/admin/", f"/admin/accounts/user/{self.guest.id}/change/"]:
+                    "/dj/staff/worker/", "/admin/", f"/admin/accounts/user/{self.guest.id}/change/",
+                    "/admin/media/facerejection/"]:
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200)
 

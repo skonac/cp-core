@@ -1141,6 +1141,229 @@
         ]
       }
     },
+    "/api/events/{code}/photos/{photo_id}/face-rejections": {
+      "post": {
+        "operationId": "events_api_reject_face",
+        "summary": "Reject Face",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "schema": {
+              "title": "Photo Id",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FaceRejectionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error423"
+                }
+              }
+            }
+          }
+        },
+        "description": "\"Not me\": this face (`faceId`, usually the photo's `matchedFace.faceId`) is not the user. The face and\nfaces closer to it than to the user's selfie are no longer matched to them, in every event; a photo\nstays in \"mine\" only if another face in it still matches. Idempotent. Returns the photo with its new\n`matchedFace` (`null`: no longer in \"mine\"). Undo: `DELETE …/face-rejections/{faceId}`.\n\nErrors: 403 consent_required (no consent: no face search) · 404 photo_not_found (not visible to the user),\nface_not_found (not a face of this photo; also on events without face search) · 410 event_expired ·\n423 event_access_closed.",
+        "tags": [
+          "events"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FaceRejectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/events/{code}/photos/{photo_id}/face-rejections/{face_id}": {
+      "delete": {
+        "operationId": "events_api_unreject_face",
+        "summary": "Unreject Face",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "schema": {
+              "title": "Photo Id",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "face_id",
+            "schema": {
+              "title": "Face Id",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FaceRejectionRemovedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error423"
+                }
+              }
+            }
+          }
+        },
+        "description": "Undo a \"not me\". Returns the photo with its `matchedFace` (it may still be `null`: below the threshold,\nor covered by another rejection).\n\nErrors: 404 photo_not_found, face_not_found (no \"not me\" of this user on this face) · 410 event_expired ·\n423 event_access_closed · 403 consent_required.",
+        "tags": [
+          "events"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
     "/api/events/{code}/photos/{photo_id}/thumb.jpg": {
       "get": {
         "operationId": "events_api_photo_thumb",
@@ -5593,6 +5816,86 @@
         "title": "GalleryResponse",
         "type": "object"
       },
+      "MatchedFaceOut": {
+        "additionalProperties": false,
+        "properties": {
+          "faceId": {
+            "description": "Send it with \"not me\" (face-rejections).",
+            "examples": [
+              "5121"
+            ],
+            "title": "Faceid",
+            "type": "string"
+          },
+          "bbox": {
+            "description": "x1, y1, x2, y2, normalized 0–1 (fractions of the image's width and height; the same for thumbnail, display and download).",
+            "examples": [
+              [
+                0.41234,
+                0.18012,
+                0.52871,
+                0.37455
+              ]
+            ],
+            "items": {
+              "type": "number"
+            },
+            "title": "Bbox",
+            "type": "array"
+          },
+          "landmarks": {
+            "description": "5 points [x, y], normalized: the two eyes, the nose tip, the two mouth corners (detector order).",
+            "examples": [
+              [
+                [
+                  0.44,
+                  0.25
+                ],
+                [
+                  0.5,
+                  0.25
+                ],
+                [
+                  0.47,
+                  0.29
+                ],
+                [
+                  0.45,
+                  0.33
+                ],
+                [
+                  0.5,
+                  0.33
+                ]
+              ]
+            ],
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Landmarks",
+            "type": "array"
+          },
+          "score": {
+            "description": "Cosine similarity to the user's selfie (threshold 0.363).",
+            "examples": [
+              0.612
+            ],
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "faceId",
+          "bbox",
+          "landmarks",
+          "score"
+        ],
+        "title": "MatchedFaceOut",
+        "type": "object"
+      },
       "PhotoOut": {
         "additionalProperties": false,
         "properties": {
@@ -5653,6 +5956,17 @@
             ],
             "title": "Downloadurl",
             "type": "string"
+          },
+          "matchedFace": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchedFaceOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The user's face in this photo, the reason it is in \"mine\"; null when it doesn't match (or no face search)."
           }
         },
         "required": [
@@ -5662,7 +5976,8 @@
           "takenAt",
           "thumbnailUrl",
           "displayUrl",
-          "downloadUrl"
+          "downloadUrl",
+          "matchedFace"
         ],
         "title": "PhotoOut",
         "type": "object"
@@ -5791,6 +6106,112 @@
           "requestId"
         ],
         "title": "GalleryPhotoResponse",
+        "type": "object"
+      },
+      "FaceRejectionOut": {
+        "additionalProperties": false,
+        "properties": {
+          "photo": {
+            "$ref": "#/components/schemas/PhotoOut"
+          }
+        },
+        "required": [
+          "photo"
+        ],
+        "title": "FaceRejectionOut",
+        "type": "object"
+      },
+      "FaceRejectionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "face_rejected",
+            "default": "face_rejected",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/FaceRejectionOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "FaceRejectionResponse",
+        "type": "object"
+      },
+      "FaceRejectionIn": {
+        "properties": {
+          "faceId": {
+            "title": "Faceid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "faceId"
+        ],
+        "title": "FaceRejectionIn",
+        "type": "object"
+      },
+      "FaceRejectionRemovedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "face_rejection_removed",
+            "default": "face_rejection_removed",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/FaceRejectionOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "FaceRejectionRemovedResponse",
         "type": "object"
       },
       "DashboardOrganizerOut": {

@@ -181,6 +181,33 @@ class ApiContractTests(TempMedia, TestCase):
         mine = {e["code"]: e for e in r.json()["data"]["events"]}
         self.assertEqual(mine[code]["matchedPhotoCount"], 2)
 
+        # --- "not me": the frame, rejecting a stranger's face (photo stays), then my own face (photo goes), undo
+        photo = c.get(f"{ev}/gallery/photos/{self.p_me.seq_str}").json()["data"]["photo"]
+        my_face, = self.p_me.faces.filter(pk=int(photo["matchedFace"]["faceId"]))
+        stranger_face, = self.p_me.faces.exclude(pk=my_face.pk)
+        self.assertEqual(photo["matchedFace"]["bbox"], my_face.bbox)
+        self.assertEqual(len(photo["matchedFace"]["landmarks"]), 5)
+        self.assertGreater(photo["matchedFace"]["score"], settings.MATCH_THRESHOLD)
+        rej = f"{ev}/photos/{self.p_me.seq_str}/face-rejections"
+        r = c.post_json(rej, {"faceId": str(stranger_face.pk)})
+        self.assertCode(r, 201, "face_rejected")
+        self.assertEqual(r.json()["data"]["photo"]["matchedFace"]["faceId"], str(my_face.pk))
+        r = c.post_json(rej, {"faceId": str(my_face.pk)})
+        self.assertCode(r, 201, "face_rejected")
+        self.assertIsNone(r.json()["data"]["photo"]["matchedFace"])
+        # rejecting your own face is a negative example of yourself: your other photos go too (undo below)
+        self.assertEqual(c.get(f"{ev}/gallery").json()["data"]["total"], 0)
+        self.assertCode(c.post_json(rej, {"faceId": str(my_face.pk)}), 404, "photo_not_found")   # no longer visible
+        self.assertCode(c.post_json(rej, {"faceId": "999999"}), 404, "photo_not_found")
+        self.assertCode(c.post_json(f"{ev}/photos/{self.p_other.seq_str}/face-rejections",
+                                    {"faceId": str(self.p_other.faces.get().pk)}), 404, "photo_not_found")
+        r = c.delete_(f"{rej}/{my_face.pk}")
+        self.assertCode(r, 200, "face_rejection_removed")
+        self.assertEqual(r.json()["data"]["photo"]["matchedFace"]["faceId"], str(my_face.pk))
+        self.assertCode(c.delete_(f"{rej}/{my_face.pk}"), 404, "face_not_found")
+        self.assertCode(c.post_json(rej, {"faceId": "999999"}), 404, "face_not_found")
+        self.assertEqual(c.get(f"{ev}/gallery").json()["data"]["total"], 2)
+
         # --- delete selfie, sign out
         self.assertEqual(c.delete_(f"/api/me/selfies/{selfie_id}").status_code, 204)
         self.assertCode(c.delete_(f"/api/me/selfies/{selfie_id}"), 404, "selfie_not_found")
