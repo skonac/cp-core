@@ -14,7 +14,7 @@ from common.testing import ApiClient
 
 from . import dispatch, providers, sender
 from .models import Notification, PushDevice
-from .providers import SendError
+from .providers import SendError, iletimerkezi
 
 
 def failing(retry=False, gone=False):
@@ -157,3 +157,86 @@ class ThreadSenderTests(TransactionTestCase):
                     break
                 time.sleep(0.05)
         self.assertEqual((row.status, row.provider_ref), ("sent", "slow-1"))
+
+
+class FakeHTTP:
+    """Stands in for urllib.request.urlopen: records the request, answers like İletiMerkezi."""
+
+    def __init__(self, code=200, body=None, error=None):
+        self.code, self.error, self.requests = code, error, []
+        self.body = body or {"response": {"status": {"code": str(code), "message": "x"}, "order": {"id": "777"}}}
+
+    def __call__(self, req, timeout=None):
+        import io
+        import json
+        import urllib.error
+        self.requests.append((req.full_url, json.loads(req.data)))
+        if self.error:
+            raise self.error
+        raw = json.dumps(self.body).encode()
+        if self.code != 200:
+            raise urllib.error.HTTPError(req.full_url, self.code, "x", {}, io.BytesIO(raw))
+        response = io.BytesIO(raw)
+        response.status = 200
+        return _Ctx(response)
+
+
+class _Ctx:
+    def __init__(self, r):
+        self.r = r
+
+    def __enter__(self):
+        return self.r
+
+    def __exit__(self, *a):
+        return False
+
+
+@override_settings(NOTIFY_SENDER="inline", SMS_DELIVERY="live", ILETIMERKEZI_API_KEY="k", ILETIMERKEZI_API_HASH="h",
+                   ILETIMERKEZI_SENDER="CLEVERPHOTO")
+class IletimerkeziTests(TestCase):
+    def test_send_body_and_order_id(self):
+        fake = FakeHTTP()
+        with mock.patch("urllib.request.urlopen", fake):
+            self.assertEqual(dispatch.otp("+905551234567", "123456"), "iletimerkezi")
+        url, body = fake.requests[0]
+        self.assertEqual(url, "https://api.iletimerkezi.com/v1/send-sms/json")
+        order = body["request"]["order"]
+        self.assertEqual(body["request"]["authentication"], {"key": "k", "hash": "h"})
+        self.assertEqual((order["sender"], order["iys"], order["message"]["receipents"]["number"]),
+                         ("CLEVERPHOTO", "0", ["5551234567"]))
+        self.assertTrue(order["message"]["text"].startswith("Cleverphotos kodun: 123456"))
+
+    def test_notification_row_gets_order_id_and_delivery_report(self):
+        with mock.patch("urllib.request.urlopen", FakeHTTP()), self.captureOnCommitCallbacks(execute=True):
+            row = dispatch.sms("+905551234567", "Fotoğrafların hazır", kind="event_end")
+        row.refresh_from_db()
+        self.assertEqual((row.status, row.provider, row.provider_ref), ("sent", "iletimerkezi", "777"))
+        report = {"report": {"id": 1, "packet_id": 777, "status": "delivered", "to": "+905551234567", "body": "x"}}
+        r = self.client.post("/api/notify/iletimerkezi/report", report, content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        row.refresh_from_db()
+        self.assertEqual(row.delivery, "delivered")
+        self.assertEqual(self.client.post("/api/notify/iletimerkezi/report", "nope",
+                                          content_type="application/json").status_code, 400)
+
+    def test_errors_final_or_retryable(self):
+        cases = [(FakeHTTP(code=402, body={"response": {"status": {"code": "402", "message": "Bakiye yetersiz"}}}), False),
+                 (FakeHTTP(code=503, body={"response": {"status": {"code": "503", "message": "down"}}}), True),
+                 (FakeHTTP(error=TimeoutError("timed out")), True)]
+        for fake, retry in cases:
+            with self.subTest(retry=retry), mock.patch("urllib.request.urlopen", fake):
+                with self.assertRaises(SendError) as e:
+                    iletimerkezi.sms("+905551234567", "x")
+                self.assertEqual(e.exception.retry, retry)
+
+    def test_non_turkish_number_has_no_route_yet(self):
+        with self.assertRaises(SendError):
+            dispatch.otp("+15551234567", "123456")
+
+    def test_check_needs_credentials(self):
+        from notify.apps import check_delivery
+        with self.settings(ILETIMERKEZI_API_HASH=""):
+            self.assertEqual([e.id for e in check_delivery()], ["cp.E011"])
+        with self.settings(ILETIMERKEZI_SENDER="cleverphotos.org"):
+            self.assertEqual([e.id for e in check_delivery()], ["cp.E012"])

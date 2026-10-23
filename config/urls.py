@@ -15,6 +15,7 @@ urlpatterns = [
     path("api/faceworker/", include("worker.urls")),   # before api/: plain views, worker's own JSON
     path("api/shop/iyzico/callback", iyzico_callback),  # before api/: iyzico's return (browser redirect)
     path("api/shop/iyzico/webhook", iyzico_webhook),    # before api/: iyzico's server notification (JSON)
+    path("api/notify/", include("notify.urls")),        # before api/: SMS providers' delivery reports
     path("api/", api.urls),                             # JSON API for cp-web; docs at /api/docs
     # Django pages (fallback UI and staff pages), all under /dj/: the rest of the site belongs to
     # cp-web (React), so nginx routes only /dj/ here. Login is phone + password until SMS sign-in exists.

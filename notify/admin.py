@@ -6,8 +6,8 @@ from .models import Notification, PushDevice
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
     """The temporary send log: read-only."""
-    list_display = ("id", "created_at", "kind", "channel", "to", "status", "provider", "attempts", "error")
-    list_filter = ("status", "channel", "kind", "provider")
+    list_display = ("id", "created_at", "kind", "channel", "to", "status", "delivery", "provider", "attempts", "error")
+    list_filter = ("status", "delivery", "channel", "kind", "provider")
     search_fields = ("to", "user__phone", "event__code", "provider_ref")
     raw_id_fields = ("user", "event", "device")
 

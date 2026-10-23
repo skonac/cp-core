@@ -59,6 +59,8 @@ class Notification(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     claimed_at = models.DateTimeField(null=True, blank=True)
     sent_at = models.DateTimeField(null=True, blank=True)
+    delivery = models.CharField(max_length=12, blank=True)   # SMS delivery report: accepted, delivered, undelivered
+    delivery_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [

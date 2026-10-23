@@ -180,6 +180,10 @@ SITE_DOMAIN = env("CP_SITE_DOMAIN", "cleverphotos.org")
 NOTIFY_SENDER = "thread"    # "thread": the in-process pool; "inline": send in the caller (tests)
 NOTIFY_THREADS = 4          # sender threads per process
 NOTIFY_KEEP_DAYS = 14       # the send log is temporary
+# İletiMerkezi (SMS to +90 numbers): API key and hash from the panel (Ayarlar -> API), the approved sender name
+ILETIMERKEZI_API_KEY = env("CP_ILETIMERKEZI_API_KEY", "")
+ILETIMERKEZI_API_HASH = env("CP_ILETIMERKEZI_API_HASH", "")
+ILETIMERKEZI_SENDER = env("CP_ILETIMERKEZI_SENDER", "")
 EVENT_LOOKUP_PER_MIN = 30   # public event lookups per IP
 CONTACT_PER_HOUR = 5        # contact form messages per IP per hour
 # Non-production only: this string is accepted as the code of any OTP challenge and as the password

@@ -9,8 +9,6 @@ Add a provider: write its function (own module), register it in the dict, route 
 """
 from django.conf import settings
 
-from . import log
-
 
 class SendError(Exception):
     """retry: worth trying again later (timeout, provider down, 5xx). gone: the address/device no longer
@@ -21,7 +19,11 @@ class SendError(Exception):
         self.retry, self.gone = retry, gone
 
 
-SMS = {"log": log.sms}
+from . import iletimerkezi, log  # noqa: E402  (they import SendError from here)
+
+
+
+SMS = {"log": log.sms, "iletimerkezi": iletimerkezi.sms}
 EMAIL = {"log": log.email}
 PUSH = {"log": log.push}
 
@@ -31,7 +33,7 @@ def sms_route(phone: str, purpose: str) -> list[str]:
     if settings.SMS_DELIVERY == "log":
         return ["log"]
     if phone.startswith("+90"):
-        return []            # iletimerkezi: next step
+        return ["iletimerkezi"]
     return []                # outside Türkiye: Twilio, later
 
 
