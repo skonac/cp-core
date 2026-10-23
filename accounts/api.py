@@ -93,12 +93,13 @@ def csrf(request):
     return respond(request, "csrf_set")
 
 
-@auth_router.post("/otp-requests", auth=None, response={201: S.OtpSentResponse, **errors(404, 422, 429)})
+@auth_router.post("/otp-requests", auth=None, response={201: S.OtpSentResponse, **errors(404, 422, 429, 502)})
 def otp_request(request, body: OtpRequestIn):
     """Sends a sign-in code (dev: to the server log and the admin). `role` defaults to participant.
 
     Errors: 404 event_not_found · 422 invalid_phone_number, invalid_role, validation_error ·
-    429 rate_limit_exceeded (3 codes per phone per 15 min; 30 s between codes)."""
+    429 rate_limit_exceeded (3 codes per phone per 15 min; 30 s between codes) ·
+    502 sms_not_sent (the SMS provider refused or could not be reached; the code was not sent)."""
     event = None
     if body.event_code:
         event = Event.objects.filter(code=normalize_code(body.event_code)).first()

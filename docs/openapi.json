@@ -97,9 +97,19 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error502"
+                }
+              }
+            }
           }
         },
-        "description": "Sends a sign-in code (dev: to the server log and the admin). `role` defaults to participant.\n\nErrors: 404 event_not_found · 422 invalid_phone_number, invalid_role, validation_error ·\n429 rate_limit_exceeded (3 codes per phone per 15 min; 30 s between codes).",
+        "description": "Sends a sign-in code (dev: to the server log and the admin). `role` defaults to participant.\n\nErrors: 404 event_not_found · 422 invalid_phone_number, invalid_role, validation_error ·\n429 rate_limit_exceeded (3 codes per phone per 15 min; 30 s between codes) ·\n502 sms_not_sent (the SMS provider refused or could not be reached; the code was not sent).",
         "tags": [
           "auth"
         ],
@@ -4126,6 +4136,72 @@
           "requestId"
         ],
         "title": "Error429",
+        "type": "object"
+      },
+      "Error502": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "payment_provider_error"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Ödeme başlatılamadı."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              null
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error502",
         "type": "object"
       },
       "OtpRequestIn": {
@@ -8164,72 +8240,6 @@
           "creditBalance"
         ],
         "title": "PurchaseStartedOut",
-        "type": "object"
-      },
-      "Error502": {
-        "additionalProperties": false,
-        "properties": {
-          "success": {
-            "const": false,
-            "default": false,
-            "title": "Success",
-            "type": "boolean"
-          },
-          "code": {
-            "examples": [
-              "payment_provider_error"
-            ],
-            "title": "Code",
-            "type": "string"
-          },
-          "message": {
-            "description": "Turkish, safe to show.",
-            "examples": [
-              "Ödeme başlatılamadı."
-            ],
-            "title": "Message",
-            "type": "string"
-          },
-          "data": {
-            "title": "Data",
-            "type": "null"
-          },
-          "requestId": {
-            "description": "Also in the X-Request-ID header; quote it in bug reports.",
-            "examples": [
-              "req_3dc994887c3ed300"
-            ],
-            "title": "Requestid",
-            "type": "string"
-          },
-          "errors": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "422 validation_error only: field -> messages.",
-            "examples": [
-              null
-            ],
-            "title": "Errors"
-          }
-        },
-        "required": [
-          "code",
-          "message",
-          "requestId"
-        ],
-        "title": "Error502",
         "type": "object"
       },
       "PurchaseIn": {

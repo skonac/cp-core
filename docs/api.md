@@ -8,7 +8,7 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-22 · API version 0.5 ("not me": `matchedFace` and face rejections §3.5; 0.4: contact form §3.9; 0.3: shop with iyzico §3.7, ÖBF + MSS sales documents, KVKK as HTML §3.3)
+Last updated: 2026-10-23 · API version 0.5 (OTP: `502 sms_not_sent`; "not me": `matchedFace` and face rejections §3.5; 0.4: contact form §3.9; 0.3: shop with iyzico §3.7, ÖBF + MSS sales documents, KVKK as HTML §3.3)
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then the
 > "Changes from cp-web's draft contract" section, which lists every place where this API
@@ -94,6 +94,7 @@ Every response except files and `204` is:
 | 429 | `rate_limit_exceeded`, `download_limit_reached` | |
 | 500 | `internal_error` | Bug; quote the `requestId` |
 | 502 | `payment_provider_error`, `payment_provider_unreachable` | Purchase: iyzico refused the request or can't be reached |
+| 502 | `sms_not_sent` | OTP request: the SMS provider refused or can't be reached |
 
 ## 3. Endpoints
 
@@ -120,9 +121,14 @@ phone is new. There is no separate register screen and no password.
 { "challengeId": "otp_WcM7QQ-RIA9d2osCR_Mx6A", "maskedPhone": "•••••••••4567", "expiresInSeconds": 120, "resendAfterSeconds": 30 }
 ```
 
-Errors: `422 invalid_phone_number`, `422 invalid_role`, `429 rate_limit_exceeded` (max 3 codes per phone per 15 min, and not within 30 s of the previous one).
+Errors: `422 invalid_phone_number`, `422 invalid_role`, `429 rate_limit_exceeded` (max 3 codes per phone per 15 min, and not within 30 s of the previous one),
+`502 sms_not_sent` (the SMS provider refused or could not be reached; nothing was sent, the user may try again).
 
-> **No SMS is sent yet.** In development the code is written to the server log and shown in the
+The SMS ends with a line `@cleverphotos.org #123456`, so browsers that support it (Chrome on Android) can offer the code
+with one tap: `navigator.credentials.get({otp: {transport: ["sms"]}})` on the code screen; give the input
+`autocomplete="one-time-code"` too (iOS Safari suggests the code above the keyboard).
+
+> **No SMS is sent on development servers** (`CP_SMS_DELIVERY=log`): the code is written to the server log and shown in the
 > admin (Accounts → Otp challenges → dev code). Ask Ozgur for it, or use the admin.
 
 **`POST /api/auth/otp-verifications`** (no session needed)

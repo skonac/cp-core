@@ -1,8 +1,9 @@
 """SMS one-time-code sign-in (design/core.md, "Sign-in"). One flow for login and registration:
 a verified phone logs in, or creates the account if it is new.
 
-While OTP_DELIVERY = "log" no SMS is sent: the code goes to the server log and to
-OtpChallenge.dev_code (visible in the admin). A real SMS provider plugs in at _deliver().
+The code is sent by notify.dispatch.otp() (SMS, routed by phone number; design/notifications.md).
+While SMS_DELIVERY = "log" no SMS leaves the server: the code goes to the server log and to
+OtpChallenge.dev_code (visible in the admin).
 """
 import hashlib
 import hmac
@@ -16,6 +17,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from common.api import ApiError
+from notify import dispatch
 
 from .models import OtpChallenge, Role, User
 
@@ -36,11 +38,14 @@ def _hash(challenge_id: str, code: str) -> str:
 
 
 def _deliver(challenge: OtpChallenge, code: str) -> None:
-    if settings.OTP_DELIVERY == "log":
+    if settings.SMS_DELIVERY == "log":
         challenge.dev_code = code
-        log.warning("OTP for %s: %s (challenge %s; not sent, OTP_DELIVERY=log)", challenge.phone, code, challenge.pk)
-        return
-    raise NotImplementedError(f"OTP_DELIVERY={settings.OTP_DELIVERY!r}: no SMS provider yet")
+    try:
+        provider = dispatch.otp(challenge.phone, code)
+    except dispatch.SendError as e:
+        log.warning("OTP for %s not sent: %s", challenge.phone, e)
+        raise ApiError(502, "sms_not_sent", "Kod gönderilemedi. Biraz sonra tekrar dene.")
+    log.info("OTP for %s sent via %s (challenge %s)", challenge.phone, provider, challenge.pk)
 
 
 def request_code(phone: str, role: str, event, ip: str | None) -> OtpChallenge:

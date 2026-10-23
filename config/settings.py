@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "worker",     # face worker API, Worker (monitoring)
     "shop",       # Product, Purchase, payments (simulated until iyzico)
     "staff",      # staff data browser pages (/dj/staff/): no models
+    "notify",     # PushDevice, Notification (temporary send log); providers, the in-process sender
 ]
 
 AUTH_USER_MODEL = "accounts.User"   # must exist before the first migrate
@@ -170,7 +171,15 @@ OTP_TTL = 120               # seconds
 OTP_MAX_PER_15MIN = 3       # codes per phone
 OTP_MAX_ATTEMPTS = 5        # wrong codes per challenge
 OTP_RESEND_AFTER = 30       # seconds before another code may be requested
-OTP_DELIVERY = env("CP_OTP_DELIVERY", "log")   # "log": code goes to the log + OtpChallenge.dev_code, no SMS
+# --- Notifications (notify/, design/notifications.md)
+# "log": no SMS leaves the server (OTP codes: log + OtpChallenge.dev_code); "live": real providers (routing in
+# notify/providers). CP_OTP_DELIVERY is the old name of the same switch.
+SMS_DELIVERY = env("CP_SMS_DELIVERY", env("CP_OTP_DELIVERY", "log"))
+OTP_SMS_TEXT = "Cleverphotos kodun: {code}\n\n@{domain} #{code}"   # last line: browsers' one-tap code fill (WebOTP)
+SITE_DOMAIN = env("CP_SITE_DOMAIN", "cleverphotos.org")
+NOTIFY_SENDER = "thread"    # "thread": the in-process pool; "inline": send in the caller (tests)
+NOTIFY_THREADS = 4          # sender threads per process
+NOTIFY_KEEP_DAYS = 14       # the send log is temporary
 EVENT_LOOKUP_PER_MIN = 30   # public event lookups per IP
 CONTACT_PER_HOUR = 5        # contact form messages per IP per hour
 # Non-production only: this string is accepted as the code of any OTP challenge and as the password

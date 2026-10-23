@@ -158,7 +158,7 @@ class ApiClient(Client):
         return self.delete(path, **self.csrf_headers())
 
     def sign_in(self, phone: str, event_code: str | None = None, role: str | None = None):
-        """OTP sign-in through the API (code read from the challenge row: OTP_DELIVERY=log)."""
+        """OTP sign-in through the API (code read from the challenge row: SMS_DELIVERY=log)."""
         from accounts.models import OtpChallenge
         self.get("/api/auth/csrf")
         body = {"phoneNumber": phone}
