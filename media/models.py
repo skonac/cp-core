@@ -34,6 +34,9 @@ class Image(models.Model):
     kind = models.CharField(max_length=8, choices=Kind.choices, default=Kind.PHOTO)
     event = models.ForeignKey("events.Event", null=True, blank=True, on_delete=models.CASCADE, related_name="images")
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="images")
+    # Photos an uploader uploaded for the organizer (owner = the organizer, who pays): which access.
+    uploaded_by = models.ForeignKey("accounts.UploaderAccess", null=True, blank=True, on_delete=models.SET_NULL,
+                                    related_name="images")
     seq = models.PositiveIntegerField(null=True, blank=True)        # photos: 44 -> "00044"
     slot = models.CharField(max_length=10, choices=Slot.choices, blank=True)   # selfies only
 

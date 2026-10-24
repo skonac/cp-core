@@ -125,6 +125,36 @@ class OtpChallenge(models.Model):
         return f"{self.phone} {self.created_at:%Y-%m-%d %H:%M}"
 
 
+class UploaderAccess(models.Model):
+    """An organizer lets a phone number upload to their events: an uploader (cp-web's draft called it
+    "photographer"; that word is the future account role, is_photographer). Not an account: no User is
+    created for the phone; signing in
+    with it (organizer entry) gives a session that can only reach /api/uploader/…, where the
+    organizer's events are listed and photos uploaded on the organizer's credits. One phone may serve
+    several organizers. Revoking keeps the row (the photos it uploaded point to it)."""
+
+    class Status(models.TextChoices):
+        ACTIVE = "active"
+        REVOKED = "revoked"
+
+    organizer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                                  related_name="uploader_accesses")
+    phone = models.CharField(max_length=16, validators=[phone_validator])
+    full_name = models.CharField(max_length=150)              # as the organizer typed it
+    status = models.CharField(max_length=8, choices=Status.choices, default=Status.ACTIVE)
+    created_at = models.DateTimeField(default=timezone.now)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    last_login_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["organizer", "phone"], condition=models.Q(status="active"),
+                                               name="uploader_once_per_organizer")]
+        indexes = [models.Index(fields=["phone"], condition=models.Q(status="active"), name="uploader_phone")]
+
+    def __str__(self):
+        return f"{self.full_name} ({self.phone}) for {self.organizer_id}"
+
+
 class ConsentLog(models.Model):
     """One row per consent given: the legal record. Append-only (read-only in the admin).
     Kept when the account is deleted (user becomes NULL; phone and name are copies)."""

@@ -141,8 +141,9 @@ def _remove(paths):
 
 # ---------------------------------------------------------------------------- photos
 
-def ingest_photo(event: Event, uploader: User, data: bytes) -> Image:
-    """Validate, make renditions, charge the event owner 1 credit, store. All or nothing."""
+def ingest_photo(event: Event, uploader: User, data: bytes, uploaded_by=None) -> Image:
+    """Validate, make renditions, charge the event owner 1 credit, store. All or nothing.
+    uploaded_by: the UploaderAccess when an uploader uploads for the organizer (uploader = organizer)."""
     _check_size(data)
     if event.status == Event.Status.EXPIRED:
         raise IngestError("event_expired")
@@ -170,7 +171,7 @@ def ingest_photo(event: Event, uploader: User, data: bytes) -> Image:
             Event.objects.filter(pk=event.pk).update(next_seq=F("next_seq") + 1)
             # 3. Row + files. Any failure from here rolls back the credit and the number too.
             image = Image.objects.create(
-                event_id=event.pk, owner=uploader, seq=seq, sha256=sha, width=width, height=height,
+                event_id=event.pk, owner=uploader, uploaded_by=uploaded_by, seq=seq, sha256=sha, width=width, height=height,
                 bytes=len(master), taken_at=taken_at, exif=exif or None)
             for rendition, blob in (("m", master), ("d", display), ("t", thumb)):
                 written.append(write_file(image.relpath(rendition), blob))

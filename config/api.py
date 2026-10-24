@@ -10,6 +10,7 @@ from common.api import Out, envelope, make_api, respond
 from config import __version__
 from events.api import events_router, public_router
 from events.organizer_api import organizer_router
+from events.uploader_api import uploader_router
 from shop.api import billing_router, shop_router
 
 api = make_api(title="cp-core API", version=__version__,
@@ -22,6 +23,7 @@ api.add_router("/contact", contact_router)
 api.add_router("/public", public_router)
 api.add_router("/events", events_router)
 api.add_router("/organizer", organizer_router)
+api.add_router("/uploader", uploader_router)
 api.add_router("/shop", shop_router)
 api.add_router("/me/billing", billing_router)
 

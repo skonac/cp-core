@@ -45,10 +45,20 @@ class MembershipOut(Out):
     role: Literal["participant"]
 
 
+class UploaderAccessOut(Out):
+    id: str = Field(description="accessId in /api/uploader/accesses/{accessId}/…", examples=["12"])
+    organizerName: str = Field(examples=["Futuruniq"])
+    uploaderName: str = Field(description="The name the organizer gave this uploader.",
+                                  examples=["Mert Yılmaz"])
+
+
 class SignInOut(Out):
-    user: UserOut
-    nextStep: Literal["consent", "selfie", "gallery", "organizer_home", "account_home"] = Field(
-        description="consent/selfie/gallery: signed in from an event link; organizer_home/account_home: no event.")
+    user: UserOut = Field(description="For an uploader without an account: id is empty, no roles.")
+    nextStep: Literal["consent", "selfie", "gallery", "organizer_home", "account_home", "uploader_home"] = Field(
+        description="consent/selfie/gallery: signed in from an event link; organizer_home/account_home: no event; "
+                    "uploader_home: organizer entry by a phone an organizer added as uploader (§3.10).")
+    uploaderAccesses: list[UploaderAccessOut] = Field(
+        description="Organizers this phone may upload for (empty for most people).", examples=[[]])
     isNewUser: bool
     eventCode: str | None = Field(examples=["RK238"])
     eventMembership: MembershipOut | None

@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from accounts.schemas import UploaderAccessOut
 from common.api import Out, envelope
 
 EventType = Literal["wedding", "sports", "graduation", "corporate", "other"]
@@ -30,7 +31,8 @@ class OrganizerEventOut(Out):
     coverThumbnailUrl: str | None = Field(description="Uploaded cover, else the first photo; null when neither.",
                                           examples=["/api/organizer/events/RK238/cover/thumb.jpg"])
     coverIsUploaded: bool = Field(description="False: the cover shown is the first photo.")
-    joinUrl: str = Field(description="Link for participants (QR content).", examples=["https://cleverphotos.org/?event=RK238"])
+    joinUrl: str | None = Field(description="Link for participants (QR content); null in the uploader API.",
+                                examples=["https://cleverphotos.org/?event=RK238"])
     createdAt: str = Field(examples=["2026-10-19T08:30:00+00:00"])
 
 
@@ -99,6 +101,8 @@ class OrganizerPhotoOut(Out):
     takenAt: str | None = Field(examples=["2026-06-12T18:14:00+00:00"])
     uploadedAt: str = Field(examples=["2026-10-18T18:30:00+00:00"])
     errorCode: str | None = Field(examples=[None])
+    uploadedBy: str | None = Field(description="The uploader's name when an uploader uploaded it; "
+                                               "null = the organizer.", examples=[None])
 
 
 class PhotoCountsOut(Out):
@@ -118,6 +122,28 @@ class PhotoListOut(Out):
 class PhotoMutationOut(Out):
     affectedCount: int
     creditBalance: int
+
+
+class UploaderOut(Out):
+    id: str = Field(examples=["12"])
+    fullName: str = Field(examples=["Mert Yılmaz"])
+    phoneNumber: str = Field(examples=["+905550000001"])
+    status: Literal["active", "revoked"]
+    createdAt: str = Field(examples=["2026-10-20T09:00:00+00:00"])
+    lastLoginAt: str | None = Field(examples=[None])
+
+
+class UploaderListOut(Out):
+    uploaders: list[UploaderOut]
+    total: int
+
+
+class UploaderDataOut(Out):
+    uploader: UploaderOut
+
+
+class UploaderAccessesOut(Out):
+    accesses: list[UploaderAccessOut]
 
 
 class ParticipantOut(Out):
@@ -154,3 +180,14 @@ UploadBatchResponse = envelope("UploadBatchResponse", UploadBatchOut, "organizer
 PhotoListResponse = envelope("OrganizerPhotoListResponse", PhotoListOut, "organizer_photos_retrieved")
 PhotosDeletedResponse = envelope("OrganizerPhotosDeletedResponse", PhotoMutationOut, "organizer_photos_deleted")
 ParticipantListResponse = envelope("ParticipantListResponse", ParticipantListOut, "organizer_participants_retrieved")
+UploaderListResponse = envelope("UploaderListResponse", UploaderListOut, "organizer_uploaders_retrieved")
+UploaderResponse = envelope("UploaderResponse", UploaderDataOut, "organizer_uploader_created")
+UploaderRevokedResponse = envelope("UploaderRevokedResponse", UploaderDataOut, "organizer_uploader_revoked")
+
+# The uploader API (events/uploader_api.py): same shapes, own codes.
+UpAccessesResponse = envelope("UploaderAccessesResponse", UploaderAccessesOut, "uploader_accesses_retrieved")
+UpEventListResponse = envelope("UploaderEventListResponse", EventListOut, "uploader_events_retrieved")
+UpEventResponse = envelope("UploaderEventResponse", EventDataOut, "uploader_event_retrieved")
+UpUploadBatchResponse = envelope("UploaderUploadBatchResponse", UploadBatchOut, "uploader_photos_uploaded")
+UpPhotoListResponse = envelope("UploaderPhotoListResponse", PhotoListOut, "uploader_photos_retrieved")
+UpPhotosDeletedResponse = envelope("UploaderPhotosDeletedResponse", PhotoMutationOut, "uploader_photos_deleted")

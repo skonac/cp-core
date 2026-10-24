@@ -1,4 +1,5 @@
-"""Organizer API (/api/organizer/…): events, cover, uploads, photos, participants. Buying credits: shop/api.py.
+"""Organizer API (/api/organizer/…): events, cover, uploads, photos, participants, uploaders.
+Buying credits: shop/api.py. The uploaders' own side: events/uploader_api.py.
 For accounts with the organizer role (staff may open any event). Shapes and codes: docs/api.md §3.6.
 
 Events are addressed by their code. Credits: one per accepted photo, charged at upload
@@ -9,13 +10,14 @@ from datetime import date as Date
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count
+from django.utils import timezone
 from ninja import File, Form, Router
 from ninja.files import UploadedFile
 from ninja.security import django_auth
 from pydantic import Field
 
-from accounts.models import User
-from accounts.otp import mask_phone
+from accounts.models import UploaderAccess, User
+from accounts.otp import E164, mask_phone, normalize_phone
 from common.api import ApiError, CamelSchema, errors, file_doc, respond
 from media.ingest import IngestError, event_cover, ingest_cover, ingest_photo
 from media.matching import my_photos, selfie_states
@@ -93,7 +95,7 @@ def _balance(user) -> int:
     return User.objects.values_list("credit_balance", flat=True).get(pk=user.pk)
 
 
-def event_json(request, event: Event, stats: dict) -> dict:
+def event_json(request, event: Event, stats: dict, base: str = "/api/organizer/events", join_url: bool = True) -> dict:
     code = event.display_code
     uploaded = event.cover_image is not None and event.cover_image.deleted_at is None
     return {
@@ -104,9 +106,9 @@ def event_json(request, event: Event, stats: dict) -> dict:
         "photoCount": stats["total"], "processedPhotoCount": stats["done"],
         "pendingPhotoCount": stats["pending"] + stats["processing"], "failedPhotoCount": stats["failed"],
         "participantCount": stats["participants"],
-        "coverThumbnailUrl": f"/api/organizer/events/{code}/cover/thumb.jpg" if uploaded or stats["total"] else None,
+        "coverThumbnailUrl": f"{base}/{code}/cover/thumb.jpg" if uploaded or stats["total"] else None,
         "coverIsUploaded": uploaded,
-        "joinUrl": request.build_absolute_uri(f"/?event={code}"),
+        "joinUrl": request.build_absolute_uri(f"/?event={code}") if join_url else None,
         "createdAt": event.created_at.isoformat(),
     }
 
@@ -120,14 +122,15 @@ def _display_size(img: Image) -> tuple[int, int]:
     return round((img.width or 0) * scale), round((img.height or 0) * scale)
 
 
-def photo_json(event: Event, img: Image) -> dict:
-    base = f"/api/organizer/events/{event.display_code}/photos/{img.seq_str}"
+def photo_json(event: Event, img: Image, root: str = "/api/organizer/events") -> dict:
+    base = f"{root}/{event.display_code}/photos/{img.seq_str}"
     width, height = _display_size(img)
     return {"id": img.seq_str, "fileName": f"{img.seq_str}.jpg", "status": STATUS_OUT[img.status],
             "faceCount": img.num_faces, "thumbnailUrl": f"{base}/thumb.jpg", "displayUrl": f"{base}/display.jpg",
             "width": width, "height": height,
             "takenAt": img.taken_at.isoformat() if img.taken_at else None,
-            "uploadedAt": img.created_at.isoformat(), "errorCode": img.error or None}
+            "uploadedAt": img.created_at.isoformat(), "errorCode": img.error or None,
+            "uploadedBy": img.uploaded_by.full_name if img.uploaded_by_id else None}
 
 
 def _ingest_error(e: IngestError):
@@ -379,7 +382,7 @@ def list_photos(request, code: str, status: str = "", cursor: int = 0, limit: in
         photos = photos.filter(status=STATUS_IN[status])
     limit = max(1, min(limit, 500))
     total = photos.count()
-    page = list(photos.order_by("seq")[cursor:cursor + limit])
+    page = list(photos.select_related("uploaded_by").order_by("seq")[cursor:cursor + limit])
     return respond(request, "organizer_photos_retrieved", {
         "photos": [photo_json(event, p) for p in page], "total": total,
         "counts": {STATUS_OUT[s]: by_status.get(s, 0) for s in STATUS_OUT},
@@ -462,3 +465,63 @@ def participants(request, code: str):
                      "matchStatus": status, "matchedPhotoCount": matched})
     return respond(request, "organizer_participants_retrieved",
                    {"participants": rows, "total": len(rows), "counts": counts})
+
+
+# ---------------------------------------------------------------------------- uploaders
+
+def uploader_json(a: UploaderAccess) -> dict:
+    return {"id": str(a.pk), "fullName": a.full_name, "phoneNumber": a.phone, "status": a.status,
+            "createdAt": a.created_at.isoformat(),
+            "lastLoginAt": a.last_login_at.isoformat() if a.last_login_at else None}
+
+
+@organizer_router.get("/uploaders", response={200: S.UploaderListResponse, **errors(401, 403)})
+def list_uploaders(request):
+    """Phone numbers this organizer lets upload to their events, newest first (revoked ones too).
+
+    Errors: 403 organizer_access_required."""
+    user = _organizer(request)
+    rows = list(UploaderAccess.objects.filter(organizer=user).order_by("-created_at"))
+    return respond(request, "organizer_uploaders_retrieved",
+                   {"uploaders": [uploader_json(a) for a in rows], "total": len(rows)})
+
+
+class UploaderIn(CamelSchema):
+    full_name: str = Field(min_length=1, max_length=150)
+    phone_number: str
+
+
+@organizer_router.post("/uploaders", response={201: S.UploaderResponse, **errors(401, 403, 409, 422)})
+def add_uploader(request, data: UploaderIn):
+    """Let a phone number upload to all of this organizer's events (not expired), on this organizer's
+    credits. No account is created for it; the uploader signs in with the organizer entry.
+
+    Errors: 403 organizer_access_required · 409 uploader_already_exists (this phone is already an
+    active uploader of this organizer) · 422 invalid_phone_number, validation_error."""
+    user = _organizer(request)
+    phone, name = normalize_phone(data.phone_number), data.full_name.strip()
+    if not E164.match(phone):
+        raise ApiError(422, "invalid_phone_number", "Geçerli bir cep telefonu numarası gir (+90…).")
+    if not name:
+        raise ApiError(422, "validation_error", "Ad gerekli.", errors={"fullName": ["required"]})
+    if UploaderAccess.objects.filter(organizer=user, phone=phone, status=UploaderAccess.Status.ACTIVE).exists():
+        raise ApiError(409, "uploader_already_exists", "Bu telefon numarası zaten ekli.")
+    access = UploaderAccess.objects.create(organizer=user, phone=phone, full_name=name)
+    return respond(request, "organizer_uploader_created", {"uploader": uploader_json(access)}, status=201)
+
+
+@organizer_router.delete("/uploaders/{uploader_id}", response={200: S.UploaderRevokedResponse, **errors(401, 403, 404)})
+def revoke_uploader(request, uploader_id: str):
+    """Revoke: the phone can no longer upload for this organizer, at once (also in an open session).
+    The row stays (status `revoked`), with the photos it uploaded. Idempotent.
+
+    Errors: 403 organizer_access_required · 404 uploader_not_found."""
+    user = _organizer(request)
+    access = (UploaderAccess.objects.filter(organizer=user, pk=int(uploader_id)).first()
+              if uploader_id.isdigit() else None)
+    if access is None:
+        raise ApiError(404, "uploader_not_found", "Kayıt bulunamadı.")
+    if access.status == UploaderAccess.Status.ACTIVE:
+        access.status, access.revoked_at = UploaderAccess.Status.REVOKED, timezone.now()
+        access.save(update_fields=["status", "revoked_at"])
+    return respond(request, "organizer_uploader_revoked", {"uploader": uploader_json(access)})

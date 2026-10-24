@@ -4,7 +4,7 @@ from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.forms import AdminUserCreationForm, UserChangeForm
 from django.contrib.auth.models import Group
 
-from .models import ConsentLog, ContactMessage, OtpChallenge, User
+from .models import ConsentLog, ContactMessage, OtpChallenge, UploaderAccess, User
 
 
 class UserCreateForm(AdminUserCreationForm):
@@ -53,6 +53,14 @@ class OtpChallengeAdmin(admin.ModelAdmin):
     list_display = ("id", "phone", "dev_code", "role", "event", "created_at", "expires_at", "attempts", "consumed_at")
     search_fields = ("phone",)
     readonly_fields = [f.name for f in OtpChallenge._meta.fields]
+
+
+@admin.register(UploaderAccess)
+class UploaderAccessAdmin(admin.ModelAdmin):
+    list_display = ("id", "full_name", "phone", "organizer", "status", "created_at", "last_login_at")
+    list_filter = ("status",)
+    search_fields = ("phone", "full_name", "organizer__phone")
+    raw_id_fields = ("organizer",)
 
 
 @admin.register(ConsentLog)

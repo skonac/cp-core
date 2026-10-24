@@ -231,14 +231,9 @@
             }
           }
         },
-        "description": "The signed-in user. 401 authentication_required when signed out (use on app start).",
+        "description": "The signed-in user. 401 authentication_required when signed out (use on app start).\nAn uploader session without an account gets a user object with an empty `id` and no roles.",
         "tags": [
           "me"
-        ],
-        "security": [
-          {
-            "SessionAuth": []
-          }
         ]
       },
       "patch": {
@@ -3156,6 +3151,1005 @@
         ]
       }
     },
+    "/api/organizer/uploaders": {
+      "get": {
+        "operationId": "events_organizer_api_list_uploaders",
+        "summary": "List Uploaders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploaderListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          }
+        },
+        "description": "Phone numbers this organizer lets upload to their events, newest first (revoked ones too).\n\nErrors: 403 organizer_access_required.",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      },
+      "post": {
+        "operationId": "events_organizer_api_add_uploader",
+        "summary": "Add Uploader",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploaderResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error409"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "Let a phone number upload to all of this organizer's events (not expired), on this organizer's\ncredits. No account is created for it; the uploader signs in with the organizer entry.\n\nErrors: 403 organizer_access_required · 409 uploader_already_exists (this phone is already an\nactive uploader of this organizer) · 422 invalid_phone_number, validation_error.",
+        "tags": [
+          "organizer"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploaderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/uploaders/{uploader_id}": {
+      "delete": {
+        "operationId": "events_organizer_api_revoke_uploader",
+        "summary": "Revoke Uploader",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uploader_id",
+            "schema": {
+              "title": "Uploader Id",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploaderRevokedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          }
+        },
+        "description": "Revoke: the phone can no longer upload for this organizer, at once (also in an open session).\nThe row stays (status `revoked`), with the photos it uploaded. Idempotent.\n\nErrors: 403 organizer_access_required · 404 uploader_not_found.",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/uploader/accesses": {
+      "get": {
+        "operationId": "events_uploader_api_accesses",
+        "summary": "Accesses",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploaderAccessesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          }
+        },
+        "description": "Organizers this phone may upload for. Errors: 401 authentication_required.",
+        "tags": [
+          "uploader"
+        ],
+        "security": [
+          {
+            "UploaderSession": []
+          }
+        ]
+      }
+    },
+    "/api/uploader/accesses/{access_id}/events": {
+      "get": {
+        "operationId": "events_uploader_api_list_events",
+        "summary": "List Events",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "access_id",
+            "schema": {
+              "title": "Access Id",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploaderEventListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          }
+        },
+        "description": "The organizer's events that are not expired, newest first (`joinUrl` is null here).\n\nErrors: 404 uploader_access_not_found (not this phone's, or revoked).",
+        "tags": [
+          "uploader"
+        ],
+        "security": [
+          {
+            "UploaderSession": []
+          }
+        ]
+      }
+    },
+    "/api/uploader/accesses/{access_id}/events/{code}": {
+      "get": {
+        "operationId": "events_uploader_api_get_event",
+        "summary": "Get Event",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "access_id",
+            "schema": {
+              "title": "Access Id",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploaderEventResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          }
+        },
+        "description": "One event. Errors: 404 uploader_access_not_found, event_not_found (also when expired).",
+        "tags": [
+          "uploader"
+        ],
+        "security": [
+          {
+            "UploaderSession": []
+          }
+        ]
+      }
+    },
+    "/api/uploader/accesses/{access_id}/events/{code}/cover/thumb.jpg": {
+      "get": {
+        "operationId": "events_uploader_api_cover_thumb",
+        "summary": "Cover Thumb",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "access_id",
+            "schema": {
+              "title": "Access Id",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Cover ~400 px (uploaded cover, else the first photo)",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "uploader"
+        ],
+        "security": [
+          {
+            "UploaderSession": []
+          }
+        ]
+      }
+    },
+    "/api/uploader/accesses/{access_id}/events/{code}/photo-upload-check": {
+      "post": {
+        "operationId": "events_uploader_api_upload_check",
+        "summary": "Upload Check",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "access_id",
+            "schema": {
+              "title": "Access Id",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadCheckResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "Does the organizer's balance cover `photoCount` photos? As in the organizer API.\n\nErrors: 404 uploader_access_not_found, event_not_found.",
+        "tags": [
+          "uploader"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "UploaderSession": []
+          }
+        ]
+      }
+    },
+    "/api/uploader/accesses/{access_id}/events/{code}/photos": {
+      "post": {
+        "operationId": "events_uploader_api_upload_photos",
+        "summary": "Upload Photos",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "access_id",
+            "schema": {
+              "title": "Access Id",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploaderUploadBatchResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "As the organizer upload (max 20 files, 60 MB per request, per-file results); 1 credit per accepted\nphoto from the organizer's balance. The photos belong to the organizer.\n\nErrors: 404 uploader_access_not_found, event_not_found · 410 event_expired · 422 too_many_files, validation_error.",
+        "tags": [
+          "uploader"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "files": {
+                    "items": {
+                      "format": "binary",
+                      "type": "string"
+                    },
+                    "title": "Files",
+                    "type": "array"
+                  },
+                  "clientIds": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "title": "Clientids",
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "files"
+                ],
+                "title": "MultiPartBodyParams",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "UploaderSession": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "events_uploader_api_list_photos",
+        "summary": "List Photos",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "access_id",
+            "schema": {
+              "title": "Access Id",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "default": "",
+              "title": "Status",
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "default": 0,
+              "title": "Cursor",
+              "type": "integer"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploaderPhotoListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "The photos this phone uploaded to the event, upload order; `counts` covers those too.\n`status` filter: queued, processing, ready, failed.\n\nErrors: 404 uploader_access_not_found, event_not_found · 422 validation_error (bad status).",
+        "tags": [
+          "uploader"
+        ],
+        "security": [
+          {
+            "UploaderSession": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "events_uploader_api_delete_photos",
+        "summary": "Delete Photos",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "access_id",
+            "schema": {
+              "title": "Access Id",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploaderPhotosDeletedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "{\"photoIds\": [...]}: deletes those of the photos this phone uploaded; others are skipped.\nNo refund. Errors: 404 uploader_access_not_found, event_not_found.",
+        "tags": [
+          "uploader"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoIdsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "UploaderSession": []
+          }
+        ]
+      }
+    },
+    "/api/uploader/accesses/{access_id}/events/{code}/photos/{photo_id}/thumb.jpg": {
+      "get": {
+        "operationId": "events_uploader_api_photo_thumb",
+        "summary": "Photo Thumb",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "access_id",
+            "schema": {
+              "title": "Access Id",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "schema": {
+              "title": "Photo Id",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "~400 px",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "uploader"
+        ],
+        "security": [
+          {
+            "UploaderSession": []
+          }
+        ]
+      }
+    },
+    "/api/uploader/accesses/{access_id}/events/{code}/photos/{photo_id}/display.jpg": {
+      "get": {
+        "operationId": "events_uploader_api_photo_display",
+        "summary": "Photo Display",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "access_id",
+            "schema": {
+              "title": "Access Id",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "schema": {
+              "title": "Photo Id",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "~1600 px",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "uploader"
+        ],
+        "security": [
+          {
+            "UploaderSession": []
+          }
+        ]
+      }
+    },
     "/api/shop/products": {
       "get": {
         "operationId": "shop_api_products",
@@ -4299,19 +5293,32 @@
         "additionalProperties": false,
         "properties": {
           "user": {
-            "$ref": "#/components/schemas/UserOut"
+            "$ref": "#/components/schemas/UserOut",
+            "description": "For an uploader without an account: id is empty, no roles."
           },
           "nextStep": {
-            "description": "consent/selfie/gallery: signed in from an event link; organizer_home/account_home: no event.",
+            "description": "consent/selfie/gallery: signed in from an event link; organizer_home/account_home: no event; uploader_home: organizer entry by a phone an organizer added as uploader (§3.10).",
             "enum": [
               "consent",
               "selfie",
               "gallery",
               "organizer_home",
-              "account_home"
+              "account_home",
+              "uploader_home"
             ],
             "title": "Nextstep",
             "type": "string"
+          },
+          "uploaderAccesses": {
+            "description": "Organizers this phone may upload for (empty for most people).",
+            "examples": [
+              []
+            ],
+            "items": {
+              "$ref": "#/components/schemas/UploaderAccessOut"
+            },
+            "title": "Uploaderaccesses",
+            "type": "array"
           },
           "isNewUser": {
             "title": "Isnewuser",
@@ -4345,6 +5352,7 @@
         "required": [
           "user",
           "nextStep",
+          "uploaderAccesses",
           "isNewUser",
           "eventCode",
           "eventMembership"
@@ -4390,6 +5398,41 @@
           "requestId"
         ],
         "title": "SignInResponse",
+        "type": "object"
+      },
+      "UploaderAccessOut": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "accessId in /api/uploader/accesses/{accessId}/…",
+            "examples": [
+              "12"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "organizerName": {
+            "examples": [
+              "Futuruniq"
+            ],
+            "title": "Organizername",
+            "type": "string"
+          },
+          "uploaderName": {
+            "description": "The name the organizer gave this uploader.",
+            "examples": [
+              "Mert Yılmaz"
+            ],
+            "title": "Uploadername",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "organizerName",
+          "uploaderName"
+        ],
+        "title": "UploaderAccessOut",
         "type": "object"
       },
       "UserOut": {
@@ -6580,12 +7623,19 @@
             "type": "boolean"
           },
           "joinUrl": {
-            "description": "Link for participants (QR content).",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Link for participants (QR content); null in the uploader API.",
             "examples": [
               "https://cleverphotos.org/?event=RK238"
             ],
-            "title": "Joinurl",
-            "type": "string"
+            "title": "Joinurl"
           },
           "createdAt": {
             "examples": [
@@ -7438,6 +8488,21 @@
               null
             ],
             "title": "Errorcode"
+          },
+          "uploadedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The uploader's name when an uploader uploaded it; null = the organizer.",
+            "examples": [
+              null
+            ],
+            "title": "Uploadedby"
           }
         },
         "required": [
@@ -7451,7 +8516,8 @@
           "height",
           "takenAt",
           "uploadedAt",
-          "errorCode"
+          "errorCode",
+          "uploadedBy"
         ],
         "title": "OrganizerPhotoOut",
         "type": "object"
@@ -7774,6 +8840,503 @@
           "matchedPhotoCount"
         ],
         "title": "ParticipantOut",
+        "type": "object"
+      },
+      "UploaderListOut": {
+        "additionalProperties": false,
+        "properties": {
+          "uploaders": {
+            "items": {
+              "$ref": "#/components/schemas/UploaderOut"
+            },
+            "title": "Uploaders",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "uploaders",
+          "total"
+        ],
+        "title": "UploaderListOut",
+        "type": "object"
+      },
+      "UploaderListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_uploaders_retrieved",
+            "default": "organizer_uploaders_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploaderListOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "UploaderListResponse",
+        "type": "object"
+      },
+      "UploaderOut": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "examples": [
+              "12"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "fullName": {
+            "examples": [
+              "Mert Yılmaz"
+            ],
+            "title": "Fullname",
+            "type": "string"
+          },
+          "phoneNumber": {
+            "examples": [
+              "+905550000001"
+            ],
+            "title": "Phonenumber",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "createdAt": {
+            "examples": [
+              "2026-10-20T09:00:00+00:00"
+            ],
+            "title": "Createdat",
+            "type": "string"
+          },
+          "lastLoginAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "examples": [
+              null
+            ],
+            "title": "Lastloginat"
+          }
+        },
+        "required": [
+          "id",
+          "fullName",
+          "phoneNumber",
+          "status",
+          "createdAt",
+          "lastLoginAt"
+        ],
+        "title": "UploaderOut",
+        "type": "object"
+      },
+      "UploaderDataOut": {
+        "additionalProperties": false,
+        "properties": {
+          "uploader": {
+            "$ref": "#/components/schemas/UploaderOut"
+          }
+        },
+        "required": [
+          "uploader"
+        ],
+        "title": "UploaderDataOut",
+        "type": "object"
+      },
+      "UploaderResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_uploader_created",
+            "default": "organizer_uploader_created",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploaderDataOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "UploaderResponse",
+        "type": "object"
+      },
+      "UploaderIn": {
+        "properties": {
+          "fullName": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Fullname",
+            "type": "string"
+          },
+          "phoneNumber": {
+            "title": "Phonenumber",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fullName",
+          "phoneNumber"
+        ],
+        "title": "UploaderIn",
+        "type": "object"
+      },
+      "UploaderRevokedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_uploader_revoked",
+            "default": "organizer_uploader_revoked",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploaderDataOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "UploaderRevokedResponse",
+        "type": "object"
+      },
+      "UploaderAccessesOut": {
+        "additionalProperties": false,
+        "properties": {
+          "accesses": {
+            "items": {
+              "$ref": "#/components/schemas/UploaderAccessOut"
+            },
+            "title": "Accesses",
+            "type": "array"
+          }
+        },
+        "required": [
+          "accesses"
+        ],
+        "title": "UploaderAccessesOut",
+        "type": "object"
+      },
+      "UploaderAccessesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "uploader_accesses_retrieved",
+            "default": "uploader_accesses_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploaderAccessesOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "UploaderAccessesResponse",
+        "type": "object"
+      },
+      "UploaderEventListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "uploader_events_retrieved",
+            "default": "uploader_events_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EventListOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "UploaderEventListResponse",
+        "type": "object"
+      },
+      "UploaderEventResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "uploader_event_retrieved",
+            "default": "uploader_event_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EventDataOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "UploaderEventResponse",
+        "type": "object"
+      },
+      "UploaderUploadBatchResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "uploader_photos_uploaded",
+            "default": "uploader_photos_uploaded",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploadBatchOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "UploaderUploadBatchResponse",
+        "type": "object"
+      },
+      "UploaderPhotoListResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "uploader_photos_retrieved",
+            "default": "uploader_photos_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PhotoListOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "UploaderPhotoListResponse",
+        "type": "object"
+      },
+      "UploaderPhotosDeletedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "uploader_photos_deleted",
+            "default": "uploader_photos_deleted",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PhotoMutationOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "UploaderPhotosDeletedResponse",
         "type": "object"
       },
       "CatalogOut": {
@@ -8654,6 +10217,11 @@
     },
     "securitySchemes": {
       "SessionAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sessionid"
+      },
+      "UploaderSession": {
         "type": "apiKey",
         "in": "cookie",
         "name": "sessionid"

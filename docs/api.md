@@ -8,7 +8,7 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-23 · API version 0.5 (OTP: `502 sms_not_sent`; "not me": `matchedFace` and face rejections §3.5; 0.4: contact form §3.9; 0.3: shop with iyzico §3.7, ÖBF + MSS sales documents, KVKK as HTML §3.3)
+Last updated: 2026-10-24 · API version 0.6 (uploaders §3.10; 0.5: OTP `502 sms_not_sent`, "not me": `matchedFace` and face rejections §3.5; 0.4: contact form §3.9; 0.3: shop with iyzico §3.7, ÖBF + MSS sales documents, KVKK as HTML §3.3)
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then the
 > "Changes from cp-web's draft contract" section, which lists every place where this API
@@ -20,6 +20,11 @@ Last updated: 2026-10-23 · API version 0.5 (OTP: `502 sms_not_sent`; "not me": 
 > the two sales documents: checkboxes + popups from `GET /api/shop/obf` / `GET /api/shop/mss`, and `documentsVersion`,
 > `acceptedObf`, `acceptedMss` in `POST /api/shop/purchases`; each purchase has `documentsUrl` (§3.7). These HTML pages
 > may be shown in an `iframe` (same origin).
+>
+> **Changed on 2026-10-24:** uploaders (§3.10, and §5c for the differences from `docs/api/organizer-photographers.md`;
+> what cp-web calls "photographer" there is an **uploader** here, see P0):
+> `nextStep: "uploader_home"` and `uploaderAccesses` in the OTP verification, `/api/organizer/uploaders`,
+> `/api/uploader/…`; organizer photos have `uploadedBy`.
 >
 > **Changed on 2026-10-22:** every gallery photo has `matchedFace` (the user's face in it: `faceId`, normalized `bbox` and
 > `landmarks`, `score`) to draw a frame, and "not me" is `POST …/photos/{photoId}/face-rejections {faceId}`, undo with
@@ -163,6 +168,7 @@ The event context comes from the challenge; `eventCode` in this body is not need
 | `selfie` | Event context; consent given, no usable selfie → selfie screen |
 | `gallery` | Event context; ready → event gallery |
 | `organizer_home` | No event context; the account is an organizer |
+| `uploader_home` | Organizer entry by a phone an organizer added as uploader (and not an organizer itself): `/uploader`, §3.10 |
 | `account_home` | No event context; anyone else |
 
 Errors: `422 invalid_otp` (wrong code, unknown or already used challenge), `410 otp_expired`,
@@ -608,6 +614,49 @@ a filled one is answered like a success but not stored.
 Errors: `422 validation_error` with `errors` per field (`name`, `email`, `subject`, `message`, `privacyNoticeAccepted`),
 `429 rate_limit_exceeded`.
 
+### 3.10 Uploaders
+
+An organizer can let other phone numbers upload photos to their events: an **uploader**. Not to be confused with the
+`photographer` account role (`accountRoles`), which is reserved for independent photographers with their own account
+(later). An uploader is **not an account**:
+signing in with that phone through the organizer entry creates no user and adds no role; the session can only use
+`/api/uploader/…`. One phone may work for several organizers. Credits come from the organizer; the photos belong to
+the organizer. Access covers all of the organizer's events that are not expired.
+
+**Organizer side** (organizer role, like §3.6):
+
+- **`GET /api/organizer/uploaders`** → `200 organizer_uploaders_retrieved` `{ uploaders: [uploader…], total }`,
+  newest first, revoked ones too. Uploader: `{ id, fullName, phoneNumber, status: "active"|"revoked", createdAt, lastLoginAt }`.
+- **`POST /api/organizer/uploaders`** `{ "fullName": "Mert Yılmaz", "phoneNumber": "+905550000001" }` →
+  `201 organizer_uploader_created` `{ uploader }`. Errors: `409 uploader_already_exists` (already an active
+  uploader of this organizer), `422 invalid_phone_number`, `422 validation_error`.
+- **`DELETE /api/organizer/uploaders/{id}`** → `200 organizer_uploader_revoked` `{ uploader }` (status `revoked`;
+  takes effect at once, also in an open session). `404 uploader_not_found`.
+- Organizer photo objects (§3.6) have **`uploadedBy`**: the uploader's name, or `null` for the organizer's own uploads.
+
+**Sign-in.** The uploader uses the organizer entry (`role: "organizer"`). The OTP verification answers
+`nextStep: "uploader_home"` with `uploaderAccesses: [{ id, organizerName, uploaderName }]`. Without an account
+the `user` object has `"id": ""`, `fullName` = the name the organizer gave, no roles, no consent, no selfie; `GET /api/me`
+returns the same while the session lasts. A phone that already has an account (say a former wedding guest) is simply
+signed in as that account (no organizer role added), with the same `nextStep`. An organizer account whose phone is also
+someone's uploader gets `organizer_home`, and `uploaderAccesses` lists the other organizers (offer a switch).
+`uploaderAccesses` is in every OTP verification answer, usually `[]`. Sign out: `DELETE /api/auth/session`.
+
+**Uploader side** (session cookie + `X-CSRFToken` like everything else; `401` without a session):
+
+| Endpoint | Code | Notes |
+| --- | --- | --- |
+| `GET /api/uploader/accesses` | `uploader_accesses_retrieved` | `{ accesses: [{ id, organizerName, uploaderName }] }` |
+| `GET …/accesses/{accessId}/events` | `uploader_events_retrieved` | `{ events, total }`: the organizer's events, not expired; event object of §3.6 with `joinUrl: null` |
+| `GET …/accesses/{accessId}/events/{code}` | `uploader_event_retrieved` | `{ event }`; cover at `…/events/{code}/cover/thumb.jpg` |
+| `POST …/events/{code}/photo-upload-check` | `photo_upload_eligibility_checked` | as §3.6, the organizer's balance |
+| `POST …/events/{code}/photos` | `uploader_photos_uploaded` | as §3.6 (`200`, ≤ 20 files, ≤ 60 MB, per-file results) |
+| `GET …/events/{code}/photos` | `uploader_photos_retrieved` | **only the photos this phone uploaded**; `counts` too; files `…/photos/{photoId}/thumb.jpg`, `display.jpg` |
+| `DELETE …/events/{code}/photos` | `uploader_photos_deleted` | `{ photoIds }`; only its own photos, others skipped |
+
+`…` = `/api/uploader`. Errors: `404 uploader_access_not_found` (not this phone's, or revoked: go back to the
+organizer list), `404 event_not_found`, `410 event_expired`, `422` as in §3.6, `403 csrf_failed`.
+
 ## 4. Flows
 
 **Guest via QR** (`/…?event=RK238` in cp-web):
@@ -673,6 +722,19 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 | O12 | `POST /api/organizer/credit-purchases {packageId, pricingVersion}` → `{purchase, availableCredits}`, paid at once | `POST /api/shop/purchases {productId, pricingVersion}` → `201 purchase_started` `{purchase, paymentPageUrl, creditBalance}`: with iyzico the purchase is `pending` and the browser goes to `paymentPageUrl`, then comes back to `/organizer/credits?purchase=<id>&status=…`; read it with `GET /api/shop/purchases/{id}`. Simulated: `paid`, `paymentPageUrl` null | Change the URL; `packageId` → `productId`; redirect to `paymentPageUrl` when set; result handling on `/organizer/credits` |
 | O13 | Cover: only at create, max 8 MB | Also `POST …/cover` / `DELETE …/cover` any time; cover URL is same-origin | — |
 | O14 | Plain `fetch` for POST/PUT/DELETE in `organizer-service.ts` | Every unsafe request needs `X-CSRFToken` | Use `apiMutation` for all of them (today they fail with `403 csrf_failed`) |
+
+### 5c. Uploaders vs cp-web's draft (`docs/api/organizer-photographers.md`, 2026-10-22)
+
+| # | Draft (cp-web) | cp-core | Action in cp-web |
+| --- | --- | --- | --- |
+| P0 | "Photographer": `/api/organizer/photographers`, `/api/photographer/…`, `photographer_home`, `photographerAccesses`, `photographerName`, `{photographer}`/`{photographers}`, codes `*photographer*` | **Uploader** everywhere: `/api/organizer/uploaders`, `/api/uploader/…`, `uploader_home`, `uploaderAccesses`, `uploaderName`, `{uploader}`/`{uploaders}`, codes `*uploader*` (e.g. `uploader_already_exists`, `uploader_access_not_found`). "Photographer" stays the future account role | Rename paths, types, routes (`/photographer` → `/uploader`), mocks and docs (`organizer-photographers.md`); the Turkish UI label is Ozgur's choice |
+| P1 | Uploader endpoints by `eventId` | The event code, as everywhere (`id` = code) | — |
+| P2 | Photo list / delete over all event photos (mocks) | Only the photos uploaded with this phone, for this organizer | Expect a shorter list; the organizer still sees everything (with `uploadedBy`) |
+| P3 | Upload answers `201` (mock) | `200`, like the organizer upload | Check `response.ok`, not `201` |
+| P4 | `user` for an uploader = the mock profile | `id: ""` when the phone has no account; real user object when it has one | Don't key anything on `user.id` in the uploader area |
+| P5 | Any phone with accesses → `uploader_home` | Organizer accounts get `organizer_home` (with `uploaderAccesses`) | Offer "upload for another organizer" when `uploaderAccesses` is not empty |
+| P6 | Unknown/revoked access | `404 uploader_access_not_found` | Back to `/uploader` |
+| P7 | Cover URL under `/api/organizer/…` | `…/accesses/{accessId}/events/{code}/cover/thumb.jpg` | Use `coverThumbnailUrl` as given |
 
 ## 6. Not yet in this API
 

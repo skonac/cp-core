@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
 from django.http import FileResponse, HttpResponse
-from django.middleware.csrf import get_token
+from django.middleware.csrf import get_token, rotate_token
 from ninja import File, Form, Router
 from ninja.files import UploadedFile
 from ninja.security import django_auth
@@ -24,7 +24,7 @@ from media.matching import my_photos, selfie_state
 from media.models import Image
 from media.storage import file_response, soft_delete
 
-from . import kvkk
+from . import kvkk, uploader
 from . import schemas as S
 from .models import ContactMessage, User
 from .otp import mask_phone, request_code, verify_code
@@ -117,12 +117,26 @@ def otp_verify(request, body: OtpVerifyIn):
     """Checks the code; signs in, or creates the account. Sets the session cookie. Follow `nextStep`.
 
     Errors: 410 otp_expired · 422 invalid_otp, validation_error · 429 rate_limit_exceeded (5 wrong codes)."""
-    user, is_new, event = verify_code(body.challenge_id, body.code)
-    login(request, user, backend="django.contrib.auth.backends.ModelBackend")   # sets sessionid, rotates csrftoken
+    user, is_new, event, uploader_phone = verify_code(body.challenge_id, body.code)
+    if user is not None:
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")   # sets sessionid, rotates csrftoken
+    else:   # uploader without an account: a session holding only the verified phone
+        request.session.cycle_key()
+        rotate_token(request)
+    request.session.pop(uploader.SESSION_KEY, None)   # never inherit another phone's uploader rights
+    accesses = list(uploader.active_accesses(uploader_phone or user.phone))
+    if uploader_phone:
+        request.session[uploader.SESSION_KEY] = uploader_phone
+        return respond(request, "phone_verified", {
+            "user": user_json(user) if user else uploader.uploader_user_json(uploader_phone, accesses),
+            "nextStep": "uploader_home", "isNewUser": False, "eventCode": None, "eventMembership": None,
+            "uploaderAccesses": [uploader.access_json(a) for a in accesses],
+        }, message="Telefon numarası doğrulandı.")
     return respond(request, "phone_verified", {
         "user": user_json(user), "nextStep": next_step(user, event), "isNewUser": is_new,
         "eventCode": event.display_code if event else None,
         "eventMembership": {"eventCode": event.display_code, "role": "participant"} if event else None,
+        "uploaderAccesses": [uploader.access_json(a) for a in accesses],
     }, message="Telefon numarası doğrulandı.")
 
 
@@ -161,10 +175,17 @@ class ConsentIn(CamelSchema):
     locale: str = "tr"    # the language shown: tr | en
 
 
-@me_router.get("", response={200: S.ProfileResponse, **errors(401)})
+@me_router.get("", auth=None, response={200: S.ProfileResponse, **errors(401)})
 def me(request):
-    """The signed-in user. 401 authentication_required when signed out (use on app start)."""
-    return respond(request, "profile_retrieved", user_json(request.user))
+    """The signed-in user. 401 authentication_required when signed out (use on app start).
+    An uploader session without an account gets a user object with an empty `id` and no roles."""
+    if request.user.is_authenticated:
+        return respond(request, "profile_retrieved", user_json(request.user))
+    phone = request.session.get(uploader.SESSION_KEY, "")
+    accesses = list(uploader.active_accesses(phone)) if phone else []
+    if not accesses:
+        raise ApiError(401, "authentication_required", "Sign in required.")
+    return respond(request, "profile_retrieved", uploader.uploader_user_json(phone, accesses))
 
 
 @me_router.patch("", response={200: S.ProfileUpdatedResponse, **errors(401, 403, 409, 422)})

@@ -19,7 +19,7 @@ from django.utils import timezone
 from common.api import ApiError
 from notify import dispatch
 
-from .models import OtpChallenge, Role, User
+from .models import OtpChallenge, UploaderAccess, Role, User
 
 log = logging.getLogger("cp.otp")
 E164 = re.compile(r"^\+[1-9]\d{6,14}$")
@@ -80,10 +80,21 @@ def is_master_pass(value) -> bool:
     return False
 
 
+def is_uploader_sign_in(challenge: OtpChallenge, user) -> bool:
+    """Organizer entry (no event) by a phone some organizer added as uploader, and not an organizer
+    account itself: an uploader session, no account created, no role added."""
+    return (challenge.role == Role.ORGANIZER and challenge.event_id is None
+            and not (user and (user.is_organizer or user.is_staff))
+            and UploaderAccess.objects.filter(phone=challenge.phone, status=UploaderAccess.Status.ACTIVE).exists())
+
+
 def verify_code(challenge_id: str, code: str):
-    """-> (user, is_new_user, event or None). Raises ApiError on any failure."""
+    """-> (user or None, is_new_user, event or None, uploader phone or "").
+    An uploader sign-in (is_uploader_sign_in) creates no account and adds no role: user is the
+    phone's existing account or None. Raises ApiError on any failure."""
     now = timezone.now()
     failure = None
+    uploader_phone, is_new, event = "", False, None
     with transaction.atomic():
         challenge = OtpChallenge.objects.select_for_update().filter(pk=challenge_id).first()
         if challenge is None or challenge.consumed_at:
@@ -101,15 +112,20 @@ def verify_code(challenge_id: str, code: str):
             challenge.consumed_at = now
             challenge.save(update_fields=["consumed_at"])
             user = User.objects.filter(phone=challenge.phone).first()
-            is_new = user is None
-            if is_new:
-                user = User.objects.create_user(challenge.phone)
-            role_flag = {"participant": "is_participant", "organizer": "is_organizer",
-                         "photographer": "is_photographer"}[challenge.role]
-            setattr(user, role_flag, True)
-            user.phone_verified_at = user.phone_verified_at or now
-            user.save(update_fields=[role_flag, "phone_verified_at"])
-            event = challenge.event
+            if is_uploader_sign_in(challenge, user):
+                uploader_phone = challenge.phone
+                UploaderAccess.objects.filter(phone=challenge.phone, status=UploaderAccess.Status.ACTIVE) \
+                    .update(last_login_at=now)
+            else:
+                is_new = user is None
+                if is_new:
+                    user = User.objects.create_user(challenge.phone)
+                role_flag = {"participant": "is_participant", "organizer": "is_organizer",
+                             "photographer": "is_photographer"}[challenge.role]
+                setattr(user, role_flag, True)
+                user.phone_verified_at = user.phone_verified_at or now
+                user.save(update_fields=[role_flag, "phone_verified_at"])
+                event = challenge.event
     if failure:
         raise failure
     if event is not None:
@@ -117,4 +133,4 @@ def verify_code(challenge_id: str, code: str):
         touch_membership(user, event)
     # Housekeeping hooked to a frequent event instead of a cron job: old challenges go.
     OtpChallenge.objects.filter(created_at__lt=now - timedelta(hours=24)).delete()
-    return user, is_new, event
+    return user, is_new, event, uploader_phone

@@ -128,7 +128,7 @@ class MasterPassTest(TestCase):
         from django.contrib.auth import authenticate
 
         from accounts.otp import verify_code
-        user, is_new, _ = verify_code(self._challenge().pk, "12345")
+        user, is_new, _, _ = verify_code(self._challenge().pk, "12345")
         self.assertEqual((user, is_new), (self.user, False))
         self.assertEqual(authenticate(username="+905550000077", password="12345"), self.user)
         self.assertEqual(authenticate(username="+905550000077", password="own-password"), self.user)
