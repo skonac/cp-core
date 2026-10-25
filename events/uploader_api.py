@@ -1,6 +1,6 @@
 """Uploader API (/api/uploader/…): a phone an organizer added as uploader
-(accounts.UploaderAccess) lists that organizer's events and uploads photos on the organizer's
-credits. Nothing else: no event settings, participants, credits, shop or uploader management.
+(accounts.UploaderAccess) lists the organizer's events it is assigned to and uploads photos to them
+on the organizer's credits. Nothing else: no event settings, participants, credits, shop or uploader management.
 Shapes are the organizer API's (docs/api.md §3.10); an uploader sees and deletes only the photos
 uploaded with their phone. Every request re-checks the access, so a revoke takes effect at once.
 
@@ -55,7 +55,8 @@ def _root(access: UploaderAccess) -> str:
 
 
 def _events(access: UploaderAccess):
-    return (Event.objects.filter(owner=access.organizer).exclude(status=Event.Status.EXPIRED)
+    """The events this uploader is assigned to, not expired."""
+    return (access.events.filter(owner=access.organizer_id).exclude(status=Event.Status.EXPIRED)
             .select_related("cover_image"))
 
 

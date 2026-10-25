@@ -124,11 +124,18 @@ class PhotoMutationOut(Out):
     creditBalance: int
 
 
+class UploaderEventOut(Out):
+    code: str = Field(examples=["RK238"])
+    name: str = Field(examples=["Derya & Can"])
+    status: EventStatus = Field(description="An expired event no longer counts for the uploader.")
+
+
 class UploaderOut(Out):
     id: str = Field(examples=["12"])
     fullName: str = Field(examples=["Mert Yılmaz"])
     phoneNumber: str = Field(examples=["+905550000001"])
     status: Literal["active", "revoked"]
+    events: list[UploaderEventOut] = Field(description="The events it may upload to (by date).")
     createdAt: str = Field(examples=["2026-10-20T09:00:00+00:00"])
     lastLoginAt: str | None = Field(examples=[None])
 
@@ -182,6 +189,7 @@ PhotosDeletedResponse = envelope("OrganizerPhotosDeletedResponse", PhotoMutation
 ParticipantListResponse = envelope("ParticipantListResponse", ParticipantListOut, "organizer_participants_retrieved")
 UploaderListResponse = envelope("UploaderListResponse", UploaderListOut, "organizer_uploaders_retrieved")
 UploaderResponse = envelope("UploaderResponse", UploaderDataOut, "organizer_uploader_created")
+UploaderUpdatedResponse = envelope("UploaderUpdatedResponse", UploaderDataOut, "organizer_uploader_updated")
 UploaderRevokedResponse = envelope("UploaderRevokedResponse", UploaderDataOut, "organizer_uploader_revoked")
 
 # The uploader API (events/uploader_api.py): same shapes, own codes.

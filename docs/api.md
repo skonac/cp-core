@@ -8,7 +8,7 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-24 · API version 0.6 (uploaders §3.10; 0.5: OTP `502 sms_not_sent`, "not me": `matchedFace` and face rejections §3.5; 0.4: contact form §3.9; 0.3: shop with iyzico §3.7, ÖBF + MSS sales documents, KVKK as HTML §3.3)
+Last updated: 2026-10-25 · API version 0.7 (uploaders per event §3.10; 0.6: uploaders; 0.5: OTP `502 sms_not_sent`, "not me": `matchedFace` and face rejections §3.5; 0.4: contact form §3.9; 0.3: shop with iyzico §3.7, ÖBF + MSS sales documents, KVKK as HTML §3.3)
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then the
 > "Changes from cp-web's draft contract" section, which lists every place where this API
@@ -20,6 +20,9 @@ Last updated: 2026-10-24 · API version 0.6 (uploaders §3.10; 0.5: OTP `502 sms
 > the two sales documents: checkboxes + popups from `GET /api/shop/obf` / `GET /api/shop/mss`, and `documentsVersion`,
 > `acceptedObf`, `acceptedMss` in `POST /api/shop/purchases`; each purchase has `documentsUrl` (§3.7). These HTML pages
 > may be shown in an `iframe` (same origin).
+>
+> **Changed on 2026-10-25:** uploaders are assigned to **events**, not to all of the organizer's events: `eventCodes` when
+> adding one, `PATCH /api/organizer/uploaders/{id}` to change them, `events` in the uploader object, `?event=` filter (§3.10, §5c P8).
 >
 > **Changed on 2026-10-24:** uploaders (§3.10, and §5c for the differences from `docs/api/organizer-photographers.md`;
 > what cp-web calls "photographer" there is an **uploader** here, see P0):
@@ -621,15 +624,22 @@ An organizer can let other phone numbers upload photos to their events: an **upl
 (later). An uploader is **not an account**:
 signing in with that phone through the organizer entry creates no user and adds no role; the session can only use
 `/api/uploader/…`. One phone may work for several organizers. Credits come from the organizer; the photos belong to
-the organizer. Access covers all of the organizer's events that are not expired.
+the organizer. Access covers only the events the organizer assigned to it (and not expired); the organizer
+changes the assignment at any time.
 
 **Organizer side** (organizer role, like §3.6):
 
-- **`GET /api/organizer/uploaders`** → `200 organizer_uploaders_retrieved` `{ uploaders: [uploader…], total }`,
-  newest first, revoked ones too. Uploader: `{ id, fullName, phoneNumber, status: "active"|"revoked", createdAt, lastLoginAt }`.
-- **`POST /api/organizer/uploaders`** `{ "fullName": "Mert Yılmaz", "phoneNumber": "+905550000001" }` →
-  `201 organizer_uploader_created` `{ uploader }`. Errors: `409 uploader_already_exists` (already an active
-  uploader of this organizer), `422 invalid_phone_number`, `422 validation_error`.
+- **`GET /api/organizer/uploaders`** (optional `?event=RK238`: only those assigned to that event) →
+  `200 organizer_uploaders_retrieved` `{ uploaders: [uploader…], total }`, newest first, revoked ones too. Uploader:
+  `{ id, fullName, phoneNumber, status: "active"|"revoked", events: [{ code, name, status }], createdAt, lastLoginAt }`.
+- **`POST /api/organizer/uploaders`** `{ "fullName": "Mert Yılmaz", "phoneNumber": "+905550000001", "eventCodes": ["RK238"] }` →
+  `201 organizer_uploader_created` `{ uploader }`. `eventCodes`: this organizer's events, not expired (may be empty).
+  One uploader per phone per organizer: to give an existing one more events, PATCH it. Errors: `409 uploader_already_exists`,
+  `422 invalid_phone_number`, `422 validation_error` (an unknown, foreign or expired code: `errors.eventCodes`).
+- **`PATCH /api/organizer/uploaders/{id}`** `{ "eventCodes": ["RK238", "TQ7MZ"], "fullName": "…" }` (either or both) →
+  `200 organizer_uploader_updated` `{ uploader }`. `eventCodes` replaces the whole set (`[]` = none); effective at once, also
+  in an open session. Errors: `404 uploader_not_found`, `410 uploader_revoked` (add it again instead), `422 validation_error`.
+  From an event's page: add or remove that event's code in the uploader's list.
 - **`DELETE /api/organizer/uploaders/{id}`** → `200 organizer_uploader_revoked` `{ uploader }` (status `revoked`;
   takes effect at once, also in an open session). `404 uploader_not_found`.
 - Organizer photo objects (§3.6) have **`uploadedBy`**: the uploader's name, or `null` for the organizer's own uploads.
@@ -647,7 +657,7 @@ someone's uploader gets `organizer_home`, and `uploaderAccesses` lists the other
 | Endpoint | Code | Notes |
 | --- | --- | --- |
 | `GET /api/uploader/accesses` | `uploader_accesses_retrieved` | `{ accesses: [{ id, organizerName, uploaderName }] }` |
-| `GET …/accesses/{accessId}/events` | `uploader_events_retrieved` | `{ events, total }`: the organizer's events, not expired; event object of §3.6 with `joinUrl: null` |
+| `GET …/accesses/{accessId}/events` | `uploader_events_retrieved` | `{ events, total }`: the events assigned to it, not expired; event object of §3.6 with `joinUrl: null` |
 | `GET …/accesses/{accessId}/events/{code}` | `uploader_event_retrieved` | `{ event }`; cover at `…/events/{code}/cover/thumb.jpg` |
 | `POST …/events/{code}/photo-upload-check` | `photo_upload_eligibility_checked` | as §3.6, the organizer's balance |
 | `POST …/events/{code}/photos` | `uploader_photos_uploaded` | as §3.6 (`200`, ≤ 20 files, ≤ 60 MB, per-file results) |
@@ -655,7 +665,7 @@ someone's uploader gets `organizer_home`, and `uploaderAccesses` lists the other
 | `DELETE …/events/{code}/photos` | `uploader_photos_deleted` | `{ photoIds }`; only its own photos, others skipped |
 
 `…` = `/api/uploader`. Errors: `404 uploader_access_not_found` (not this phone's, or revoked: go back to the
-organizer list), `404 event_not_found`, `410 event_expired`, `422` as in §3.6, `403 csrf_failed`.
+organizer list), `404 event_not_found` (also an event not assigned, or no longer), `410 event_expired`, `422` as in §3.6, `403 csrf_failed`.
 
 ## 4. Flows
 
@@ -735,6 +745,7 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 | P5 | Any phone with accesses → `uploader_home` | Organizer accounts get `organizer_home` (with `uploaderAccesses`) | Offer "upload for another organizer" when `uploaderAccesses` is not empty |
 | P6 | Unknown/revoked access | `404 uploader_access_not_found` | Back to `/uploader` |
 | P7 | Cover URL under `/api/organizer/…` | `…/accesses/{accessId}/events/{code}/cover/thumb.jpg` | Use `coverThumbnailUrl` as given |
+| P8 | Uploader = all of the organizer's events (and `technical-todo.md`: "etkinlik bazlı atama … netleştir") | Decided: per event. `eventCodes` in POST, `PATCH …/uploaders/{id}` to change, `events` in the uploader object, `?event=` filter; the uploader's event list holds only the assigned ones | Event picker in the add/edit form (or an "Uploaders" box on the event page using `?event=` + PATCH); show `events` in the list |
 
 ## 6. Not yet in this API
 

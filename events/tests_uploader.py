@@ -1,5 +1,6 @@
-"""Uploaders: an organizer adds a phone; that phone signs in without an account and uploads to the
-organizer's events on the organizer's credits, seeing only its own photos; revoking works at once.
+"""Uploaders: an organizer adds a phone for some of their events; that phone signs in without an account
+and uploads to those events on the organizer's credits, seeing only its own photos; changing the
+events and revoking work at once.
 Every /api/uploader/ and /api/organizer/uploaders endpoint is called (last check)."""
 import json
 import re
@@ -30,6 +31,7 @@ class UploaderTests(TempMedia, TestCase):
         self.org = User.objects.create_user(ORG, is_organizer=True, credit_balance=10, full_name="Futuruniq")
         self.other = User.objects.create_user(OTHER_ORG, is_organizer=True, credit_balance=10)
         self.event = make_event(self.org, name="Derya & Can")
+        self.event2 = make_event(self.org, name="Ece & Ali")         # not assigned at first
         self.org_photo = add_photo(self.event, 1)                      # the organizer's own upload
         self.expired = make_event(self.org, status=Event.Status.EXPIRED)
         self.foreign = make_event(self.other)
@@ -51,10 +53,18 @@ class UploaderTests(TempMedia, TestCase):
         c = self.c
         # --- the organizer adds an uploader
         self.as_organizer()
-        r = c.post_json("/api/organizer/uploaders", {"fullName": "Mert", "phoneNumber": "+90 555 000 02 03"})
+        self.assertCode(c.post_json("/api/organizer/uploaders", {"fullName": "Mert", "phoneNumber": PH,
+                                                                 "eventCodes": [self.foreign.code]}), 422, "validation_error")
+        self.assertCode(c.post_json("/api/organizer/uploaders", {"fullName": "Mert", "phoneNumber": PH,
+                                                                 "eventCodes": [self.expired.code]}), 422, "validation_error")
+        r = c.post_json("/api/organizer/uploaders", {"fullName": "Mert", "phoneNumber": "+90 555 000 02 03",
+                                                     "eventCodes": [self.event.code.upper()]})
         self.assertCode(r, 201, "organizer_uploader_created")
         ph = r.json()["data"]["uploader"]
         self.assertEqual((ph["phoneNumber"], ph["status"], ph["lastLoginAt"]), (PH, "active", None))
+        self.assertEqual([e["code"] for e in ph["events"]], [self.event.display_code])
+        self.assertEqual(c.get("/api/organizer/uploaders", {"event": self.event2.code}).json()["data"]["total"], 0)
+        self.assertEqual(c.get("/api/organizer/uploaders", {"event": self.event.code}).json()["data"]["total"], 1)
         self.assertCode(c.post_json("/api/organizer/uploaders", {"fullName": "Mert", "phoneNumber": PH}),
                         409, "uploader_already_exists")
         self.assertCode(c.post_json("/api/organizer/uploaders", {"fullName": "X", "phoneNumber": "123"}),
@@ -89,6 +99,7 @@ class UploaderTests(TempMedia, TestCase):
         self.assertCode(c.get(ev), 200, "uploader_event_retrieved")
         self.assertEqual(c.get(f"{ev}/cover/thumb.jpg")["Content-Type"], "image/jpeg")
         self.assertCode(c.get(f"{root}/{self.foreign.code}"), 404, "event_not_found")
+        self.assertCode(c.get(f"{root}/{self.event2.code}"), 404, "event_not_found")      # not assigned
         self.assertCode(c.get(f"{root}/{self.expired.code}"), 404, "event_not_found")
         self.assertCode(c.get("/api/uploader/accesses/999999/events"), 404, "uploader_access_not_found")
 
@@ -119,14 +130,29 @@ class UploaderTests(TempMedia, TestCase):
         self.org_photo.refresh_from_db()
         self.assertIsNone(self.org_photo.deleted_at)
 
-        # --- the organizer sees who uploaded, and revokes
+        # --- the organizer sees who uploaded, changes the events
         self.as_organizer()
         photos = {p["id"]: p["uploadedBy"] for p in c.get(f"/api/organizer/events/{self.event.code}/photos").json()["data"]["photos"]}
         self.assertEqual((photos[mine[0]], photos[self.org_photo.seq_str]), ("Mert", None))
+        up = f"/api/organizer/uploaders/{ph['id']}"
+        r = c.patch_json(up, {"eventCodes": [self.event2.code], "fullName": "Mert Kaya"})
+        self.assertCode(r, 200, "organizer_uploader_updated")
+        self.assertEqual(([e["code"] for e in r.json()["data"]["uploader"]["events"]], r.json()["data"]["uploader"]["fullName"]),
+                         ([self.event2.display_code], "Mert Kaya"))
+        self.assertCode(c.patch_json(up, {"eventCodes": ["zzzzz"]}), 422, "validation_error")
+        self.assertCode(c.patch_json("/api/organizer/uploaders/999999", {"eventCodes": []}), 404, "uploader_not_found")
+        self.sign_in_again(PH)
+        self.assertEqual([e["code"] for e in c.get(root).json()["data"]["events"]], [self.event2.display_code])
+        self.assertCode(c.get(ev), 404, "event_not_found")                               # taken away at once
+        self.assertCode(c.get(f"{ev}/photos"), 404, "event_not_found")
+
+        # --- and revokes
+        self.as_organizer()
         r = c.delete_(f"/api/organizer/uploaders/{ph['id']}")
         self.assertCode(r, 200, "organizer_uploader_revoked")
         self.assertEqual(r.json()["data"]["uploader"]["status"], "revoked")
         self.assertCode(c.delete_("/api/organizer/uploaders/999999"), 404, "uploader_not_found")
+        self.assertCode(c.patch_json(up, {"eventCodes": []}), 410, "uploader_revoked")
 
         # --- revoked: that organizer is gone at once; the other one remains
         self.sign_in_again(PH)

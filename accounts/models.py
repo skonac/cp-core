@@ -126,12 +126,13 @@ class OtpChallenge(models.Model):
 
 
 class UploaderAccess(models.Model):
-    """An organizer lets a phone number upload to their events: an uploader (cp-web's draft called it
-    "photographer"; that word is the future account role, is_photographer). Not an account: no User is
-    created for the phone; signing in
-    with it (organizer entry) gives a session that can only reach /api/uploader/…, where the
-    organizer's events are listed and photos uploaded on the organizer's credits. One phone may serve
-    several organizers. Revoking keeps the row (the photos it uploaded point to it)."""
+    """An organizer lets a phone number upload to some of their events: an uploader (cp-web's draft
+    called it "photographer"; that word is the future account role, is_photographer). One row per
+    organizer and phone, with the events it is assigned to (`events`, chosen by the organizer).
+    Not an account: no User is created for the phone; signing in with it (organizer entry) gives a
+    session that can only reach /api/uploader/…: the assigned events that are not expired, uploads on
+    the organizer's credits. One phone may serve several organizers. Revoking keeps the row (the photos
+    it uploaded point to it)."""
 
     class Status(models.TextChoices):
         ACTIVE = "active"
@@ -141,6 +142,7 @@ class UploaderAccess(models.Model):
                                   related_name="uploader_accesses")
     phone = models.CharField(max_length=16, validators=[phone_validator])
     full_name = models.CharField(max_length=150)              # as the organizer typed it
+    events = models.ManyToManyField("events.Event", blank=True, related_name="uploader_accesses")   # where it may upload
     status = models.CharField(max_length=8, choices=Status.choices, default=Status.ACTIVE)
     created_at = models.DateTimeField(default=timezone.now)
     revoked_at = models.DateTimeField(null=True, blank=True)

@@ -470,18 +470,43 @@ def participants(request, code: str):
 # ---------------------------------------------------------------------------- uploaders
 
 def uploader_json(a: UploaderAccess) -> dict:
+    events = sorted(a.events.all(), key=lambda e: (e.date, e.code))
     return {"id": str(a.pk), "fullName": a.full_name, "phoneNumber": a.phone, "status": a.status,
+            "events": [{"code": e.display_code, "name": e.name, "status": public_status(e)} for e in events],
             "createdAt": a.created_at.isoformat(),
             "lastLoginAt": a.last_login_at.isoformat() if a.last_login_at else None}
 
 
+def _own_uploader(request, uploader_id: str) -> UploaderAccess:
+    access = (UploaderAccess.objects.filter(organizer=request.user, pk=int(uploader_id)).first()
+              if uploader_id.isdigit() else None)
+    if access is None:
+        raise ApiError(404, "uploader_not_found", "Kayıt bulunamadı.")
+    return access
+
+
+def _assignable_events(user, codes: list[str]) -> list[Event]:
+    """The organizer's own events for these codes (not expired). Any other code -> 422."""
+    wanted = {normalize_code(c) for c in codes}
+    found = list(Event.objects.filter(owner=user, code__in=wanted).exclude(status=Event.Status.EXPIRED))
+    missing = wanted - {e.code for e in found}
+    if missing:
+        raise ApiError(422, "validation_error", "Etkinlik bulunamadı.",
+                       errors={"eventCodes": [f"unknown or expired: {c.upper()}" for c in sorted(missing)]})
+    return found
+
+
 @organizer_router.get("/uploaders", response={200: S.UploaderListResponse, **errors(401, 403)})
-def list_uploaders(request):
-    """Phone numbers this organizer lets upload to their events, newest first (revoked ones too).
+def list_uploaders(request, event: str = ""):
+    """Phone numbers this organizer lets upload, newest first (revoked ones too), each with its events.
+    `event=RK238`: only the uploaders assigned to that event.
 
     Errors: 403 organizer_access_required."""
     user = _organizer(request)
-    rows = list(UploaderAccess.objects.filter(organizer=user).order_by("-created_at"))
+    rows = UploaderAccess.objects.filter(organizer=user).prefetch_related("events").order_by("-created_at")
+    if event:
+        rows = rows.filter(events__code=normalize_code(event))
+    rows = list(rows)
     return respond(request, "organizer_uploaders_retrieved",
                    {"uploaders": [uploader_json(a) for a in rows], "total": len(rows)})
 
@@ -489,38 +514,69 @@ def list_uploaders(request):
 class UploaderIn(CamelSchema):
     full_name: str = Field(min_length=1, max_length=150)
     phone_number: str
+    event_codes: list[str] = Field(default_factory=list, max_length=500)
 
 
 @organizer_router.post("/uploaders", response={201: S.UploaderResponse, **errors(401, 403, 409, 422)})
 def add_uploader(request, data: UploaderIn):
-    """Let a phone number upload to all of this organizer's events (not expired), on this organizer's
-    credits. No account is created for it; the uploader signs in with the organizer entry.
+    """Let a phone number upload to the chosen events (`eventCodes`, this organizer's, not expired), on this
+    organizer's credits. No account is created for it; the uploader signs in with the organizer entry.
+    One uploader per phone: to give it more events, PATCH it.
 
     Errors: 403 organizer_access_required · 409 uploader_already_exists (this phone is already an
-    active uploader of this organizer) · 422 invalid_phone_number, validation_error."""
+    active uploader of this organizer) · 422 invalid_phone_number, validation_error (also an unknown or
+    expired event code, in errors.eventCodes)."""
     user = _organizer(request)
     phone, name = normalize_phone(data.phone_number), data.full_name.strip()
     if not E164.match(phone):
         raise ApiError(422, "invalid_phone_number", "Geçerli bir cep telefonu numarası gir (+90…).")
     if not name:
         raise ApiError(422, "validation_error", "Ad gerekli.", errors={"fullName": ["required"]})
+    events = _assignable_events(user, data.event_codes)
     if UploaderAccess.objects.filter(organizer=user, phone=phone, status=UploaderAccess.Status.ACTIVE).exists():
         raise ApiError(409, "uploader_already_exists", "Bu telefon numarası zaten ekli.")
-    access = UploaderAccess.objects.create(organizer=user, phone=phone, full_name=name)
+    with transaction.atomic():
+        access = UploaderAccess.objects.create(organizer=user, phone=phone, full_name=name)
+        access.events.set(events)
     return respond(request, "organizer_uploader_created", {"uploader": uploader_json(access)}, status=201)
+
+
+class UploaderPatchIn(CamelSchema):
+    full_name: str | None = Field(None, min_length=1, max_length=150)
+    event_codes: list[str] | None = Field(None, max_length=500)
+
+
+@organizer_router.patch("/uploaders/{uploader_id}", response={200: S.UploaderUpdatedResponse, **errors(401, 403, 404, 410, 422)})
+def update_uploader(request, uploader_id: str, data: UploaderPatchIn):
+    """Change the name and/or the events (`eventCodes` replaces the whole set; `[]` = none). Takes effect at
+    once, also in an open session. Assignments to expired events are kept as they are (they no longer count).
+
+    Errors: 403 organizer_access_required · 404 uploader_not_found · 410 uploader_revoked (add it again
+    instead) · 422 validation_error (also an unknown or expired event code)."""
+    _organizer(request)
+    access = _own_uploader(request, uploader_id)
+    if access.status != UploaderAccess.Status.ACTIVE:
+        raise ApiError(410, "uploader_revoked", "Bu kayıt kaldırılmış.")
+    with transaction.atomic():
+        if data.full_name is not None:
+            access.full_name = data.full_name.strip()
+            if not access.full_name:
+                raise ApiError(422, "validation_error", "Ad gerekli.", errors={"fullName": ["required"]})
+            access.save(update_fields=["full_name"])
+        if data.event_codes is not None:
+            expired = list(access.events.filter(status=Event.Status.EXPIRED))
+            access.events.set(_assignable_events(request.user, data.event_codes) + expired)
+    return respond(request, "organizer_uploader_updated", {"uploader": uploader_json(access)})
 
 
 @organizer_router.delete("/uploaders/{uploader_id}", response={200: S.UploaderRevokedResponse, **errors(401, 403, 404)})
 def revoke_uploader(request, uploader_id: str):
     """Revoke: the phone can no longer upload for this organizer, at once (also in an open session).
-    The row stays (status `revoked`), with the photos it uploaded. Idempotent.
+    The row stays (status `revoked`, its events kept for the record), with the photos it uploaded. Idempotent.
 
     Errors: 403 organizer_access_required · 404 uploader_not_found."""
-    user = _organizer(request)
-    access = (UploaderAccess.objects.filter(organizer=user, pk=int(uploader_id)).first()
-              if uploader_id.isdigit() else None)
-    if access is None:
-        raise ApiError(404, "uploader_not_found", "Kayıt bulunamadı.")
+    _organizer(request)
+    access = _own_uploader(request, uploader_id)
     if access.status == UploaderAccess.Status.ACTIVE:
         access.status, access.revoked_at = UploaderAccess.Status.REVOKED, timezone.now()
         access.save(update_fields=["status", "revoked_at"])

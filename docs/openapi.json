@@ -3155,7 +3155,18 @@
       "get": {
         "operationId": "events_organizer_api_list_uploaders",
         "summary": "List Uploaders",
-        "parameters": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "event",
+            "schema": {
+              "default": "",
+              "title": "Event",
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -3188,7 +3199,7 @@
             }
           }
         },
-        "description": "Phone numbers this organizer lets upload to their events, newest first (revoked ones too).\n\nErrors: 403 organizer_access_required.",
+        "description": "Phone numbers this organizer lets upload, newest first (revoked ones too), each with its events.\n`event=RK238`: only the uploaders assigned to that event.\n\nErrors: 403 organizer_access_required.",
         "tags": [
           "organizer"
         ],
@@ -3254,7 +3265,7 @@
             }
           }
         },
-        "description": "Let a phone number upload to all of this organizer's events (not expired), on this organizer's\ncredits. No account is created for it; the uploader signs in with the organizer entry.\n\nErrors: 403 organizer_access_required · 409 uploader_already_exists (this phone is already an\nactive uploader of this organizer) · 422 invalid_phone_number, validation_error.",
+        "description": "Let a phone number upload to the chosen events (`eventCodes`, this organizer's, not expired), on this\norganizer's credits. No account is created for it; the uploader signs in with the organizer entry.\nOne uploader per phone: to give it more events, PATCH it.\n\nErrors: 403 organizer_access_required · 409 uploader_already_exists (this phone is already an\nactive uploader of this organizer) · 422 invalid_phone_number, validation_error (also an unknown or\nexpired event code, in errors.eventCodes).",
         "tags": [
           "organizer"
         ],
@@ -3276,6 +3287,102 @@
       }
     },
     "/api/organizer/uploaders/{uploader_id}": {
+      "patch": {
+        "operationId": "events_organizer_api_update_uploader",
+        "summary": "Update Uploader",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uploader_id",
+            "schema": {
+              "title": "Uploader Id",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploaderUpdatedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "Change the name and/or the events (`eventCodes` replaces the whole set; `[]` = none). Takes effect at\nonce, also in an open session. Assignments to expired events are kept as they are (they no longer count).\n\nErrors: 403 organizer_access_required · 404 uploader_not_found · 410 uploader_revoked (add it again\ninstead) · 422 validation_error (also an unknown or expired event code).",
+        "tags": [
+          "organizer"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploaderPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      },
       "delete": {
         "operationId": "events_organizer_api_revoke_uploader",
         "summary": "Revoke Uploader",
@@ -3332,7 +3439,7 @@
             }
           }
         },
-        "description": "Revoke: the phone can no longer upload for this organizer, at once (also in an open session).\nThe row stays (status `revoked`), with the photos it uploaded. Idempotent.\n\nErrors: 403 organizer_access_required · 404 uploader_not_found.",
+        "description": "Revoke: the phone can no longer upload for this organizer, at once (also in an open session).\nThe row stays (status `revoked`, its events kept for the record), with the photos it uploaded. Idempotent.\n\nErrors: 403 organizer_access_required · 404 uploader_not_found.",
         "tags": [
           "organizer"
         ],
@@ -8842,6 +8949,42 @@
         "title": "ParticipantOut",
         "type": "object"
       },
+      "UploaderEventOut": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "examples": [
+              "RK238"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "examples": [
+              "Derya & Can"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "description": "An expired event no longer counts for the uploader.",
+            "enum": [
+              "active",
+              "access_closed",
+              "expired"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "status"
+        ],
+        "title": "UploaderEventOut",
+        "type": "object"
+      },
       "UploaderListOut": {
         "additionalProperties": false,
         "properties": {
@@ -8936,6 +9079,14 @@
             "title": "Status",
             "type": "string"
           },
+          "events": {
+            "description": "The events it may upload to (by date).",
+            "items": {
+              "$ref": "#/components/schemas/UploaderEventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
           "createdAt": {
             "examples": [
               "2026-10-20T09:00:00+00:00"
@@ -8963,6 +9114,7 @@
           "fullName",
           "phoneNumber",
           "status",
+          "events",
           "createdAt",
           "lastLoginAt"
         ],
@@ -9033,6 +9185,14 @@
           "phoneNumber": {
             "title": "Phonenumber",
             "type": "string"
+          },
+          "eventCodes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Eventcodes",
+            "type": "array"
           }
         },
         "required": [
@@ -9040,6 +9200,80 @@
           "phoneNumber"
         ],
         "title": "UploaderIn",
+        "type": "object"
+      },
+      "UploaderUpdatedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_uploader_updated",
+            "default": "organizer_uploader_updated",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploaderDataOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "UploaderUpdatedResponse",
+        "type": "object"
+      },
+      "UploaderPatchIn": {
+        "properties": {
+          "fullName": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fullname"
+          },
+          "eventCodes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 500,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eventcodes"
+          }
+        },
+        "title": "UploaderPatchIn",
         "type": "object"
       },
       "UploaderRevokedResponse": {
