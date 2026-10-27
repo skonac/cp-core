@@ -26,15 +26,15 @@ def write_file(relpath: str, data: bytes) -> Path:
     return path
 
 
-def file_response(relpath: str, download_name: str | None = None) -> HttpResponse:
+def file_response(relpath: str, download_name: str | None = None, content_type: str = "image/jpeg") -> HttpResponse:
     if settings.USE_X_ACCEL:
-        response = HttpResponse(content_type="image/jpeg")
+        response = HttpResponse(content_type=content_type)
         response["X-Accel-Redirect"] = settings.X_ACCEL_PREFIX + relpath
     else:
         path = abspath(relpath)
         if not path.is_file():
             raise Http404
-        response = FileResponse(path.open("rb"), content_type="image/jpeg")
+        response = FileResponse(path.open("rb"), content_type=content_type)
     if download_name:
         response["Content-Disposition"] = f'attachment; filename="{download_name}"'
     return response

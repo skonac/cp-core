@@ -35,6 +35,11 @@ class Event(models.Model):
     is_consent_required = models.BooleanField(default=True)    # False: members without consent get browse-all only
 
     cover_image = models.ForeignKey("media.Image", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    frame_landscape_image = models.ForeignKey("media.Image", null=True, blank=True, on_delete=models.SET_NULL,
+                                              related_name="+")
+    frame_portrait_image = models.ForeignKey("media.Image", null=True, blank=True, on_delete=models.SET_NULL,
+                                             related_name="+")
+    frame_changed_at = models.DateTimeField(null=True, blank=True, editable=False)   # guards a render racing a change
     next_seq = models.PositiveIntegerField(default=1, editable=False)     # next photo number (00001, 00002, ...)
     last_claimed_at = models.DateTimeField(null=True, blank=True, editable=False)   # worker round-robin
 

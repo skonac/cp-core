@@ -8,7 +8,7 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-28 · API version 0.7
+Last updated: 2026-10-28 (frames step 1) · API version 0.7
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then §5 ("Changes from cp-web's drafts"),
 > which lists every place where this API still differs from `cp-web/docs/api/*.md` and the MSW mocks. Update
@@ -19,6 +19,7 @@ Last updated: 2026-10-28 · API version 0.7
 
 | Date | Change | Where |
 | --- | --- | --- |
+| 2026-10-28 | Event frames (upload + storage, step 1 of 2): `POST`/`DELETE /api/organizer/events/{code}/frame?orientation=`, `GET …/frame/{orientation}.png`, `frameLandscapeUrl`/`framePortraitUrl` on the event object. Rendering photos with the frame (step 2) is not built yet | §3.6 |
 | 2026-10-28 | Event QR code: `GET /api/organizer/events/{code}/qr?width=` (SVG) | §3.6 |
 | 2026-10-25 | Uploaders are assigned to **events**: `eventCodes` when adding one, `PATCH /api/organizer/uploaders/{id}` to change them, `events` in the uploader object, `?event=` filter | §3.10, §5c P8 |
 | 2026-10-24 | Uploaders (cp-web's draft called them "photographers"): `nextStep: "uploader_home"`, `uploaderAccesses`, `/api/organizer/uploaders`, `/api/uploader/…`; organizer photos have `uploadedBy` | §3.10, §5c |
@@ -91,7 +92,7 @@ Every response except files and `204` is:
 | 409 | `pricing_changed` | Purchase with an old `pricingVersion` |
 | 410 | `event_expired`, `otp_expired` | |
 | 422 | `billing_profile_required` | Purchase before the billing profile is complete (§3.8) |
-| 422 | `validation_error`, `invalid_phone_number`, `invalid_role`, `invalid_otp`, `explicit_consent_required`, `unsupported_file_type`, `unreadable_image`, `file_too_large`, `file_required`, `invalid_slot`, `invalid_event_settings`, `too_many_files` | |
+| 422 | `validation_error`, `invalid_phone_number`, `invalid_role`, `invalid_otp`, `explicit_consent_required`, `unsupported_file_type`, `unreadable_image`, `file_too_large`, `file_required`, `invalid_slot`, `invalid_event_settings`, `too_many_files`, `invalid_orientation`, `frame_size_out_of_range`, `frame_wrong_orientation` | |
 | 423 | `event_access_closed` | The organizer closed access |
 | 429 | `rate_limit_exceeded`, `download_limit_reached` | |
 | 500 | `internal_error` | Bug; quote the `requestId` |
@@ -376,6 +377,7 @@ allows an overdraft down to a floor, so a balance of −12 is shown as −12.
   "photoCount": 684, "processedPhotoCount": 680, "pendingPhotoCount": 4, "failedPhotoCount": 0,
   "participantCount": 213,
   "coverThumbnailUrl": "/api/organizer/events/RK238/cover/thumb.jpg", "coverIsUploaded": true,
+  "frameLandscapeUrl": "/api/organizer/events/RK238/frame/landscape.png", "framePortraitUrl": null,
   "joinUrl": "https://cleverphotos.org/?event=RK238", "createdAt": "2026-10-19T08:30:00+00:00" }
 ```
 
@@ -388,6 +390,7 @@ allows an overdraft down to a floor, so a balance of −12 is shown as −12.
 | `processedPhotoCount` / `pendingPhotoCount` / `failedPhotoCount` | Face processing: finished / waiting or running / failed |
 | `participantCount` | People who opened the event (the organizer not counted) |
 | `coverThumbnailUrl` | The uploaded cover; without one, the first photo; `null` when neither exists. `coverIsUploaded` tells which |
+| `frameLandscapeUrl` / `framePortraitUrl` | That slot's uploaded frame PNG; `null` when empty. Not yet used to frame any photo (step 2) |
 | `joinUrl` | The link for participants; put it in the QR code |
 
 **`GET /api/organizer/dashboard`** → `200 organizer_dashboard_retrieved`:
@@ -419,6 +422,19 @@ itself is gone). The content never changes, so the response is sent with
 not in the gallery; replaces the previous uploaded cover. `DELETE /api/organizer/events/{code}/cover` removes it
 (the first photo is shown instead). Both → `200 organizer_cover_updated` `{ event }`.
 Files: `GET …/cover/thumb.jpg` (~400 px), `GET …/cover/display.jpg` (~1600 px).
+
+**Frame.** Two slots per event, `landscape` and `portrait`: a PNG overlay the organizer uploads, kept
+exactly as given (no re-encoding - transparency survives) for later use framing photos (not built yet;
+today this is upload and storage only). `POST /api/organizer/events/{code}/frame?orientation=landscape|portrait`
+— `multipart/form-data`: `file` (PNG). Free; replaces that slot's previous frame. Checks: PNG; long side
+1600–4000 px; pixel shape must match the slot (a landscape-shaped PNG for `landscape`, portrait-shaped for
+`portrait`; a square PNG counts as landscape). The alpha channel and how much of it is transparent are not
+checked - that's on the organizer. `DELETE …/frame?orientation=…` removes that slot's frame (not an error on
+an already-empty slot). Both → `200 organizer_frame_updated` `{ event }`. Errors: `404 event_not_found` ·
+`410 event_expired` (`POST` only) · `422 invalid_orientation`, `unsupported_file_type`, `unreadable_image`,
+`file_too_large`, `frame_size_out_of_range`, `frame_wrong_orientation`.
+File: `GET …/frame/{orientation}.png` → `200 image/png`, that slot's frame exactly as uploaded; `404 not_found`
+when that slot is empty. The event object carries `frameLandscapeUrl`/`framePortraitUrl` (null when empty).
 
 **`POST /api/organizer/events/{code}/photo-upload-check`** `{ "photoCount": 240 }` → `200 photo_upload_eligibility_checked`:
 
@@ -749,7 +765,7 @@ Done in cp-web `c37cce4`: the rename from "photographer" (P0), event codes in pa
 
 ## 6. Not yet in this API
 
-Live iyzico payments (sandbox now), real OTP delivery (WhatsApp; SMS parked), event frames,
-push notifications (new photos of you, end of event), a WhatsApp message to a newly added uploader, emailing the documents after payment,
+Live iyzico payments (sandbox now), real OTP delivery (WhatsApp; SMS parked), framing photos with the
+uploaded event frame (rendering + preview; upload/storage is built), push notifications (new photos of you, end of event), a WhatsApp message to a newly added uploader, emailing the documents after payment,
 discounts and coupons, organizer activity feed, participant access revoke, choosing the cover from the event's photos,
 covers for participants (`coverThumbnailUrl` in `/api/me/events`), email login. Ask before building screens that need them.

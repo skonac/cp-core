@@ -31,6 +31,10 @@ class OrganizerEventOut(Out):
     coverThumbnailUrl: str | None = Field(description="Uploaded cover, else the first photo; null when neither.",
                                           examples=["/api/organizer/events/RK238/cover/thumb.jpg"])
     coverIsUploaded: bool = Field(description="False: the cover shown is the first photo.")
+    frameLandscapeUrl: str | None = Field(description="That slot's frame PNG; null when empty.",
+                                          examples=["/api/organizer/events/RK238/frame/landscape.png"])
+    framePortraitUrl: str | None = Field(description="That slot's frame PNG; null when empty.",
+                                         examples=["/api/organizer/events/RK238/frame/portrait.png"])
     joinUrl: str | None = Field(description="Link for participants (QR content); null in the uploader API.",
                                 examples=["https://cleverphotos.org/?event=RK238"])
     createdAt: str = Field(examples=["2026-10-19T08:30:00+00:00"])
@@ -182,6 +186,7 @@ EventCreatedResponse = envelope("OrganizerEventCreatedResponse", EventDataOut, "
 EventResponse = envelope("OrganizerEventResponse", EventDataOut, "organizer_event_retrieved")
 EventUpdatedResponse = envelope("OrganizerEventUpdatedResponse", EventDataOut, "organizer_event_updated")
 CoverResponse = envelope("OrganizerCoverResponse", EventDataOut, "organizer_cover_updated")
+FrameResponse = envelope("OrganizerFrameResponse", EventDataOut, "organizer_frame_updated")
 UploadCheckResponse = envelope("UploadCheckResponse", UploadCheckOut, "photo_upload_eligibility_checked")
 UploadBatchResponse = envelope("UploadBatchResponse", UploadBatchOut, "organizer_photos_uploaded")
 PhotoListResponse = envelope("OrganizerPhotoListResponse", PhotoListOut, "organizer_photos_retrieved")

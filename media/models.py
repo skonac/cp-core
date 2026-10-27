@@ -21,6 +21,7 @@ class Image(models.Model):
         PHOTO = "photo"     # event photo: numbered (seq), charged 1 credit, worker task all_faces
         SELFIE = "selfie"   # a user's face profile: no event, slot primary/secondary, worker task main_face
         COVER = "cover"     # event cover uploaded by the organizer: free, never processed, not in the gallery
+        FRAME = "frame"     # landscape/portrait overlay PNG uploaded by the organizer: free, never processed
 
     class Slot(models.TextChoices):
         PRIMARY = "primary"
@@ -62,11 +63,12 @@ class Image(models.Model):
 
     class Meta:
         constraints = [
-            # A photo belongs to an event and has a number; a selfie has neither; a cover has an event, no number.
+            # A photo belongs to an event and has a number; a selfie has neither; a cover or frame has
+            # an event, no number.
             models.CheckConstraint(
                 condition=Q(kind="photo", event__isnull=False, seq__isnull=False)
                 | Q(kind="selfie", event__isnull=True, seq__isnull=True)
-                | Q(kind="cover", event__isnull=False, seq__isnull=True),
+                | Q(kind__in=["cover", "frame"], event__isnull=False, seq__isnull=True),
                 name="image_kind_shape"),
             models.UniqueConstraint(fields=["event", "seq"], name="image_seq_per_event"),
             # The same file twice in one event is rejected (and not charged).
@@ -91,14 +93,21 @@ class Image(models.Model):
         return self.kind == self.Kind.COVER
 
     @property
+    def is_frame(self) -> bool:
+        return self.kind == self.Kind.FRAME
+
+    @property
     def seq_str(self) -> str:
         return f"{self.seq:05d}" if self.seq is not None else ""
 
-    def relpath(self, rendition: str) -> str:
+    def relpath(self, rendition: str = "") -> str:
         """File path under MEDIA_ROOT: events/<event_id>/00044_m.jpg, events/<event_id>/cover_<id>_d.jpg
-        or selfies/<user_id>/<id>_d.jpg. Covers and selfies have no master (_d and _t only)."""
+        or selfies/<user_id>/<id>_d.jpg. Covers and selfies have no master (_d and _t only). A frame is
+        kept as the one PNG the organizer uploaded, no rendition suffix: events/<event_id>/frame_<id>.png."""
         if self.is_selfie:
             return f"selfies/{self.owner_id}/{self.pk}_{rendition}.jpg"
+        if self.is_frame:
+            return f"events/{self.event_id}/frame_{self.pk}.png"
         if self.is_cover:
             return f"events/{self.event_id}/cover_{self.pk}_{rendition}.jpg"
         return f"events/{self.event_id}/{self.seq_str}_{rendition}.jpg"
@@ -106,6 +115,8 @@ class Image(models.Model):
     def __str__(self):
         if self.is_selfie:
             return f"selfie {self.pk} ({self.owner_id})"
+        if self.is_frame:
+            return f"{self.event_id}/frame {self.pk}"
         return f"{self.event_id}/cover {self.pk}" if self.is_cover else f"{self.event_id}/{self.seq_str}"
 
 

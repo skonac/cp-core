@@ -36,6 +36,14 @@ def jpeg(color=(120, 90, 60), size=(800, 600), seed: int | None = None) -> bytes
     return buf.getvalue()
 
 
+def png(size=(1800, 1200)) -> bytes:
+    """A small transparent PNG (frame uploads: RGBA, alpha channel never checked)."""
+    im = PILImage.new("RGBA", size, (0, 0, 0, 0))
+    buf = io.BytesIO()
+    im.save(buf, "PNG")
+    return buf.getvalue()
+
+
 def _unit(v: list[float]) -> list[float]:
     n = math.sqrt(sum(x * x for x in v))
     return [x / n for x in v]

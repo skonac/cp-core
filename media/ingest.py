@@ -1,9 +1,11 @@
 """Accepting uploads. The single place where a file becomes an Image row, and for event
 photos the single place where a credit is spent (design/core.md, "Photo upload and credits").
 
-    ingest_photo(event, uploader, data) -> Image     raises IngestError(code)
-    ingest_selfie(user, data, slot)     -> Image     raises IngestError(code)
-    ingest_cover(event, uploader, data) -> Image     raises IngestError(code); free, never processed
+    ingest_photo(event, uploader, data)             -> Image     raises IngestError(code)
+    ingest_selfie(user, data, slot)                 -> Image     raises IngestError(code)
+    ingest_cover(event, uploader, data)             -> Image     raises IngestError(code); free, never processed
+    ingest_frame(event, uploader, data, orientation) -> Image    raises IngestError(code); free, never processed
+    delete_frame(event, orientation)                -> None; idempotent
 """
 import hashlib
 import io
@@ -29,6 +31,8 @@ log = logging.getLogger("cp.ingest")
 
 ACCEPTED_FORMATS = {"JPEG", "MPO", "PNG", "WEBP", "HEIF"}   # MPO: phone JPEGs with an extra embedded image
 SKIP_EXIF_TAGS = {0x8769, 0x8825, 0xA005, 0x927C, 0x9286, 0x0201, 0x0202}   # pointers, GPS, maker note, comment, thumbnail
+
+FRAME_FIELDS = {"landscape": "frame_landscape_image", "portrait": "frame_portrait_image"}
 
 
 class IngestError(Exception):
@@ -255,3 +259,73 @@ def event_cover(event: Event) -> Image | None:
         return cover
     return (Image.objects.filter(event=event, kind=Image.Kind.PHOTO, deleted_at__isnull=True)
             .order_by("seq").first())
+
+
+# ---------------------------------------------------------------------------- frames
+
+def _decode_frame_dimensions(data: bytes) -> tuple[int, int]:
+    """Just enough to validate and size a frame PNG; the bytes themselves are kept untouched
+    (alpha channel and all) - no re-encoding, no resizing, unlike photos/selfies/covers."""
+    try:
+        im = PILImage.open(io.BytesIO(data))
+        if im.format != "PNG":
+            raise IngestError("unsupported_file_type", str(im.format))
+        im.load()
+    except IngestError:
+        raise
+    except (UnidentifiedImageError, OSError, ValueError, PILImage.DecompressionBombError) as e:
+        raise IngestError("unreadable_image", type(e).__name__) from None
+    return im.width, im.height
+
+
+def ingest_frame(event: Event, uploader: User, data: bytes, orientation: str) -> Image:
+    """The event's landscape or portrait frame overlay: a PNG kept exactly as uploaded (no
+    re-encoding, so transparency survives), free, never sent to the worker. Replaces that slot's
+    previous frame and becomes event.frame_landscape_image / event.frame_portrait_image.
+    `orientation` must already be one of FRAME_FIELDS (the view validates the query param)."""
+    _check_size(data)
+    if event.status == Event.Status.EXPIRED:
+        raise IngestError("event_expired")
+    width, height = _decode_frame_dimensions(data)
+    long_side = max(width, height)
+    if not settings.DISPLAY_SIDE <= long_side <= settings.MASTER_SIDE:
+        raise IngestError("frame_size_out_of_range", f"{width}x{height}")
+    is_landscape_shaped = width >= height   # a square PNG counts as landscape-shaped (design/core.md)
+    if (orientation == "landscape") != is_landscape_shaped:
+        raise IngestError("frame_wrong_orientation", f"{width}x{height} for {orientation}")
+    sha = hashlib.sha256(data).hexdigest()
+    field = FRAME_FIELDS[orientation]
+
+    written = []
+    try:
+        with transaction.atomic():
+            old = Image.objects.select_for_update().filter(pk=getattr(event, field + "_id"),
+                                                            deleted_at__isnull=True).first()
+            if old is not None:
+                soft_delete(old)
+            image = Image.objects.create(kind=Image.Kind.FRAME, event_id=event.pk, owner=uploader, sha256=sha,
+                                         status=Image.Status.DONE, width=width, height=height, bytes=len(data))
+            written.append(write_file(image.relpath(), data))
+            now = timezone.now()
+            Event.objects.filter(pk=event.pk).update(**{field: image, "frame_changed_at": now})
+            setattr(event, field, image)
+            event.frame_changed_at = now
+    except BaseException:
+        _remove(written)
+        raise
+    log.info("frame %s (%s) accepted for event %s", image.pk, orientation, event.code)
+    return image
+
+
+def delete_frame(event: Event, orientation: str) -> None:
+    """Removes that slot's frame, if any. Idempotent: an already-empty slot is not an error."""
+    field = FRAME_FIELDS[orientation]
+    with transaction.atomic():
+        old = Image.objects.select_for_update().filter(pk=getattr(event, field + "_id"),
+                                                        deleted_at__isnull=True).first()
+        if old is not None:
+            soft_delete(old)
+        now = timezone.now()
+        Event.objects.filter(pk=event.pk).update(**{field: None, "frame_changed_at": now})
+        setattr(event, field, None)
+        event.frame_changed_at = now

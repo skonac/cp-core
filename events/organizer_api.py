@@ -20,7 +20,7 @@ from pydantic import Field
 from accounts.models import UploaderAccess, User
 from accounts.otp import E164, mask_phone, normalize_phone
 from common.api import ApiError, CamelSchema, errors, file_doc, respond
-from media.ingest import IngestError, event_cover, ingest_cover, ingest_photo
+from media.ingest import FRAME_FIELDS, IngestError, delete_frame, event_cover, ingest_cover, ingest_frame, ingest_photo
 from media.matching import my_photos, selfie_states
 from media.models import Image
 from media.storage import file_response, soft_delete
@@ -44,6 +44,8 @@ INGEST_MESSAGES = {
     "duplicate_photo": "Bu fotoğraf bu etkinlikte zaten var.",
     "insufficient_credits": "Kontör yetersiz.",
     "event_expired": "Bu etkinliğin süresi sona erdi.",
+    "frame_size_out_of_range": f"Çerçeve PNG'sinin uzun kenarı {settings.DISPLAY_SIDE}-{settings.MASTER_SIDE} px arasında olmalı.",
+    "frame_wrong_orientation": "Çerçevenin yönü (dikey/yatay) seçilen slota uymuyor.",
 }
 
 
@@ -59,7 +61,7 @@ def _organizer(request) -> User:
 def _event(request, code: str) -> Event:
     """The event, if this organizer owns it (staff: any). Anything else is 404."""
     _organizer(request)
-    events = Event.objects.select_related("owner", "cover_image")
+    events = Event.objects.select_related("owner", "cover_image", "frame_landscape_image", "frame_portrait_image")
     if not request.user.is_staff:
         events = events.filter(owner=request.user)
     event = events.filter(code=normalize_code(code)).first()
@@ -97,6 +99,12 @@ def _balance(user) -> int:
     return User.objects.values_list("credit_balance", flat=True).get(pk=user.pk)
 
 
+def _frame_url(event, image, orientation: str, base: str) -> str | None:
+    if image is None or image.deleted_at is not None:
+        return None
+    return f"{base}/{event.display_code}/frame/{orientation}.png"
+
+
 def event_json(request, event: Event, stats: dict, base: str = "/api/organizer/events", join_url: bool = True) -> dict:
     code = event.display_code
     uploaded = event.cover_image is not None and event.cover_image.deleted_at is None
@@ -110,6 +118,8 @@ def event_json(request, event: Event, stats: dict, base: str = "/api/organizer/e
         "participantCount": stats["participants"],
         "coverThumbnailUrl": f"{base}/{code}/cover/thumb.jpg" if uploaded or stats["total"] else None,
         "coverIsUploaded": uploaded,
+        "frameLandscapeUrl": _frame_url(event, event.frame_landscape_image, "landscape", base),
+        "framePortraitUrl": _frame_url(event, event.frame_portrait_image, "portrait", base),
         "joinUrl": request.build_absolute_uri(f"/?event={code}") if join_url else None,
         "createdAt": event.created_at.isoformat(),
     }
@@ -149,7 +159,7 @@ def dashboard(request):
     Errors: 403 organizer_access_required."""
     user = _organizer(request)
     events = list(Event.objects.filter(owner=user).exclude(status=Event.Status.EXPIRED)
-                  .select_related("cover_image").order_by("-created_at"))
+                  .select_related("cover_image", "frame_landscape_image", "frame_portrait_image").order_by("-created_at"))
     stats = _stats(events)
     return respond(request, "organizer_dashboard_retrieved", {
         "organizer": {"displayName": user.full_name or None, "creditBalance": _balance(user)},
@@ -167,7 +177,7 @@ def list_events(request, includeExpired: bool = False):
 
     Errors: 403 organizer_access_required."""
     user = _organizer(request)
-    events = Event.objects.filter(owner=user).select_related("cover_image").order_by("-created_at")
+    events = Event.objects.filter(owner=user).select_related("cover_image", "frame_landscape_image", "frame_portrait_image").order_by("-created_at")
     if not includeExpired:
         events = events.exclude(status=Event.Status.EXPIRED)
     events = list(events)
@@ -330,6 +340,54 @@ def cover_thumb(request, code: str):
                       openapi_extra=file_doc("image/jpeg", "Cover ~1600 px"))
 def cover_display(request, code: str):
     return _cover_file(request, code, "d")
+
+
+# ---------------------------------------------------------------------------- frame
+
+def _orientation(value: str) -> str:
+    if value not in FRAME_FIELDS:
+        raise ApiError(422, "invalid_orientation", "orientation: landscape veya portrait.")
+    return value
+
+
+@organizer_router.post("/events/{code}/frame", response={200: S.FrameResponse, **errors(401, 403, 404, 410, 422)})
+def put_frame(request, code: str, orientation: str, file: File[UploadedFile]):
+    """multipart/form-data: file (PNG). `orientation`: landscape or portrait - which slot. Free;
+    replaces that slot's previous frame. The PNG is kept exactly as uploaded (no re-encoding, so
+    transparency survives); long side must be 1600-4000 px and match the slot's shape (a
+    landscape-shaped PNG for the landscape slot, portrait-shaped for portrait; square counts as
+    landscape). No check of the alpha channel or how much of it is transparent.
+
+    Errors: 404 event_not_found · 410 event_expired · 422 invalid_orientation,
+    unsupported_file_type, unreadable_image, file_too_large, frame_size_out_of_range,
+    frame_wrong_orientation."""
+    event = _event(request, code)
+    orientation = _orientation(orientation)
+    try:
+        ingest_frame(event, request.user, file.read(), orientation)
+    except IngestError as e:
+        raise _ingest_error(e) from None
+    return respond(request, "organizer_frame_updated", _one(request, event))
+
+
+@organizer_router.delete("/events/{code}/frame", response={200: S.FrameResponse, **errors(401, 403, 404, 422)})
+def remove_frame(request, code: str, orientation: str):
+    """Removes that slot's frame, if any (not an error on an already-empty slot).
+
+    Errors: 404 event_not_found · 422 invalid_orientation."""
+    event = _event(request, code)
+    delete_frame(event, _orientation(orientation))
+    return respond(request, "organizer_frame_updated", _one(request, event))
+
+
+@organizer_router.get("/events/{code}/frame/{orientation}.png", response=errors(401, 403, 404, 422),
+                      openapi_extra=file_doc("image/png", "That slot's frame PNG, exactly as uploaded."))
+def frame_file(request, code: str, orientation: str):
+    event = _event(request, code)
+    image = getattr(event, FRAME_FIELDS[_orientation(orientation)])
+    if image is None or image.deleted_at is not None:
+        raise ApiError(404, "not_found", "Çerçeve yok.")
+    return file_response(image.relpath(), content_type="image/png")
 
 
 # ---------------------------------------------------------------------------- uploads

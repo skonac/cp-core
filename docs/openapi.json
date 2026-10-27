@@ -2599,6 +2599,296 @@
         ]
       }
     },
+    "/api/organizer/events/{code}/frame": {
+      "post": {
+        "operationId": "events_organizer_api_put_frame",
+        "summary": "Put Frame",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "orientation",
+            "schema": {
+              "title": "Orientation",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizerFrameResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "multipart/form-data: file (PNG). `orientation`: landscape or portrait - which slot. Free;\nreplaces that slot's previous frame. The PNG is kept exactly as uploaded (no re-encoding, so\ntransparency survives); long side must be 1600-4000 px and match the slot's shape (a\nlandscape-shaped PNG for the landscape slot, portrait-shaped for portrait; square counts as\nlandscape). No check of the alpha channel or how much of it is transparent.\n\nErrors: 404 event_not_found · 410 event_expired · 422 invalid_orientation,\nunsupported_file_type, unreadable_image, file_too_large, frame_size_out_of_range,\nframe_wrong_orientation.",
+        "tags": [
+          "organizer"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "title": "File",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "title": "FileParams",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "events_organizer_api_remove_frame",
+        "summary": "Remove Frame",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "orientation",
+            "schema": {
+              "title": "Orientation",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizerFrameResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "Removes that slot's frame, if any (not an error on an already-empty slot).\n\nErrors: 404 event_not_found · 422 invalid_orientation.",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/events/{code}/frame/{orientation}.png": {
+      "get": {
+        "operationId": "events_organizer_api_frame_file",
+        "summary": "Frame File",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "orientation",
+            "schema": {
+              "title": "Orientation",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "That slot's frame PNG, exactly as uploaded.",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
     "/api/organizer/events/{code}/photo-upload-check": {
       "post": {
         "operationId": "events_organizer_api_upload_check",
@@ -7808,6 +8098,36 @@
             "title": "Coverisuploaded",
             "type": "boolean"
           },
+          "frameLandscapeUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "That slot's frame PNG; null when empty.",
+            "examples": [
+              "/api/organizer/events/RK238/frame/landscape.png"
+            ],
+            "title": "Framelandscapeurl"
+          },
+          "framePortraitUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "That slot's frame PNG; null when empty.",
+            "examples": [
+              "/api/organizer/events/RK238/frame/portrait.png"
+            ],
+            "title": "Frameportraiturl"
+          },
           "joinUrl": {
             "anyOf": [
               {
@@ -7850,6 +8170,8 @@
           "participantCount",
           "coverThumbnailUrl",
           "coverIsUploaded",
+          "frameLandscapeUrl",
+          "framePortraitUrl",
           "joinUrl",
           "createdAt"
         ],
@@ -8270,6 +8592,46 @@
           "requestId"
         ],
         "title": "OrganizerCoverResponse",
+        "type": "object"
+      },
+      "OrganizerFrameResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_frame_updated",
+            "default": "organizer_frame_updated",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EventDataOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "OrganizerFrameResponse",
         "type": "object"
       },
       "UploadCheckOut": {

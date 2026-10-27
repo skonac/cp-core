@@ -10,7 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from accounts.models import User
-from common.testing import ApiClient, TempMedia, add_selfie, face_of, jpeg, person, process
+from common.testing import ApiClient, TempMedia, add_selfie, face_of, jpeg, person, png, process
 from config.api import api
 from events.models import Event, EventMember
 from events.qr import event_qr_svg
@@ -159,6 +159,37 @@ class OrganizerApiTests(TempMedia, TestCase):
         self.assertCode(r, 200, "organizer_cover_updated")
         self.assertEqual(Image.objects.filter(event=event, kind="cover", deleted_at__isnull=True).count(), 1)
 
+        # --- frames: upload both slots (kept as-is, PNG), wrong orientation/size rejected, serve, delete
+        land = SimpleUploadedFile("land.png", png((1800, 1200)), content_type="image/png")
+        r = self.post_form(f"{base}/frame?orientation=landscape", {"file": land})
+        self.assertCode(r, 200, "organizer_frame_updated")
+        self.assertTrue(r.json()["data"]["event"]["frameLandscapeUrl"].endswith("/frame/landscape.png"))
+        self.assertIsNone(r.json()["data"]["event"]["framePortraitUrl"])
+        port = SimpleUploadedFile("port.png", png((1200, 1800)), content_type="image/png")
+        self.assertCode(self.post_form(f"{base}/frame?orientation=portrait", {"file": port}), 200,
+                        "organizer_frame_updated")
+        square = SimpleUploadedFile("sq.png", png((2000, 2000)), content_type="image/png")
+        self.assertCode(self.post_form(f"{base}/frame?orientation=landscape", {"file": square}), 200,
+                        "organizer_frame_updated")   # square counts as landscape
+        self.assertEqual(c.get(f"{base}/frame/landscape.png")["Content-Type"], "image/png")
+        self.assertEqual(c.get(f"{base}/frame/portrait.png").status_code, 200)
+        mismatch = SimpleUploadedFile("m.png", png((1800, 1200)), content_type="image/png")
+        self.assertCode(self.post_form(f"{base}/frame?orientation=portrait", {"file": mismatch}),
+                        422, "frame_wrong_orientation")
+        small = SimpleUploadedFile("s.png", png((1000, 700)), content_type="image/png")
+        self.assertCode(self.post_form(f"{base}/frame?orientation=landscape", {"file": small}),
+                        422, "frame_size_out_of_range")
+        not_png = SimpleUploadedFile("x.jpg", jpeg(), content_type="image/jpeg")
+        self.assertCode(self.post_form(f"{base}/frame?orientation=landscape", {"file": not_png}),
+                        422, "unsupported_file_type")
+        self.assertCode(self.post_form(f"{base}/frame?orientation=sideways", {"file": land}),
+                        422, "invalid_orientation")
+        self.assertEqual(Image.objects.filter(event=event, kind="frame", deleted_at__isnull=True).count(), 2)
+        self.assertCode(c.delete_(f"{base}/frame?orientation=landscape"), 200, "organizer_frame_updated")
+        self.assertIsNone(c.get(base).json()["data"]["event"]["frameLandscapeUrl"])
+        self.assertCode(c.get(f"{base}/frame/landscape.png"), 404, "not_found")
+        self.assertCode(c.delete_(f"{base}/frame?orientation=landscape"), 200, "organizer_frame_updated")   # idempotent
+
         # --- participants
         r = c.get(f"{base}/participants")
         self.assertCode(r, 200, "organizer_participants_retrieved")
@@ -180,6 +211,7 @@ class OrganizerApiTests(TempMedia, TestCase):
         c.sign_in("+905550000105", role="organizer")
         self.assertCode(c.get(base), 404, "event_not_found")
         self.assertCode(c.get(f"{base}/qr"), 404, "event_not_found")   # another organizer's event
+        self.assertCode(c.get(f"{base}/frame/portrait.png"), 404, "event_not_found")
         c.delete_("/api/auth/session")
         c.force_login(org)   # a second OTP for the same phone within 30 s is refused
         c.get("/api/auth/csrf")
@@ -188,7 +220,10 @@ class OrganizerApiTests(TempMedia, TestCase):
         self.assertCode(self.post_form(f"{base}/photos", {"files": [_file(15)]}), 410, "event_expired")
         self.assertCode(c.post_json(f"{base}/photo-upload-check", {"photoCount": 1}), 410, "event_expired")
         self.assertCode(self.post_form(f"{base}/cover", {"file": _file(3)}), 410, "event_expired")
+        land2 = SimpleUploadedFile("land2.png", png((1800, 1200)), content_type="image/png")
+        self.assertCode(self.post_form(f"{base}/frame?orientation=landscape", {"file": land2}), 410, "event_expired")
         self.assertEqual(c.get(f"{base}/qr").status_code, 200)   # QR works even on an expired event
+        self.assertEqual(c.get(f"{base}/frame/portrait.png").status_code, 200)   # so does serving a frame
         self.assertEqual(c.get("/api/organizer/dashboard").json()["data"]["events"], [])
         self.assertEqual(c.get("/api/organizer/events", {"includeExpired": "true"}).json()["data"]["total"], 1)
 
