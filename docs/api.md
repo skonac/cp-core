@@ -8,7 +8,7 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-27 · API version 0.7
+Last updated: 2026-10-28 · API version 0.7
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then §5 ("Changes from cp-web's drafts"),
 > which lists every place where this API still differs from `cp-web/docs/api/*.md` and the MSW mocks. Update
@@ -19,6 +19,7 @@ Last updated: 2026-10-27 · API version 0.7
 
 | Date | Change | Where |
 | --- | --- | --- |
+| 2026-10-28 | Event QR code: `GET /api/organizer/events/{code}/qr?width=` (SVG) | §3.6 |
 | 2026-10-25 | Uploaders are assigned to **events**: `eventCodes` when adding one, `PATCH /api/organizer/uploaders/{id}` to change them, `events` in the uploader object, `?event=` filter | §3.10, §5c P8 |
 | 2026-10-24 | Uploaders (cp-web's draft called them "photographers"): `nextStep: "uploader_home"`, `uploaderAccesses`, `/api/organizer/uploaders`, `/api/uploader/…`; organizer photos have `uploadedBy` | §3.10, §5c |
 | 2026-10-23 | OTP request can answer `502 sms_not_sent`; the SMS carries a one-tap code line (`@cleverphotos.org #123456`) | §3.1 |
@@ -408,6 +409,12 @@ Errors: `422 validation_error`, `invalid_event_settings` (face search off withou
 `hasFaceSearch`, `allowsBrowseAll`, `requiresConsent`, `status` (`active` | `access_closed`: open/close access).
 → `200 organizer_event_updated` `{ event }`. Errors: `410 event_expired`, `422 validation_error`, `invalid_event_settings`.
 
+**QR code.** `GET /api/organizer/events/{code}/qr?width=<px>` → `200 image/svg+xml`: a QR code encoding
+the event's `joinUrl`, for printing or display (e.g. `<img src="…">`). `width` (px, default 370) is
+silently clamped to 111–800. Works on any event status, including `expired` (dies only once the event
+itself is gone). The content never changes, so the response is sent with
+`Cache-Control: private, max-age=31536000, immutable`. Errors: 404 event_not_found.
+
 **Cover.** `POST /api/organizer/events/{code}/cover` — `multipart/form-data`: `file`. Free, not face-processed,
 not in the gallery; replaces the previous uploaded cover. `DELETE /api/organizer/events/{code}/cover` removes it
 (the first photo is shown instead). Both → `200 organizer_cover_updated` `{ event }`.
@@ -742,7 +749,7 @@ Done in cp-web `c37cce4`: the rename from "photographer" (P0), event codes in pa
 
 ## 6. Not yet in this API
 
-Live iyzico payments (sandbox now), real OTP delivery (WhatsApp; SMS parked), an event QR code, event frames,
+Live iyzico payments (sandbox now), real OTP delivery (WhatsApp; SMS parked), event frames,
 push notifications (new photos of you, end of event), a WhatsApp message to a newly added uploader, emailing the documents after payment,
 discounts and coupons, organizer activity feed, participant access revoke, choosing the cover from the event's photos,
 covers for participants (`coverThumbnailUrl` in `/api/me/events`), email login. Ask before building screens that need them.

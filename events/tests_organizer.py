@@ -13,6 +13,7 @@ from accounts.models import User
 from common.testing import ApiClient, TempMedia, add_selfie, face_of, jpeg, person, process
 from config.api import api
 from events.models import Event, EventMember
+from events.qr import event_qr_svg
 from media.models import Image
 
 ORG = "+905550000101"
@@ -74,6 +75,19 @@ class OrganizerApiTests(TempMedia, TestCase):
         base = f"/api/organizer/events/{code}"
         self.assertEqual(c.get(f"{base}/cover/thumb.jpg")["Content-Type"], "image/jpeg")
         self.assertEqual(c.get(f"{base}/cover/display.jpg").status_code, 200)
+
+        # --- QR code: SVG of the joinUrl, default and custom width, width silently clamped
+        r = c.get(f"{base}/qr")
+        self.assertEqual(r["Content-Type"], "image/svg+xml")
+        self.assertEqual(r["Cache-Control"], "private, max-age=31536000, immutable")
+        self.assertEqual(r.content.decode(), event_qr_svg(f"http://testserver/?event={code}", 370))
+        self.assertEqual(c.get(f"{base}/qr", {"width": 500}).content.decode(),
+                         event_qr_svg(f"http://testserver/?event={code}", 500))
+        self.assertEqual(c.get(f"{base}/qr", {"width": 1}).content.decode(),
+                         event_qr_svg(f"http://testserver/?event={code}", 111))   # clamped up
+        self.assertEqual(c.get(f"{base}/qr", {"width": 99999}).content.decode(),
+                         event_qr_svg(f"http://testserver/?event={code}", 800))   # clamped down
+        self.assertCode(c.get("/api/organizer/events/zzzzz/qr"), 404, "event_not_found")
 
         # --- read, list, edit
         self.assertCode(c.get(f"{base.lower()}"), 200, "organizer_event_retrieved")
@@ -165,6 +179,7 @@ class OrganizerApiTests(TempMedia, TestCase):
         c.delete_("/api/auth/session")
         c.sign_in("+905550000105", role="organizer")
         self.assertCode(c.get(base), 404, "event_not_found")
+        self.assertCode(c.get(f"{base}/qr"), 404, "event_not_found")   # another organizer's event
         c.delete_("/api/auth/session")
         c.force_login(org)   # a second OTP for the same phone within 30 s is refused
         c.get("/api/auth/csrf")
@@ -173,6 +188,7 @@ class OrganizerApiTests(TempMedia, TestCase):
         self.assertCode(self.post_form(f"{base}/photos", {"files": [_file(15)]}), 410, "event_expired")
         self.assertCode(c.post_json(f"{base}/photo-upload-check", {"photoCount": 1}), 410, "event_expired")
         self.assertCode(self.post_form(f"{base}/cover", {"file": _file(3)}), 410, "event_expired")
+        self.assertEqual(c.get(f"{base}/qr").status_code, 200)   # QR works even on an expired event
         self.assertEqual(c.get("/api/organizer/dashboard").json()["data"]["events"], [])
         self.assertEqual(c.get("/api/organizer/events", {"includeExpired": "true"}).json()["data"]["total"], 1)
 

@@ -10,6 +10,7 @@ from datetime import date as Date
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count
+from django.http import HttpResponse
 from django.utils import timezone
 from ninja import File, Form, Router
 from ninja.files import UploadedFile
@@ -28,6 +29,7 @@ from . import organizer_schemas as S
 from .codes import normalize_code
 from .models import Event, EventMember
 from .participant import public_status
+from .qr import DEFAULT_WIDTH, clamp_width, event_qr_svg
 
 organizer_router = Router(tags=["organizer"], auth=django_auth)
 
@@ -262,6 +264,26 @@ def update_event(request, code: str, data: EventPatchIn):
     _check_rule(event.is_processing_faces, event.is_browse_all)
     event.save()
     return respond(request, "organizer_event_updated", _one(request, event))
+
+
+# ---------------------------------------------------------------------------- QR code
+
+@organizer_router.get("/events/{code}/qr", response=errors(401, 403, 404),
+                      openapi_extra=file_doc("image/svg+xml",
+                                             "QR code (SVG) for the event's joinUrl. Content never changes."))
+def event_qr(request, code: str, width: int = DEFAULT_WIDTH):
+    """SVG QR code encoding the event's `joinUrl`, for printing or display. `width` (px, default
+    370) is silently clamped to 111-800. Works regardless of event status (active, access_closed,
+    expired) - it only answers 404 once the event itself is gone. Cached forever: regenerating from
+    the same joinUrl gives the same bytes.
+
+    Errors: 404 event_not_found."""
+    event = _event(request, code)
+    join_url = request.build_absolute_uri(f"/?event={event.display_code}")
+    svg = event_qr_svg(join_url, clamp_width(width))
+    response = HttpResponse(svg, content_type="image/svg+xml")
+    response["Cache-Control"] = "private, max-age=31536000, immutable"
+    return response
 
 
 # ---------------------------------------------------------------------------- cover

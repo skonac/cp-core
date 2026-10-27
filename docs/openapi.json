@@ -2209,6 +2209,85 @@
         ]
       }
     },
+    "/api/organizer/events/{code}/qr": {
+      "get": {
+        "operationId": "events_organizer_api_event_qr",
+        "summary": "Event Qr",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "width",
+            "schema": {
+              "default": 370,
+              "title": "Width",
+              "type": "integer"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "QR code (SVG) for the event's joinUrl. Content never changes.",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "description": "SVG QR code encoding the event's `joinUrl`, for printing or display. `width` (px, default\n370) is silently clamped to 111-800. Works regardless of event status (active, access_closed,\nexpired) - it only answers 404 once the event itself is gone. Cached forever: regenerating from\nthe same joinUrl gives the same bytes.\n\nErrors: 404 event_not_found.",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
     "/api/organizer/events/{code}/cover": {
       "post": {
         "operationId": "events_organizer_api_put_cover",
