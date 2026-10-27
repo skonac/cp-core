@@ -8,30 +8,23 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-25 · API version 0.7 (uploaders per event §3.10; 0.6: uploaders; 0.5: OTP `502 sms_not_sent`, "not me": `matchedFace` and face rejections §3.5; 0.4: contact form §3.9; 0.3: shop with iyzico §3.7, ÖBF + MSS sales documents, KVKK as HTML §3.3)
+Last updated: 2026-10-27 · API version 0.7
 
-> **For an AI coding assistant working in cp-web:** read this whole file, then the
-> "Changes from cp-web's draft contract" section, which lists every place where this API
-> differs from `cp-web/docs/api/*.md` and the current MSW mocks. Update `src/features/*/api/*`
-> and `src/mocks/handlers.ts` to match. Do not keep `accessToken`, `match-jobs`, or the
-> event-scoped selfie/consent paths. For the organizer screens: §3.6, §3.7, §3.8 and §5b. Multi-photo download: §3.5 `download.zip`.
->
-> **Changed on 2026-10-21:** KVKK documents are HTML pages, not PDFs (`/api/kvkk/kvkk_tr_002.html`, §3.3). Buying needs
-> the two sales documents: checkboxes + popups from `GET /api/shop/obf` / `GET /api/shop/mss`, and `documentsVersion`,
-> `acceptedObf`, `acceptedMss` in `POST /api/shop/purchases`; each purchase has `documentsUrl` (§3.7). These HTML pages
-> may be shown in an `iframe` (same origin).
->
-> **Changed on 2026-10-25:** uploaders are assigned to **events**, not to all of the organizer's events: `eventCodes` when
-> adding one, `PATCH /api/organizer/uploaders/{id}` to change them, `events` in the uploader object, `?event=` filter (§3.10, §5c P8).
->
-> **Changed on 2026-10-24:** uploaders (§3.10, and §5c for the differences from `docs/api/organizer-photographers.md`;
-> what cp-web calls "photographer" there is an **uploader** here, see P0):
-> `nextStep: "uploader_home"` and `uploaderAccesses` in the OTP verification, `/api/organizer/uploaders`,
-> `/api/uploader/…`; organizer photos have `uploadedBy`.
->
-> **Changed on 2026-10-22:** every gallery photo has `matchedFace` (the user's face in it: `faceId`, normalized `bbox` and
-> `landmarks`, `score`) to draw a frame, and "not me" is `POST …/photos/{photoId}/face-rejections {faceId}`, undo with
-> `DELETE …/face-rejections/{faceId}` (§3.5 "Not me").
+> **For an AI coding assistant working in cp-web:** read this whole file, then §5 ("Changes from cp-web's drafts"),
+> which lists every place where this API still differs from `cp-web/docs/api/*.md` and the MSW mocks. Update
+> `src/features/*/api/*` and `src/mocks/handlers.ts` to match. For the organizer screens: §3.6–§3.8 and §5b;
+> uploaders: §3.10 and §5c.
+
+**Recent changes**
+
+| Date | Change | Where |
+| --- | --- | --- |
+| 2026-10-25 | Uploaders are assigned to **events**: `eventCodes` when adding one, `PATCH /api/organizer/uploaders/{id}` to change them, `events` in the uploader object, `?event=` filter | §3.10, §5c P8 |
+| 2026-10-24 | Uploaders (cp-web's draft called them "photographers"): `nextStep: "uploader_home"`, `uploaderAccesses`, `/api/organizer/uploaders`, `/api/uploader/…`; organizer photos have `uploadedBy` | §3.10, §5c |
+| 2026-10-23 | OTP request can answer `502 sms_not_sent`; the SMS carries a one-tap code line (`@cleverphotos.org #123456`) | §3.1 |
+| 2026-10-22 | "Not me": `matchedFace` on every gallery photo (frame the user's face), `POST`/`DELETE …/photos/{photoId}/face-rejections` | §3.5 |
+| 2026-10-22 | Contact form `POST /api/contact/messages` | §3.9 |
+| 2026-10-21 | KVKK documents are HTML pages, not PDFs; buying needs the ÖBF + MSS checkboxes (`documentsVersion`, `acceptedObf`, `acceptedMss`), `documentsUrl` per purchase; these pages may be shown in an `iframe` | §3.3, §3.7 |
 
 ## 1. Basics
 
@@ -684,9 +677,11 @@ organizer list), `404 event_not_found` (also an event not assigned, or no longer
 upload: `photo-upload-check` with the selected count → (not eligible: credit store) → `POST …/photos` in batches →
 poll `GET …/photos` (or the event) while `pendingPhotoCount > 0`. Share `joinUrl`.
 
-## 5. Changes from cp-web's draft contract
+## 5. Changes from cp-web's drafts
 
-Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-18:
+Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-18 (rows cp-web has adopted stay for
+reference). Still in the mocks on 2026-10-27 and dead: the `match-jobs` and `PUT /api/me/face-profile` handlers (#9–#11)
+and the KVKK `.pdf` URLs (#8): remove them.
 
 | # | Draft (cp-web) | cp-core | Action in cp-web |
 | --- | --- | --- | --- |
@@ -733,22 +728,21 @@ Compared with `cp-web/docs/api/*.md` and `src/mocks/handlers.ts` as of 2026-10-1
 | O13 | Cover: only at create, max 8 MB | Also `POST …/cover` / `DELETE …/cover` any time; cover URL is same-origin | — |
 | O14 | Plain `fetch` for POST/PUT/DELETE in `organizer-service.ts` | Every unsafe request needs `X-CSRFToken` | Use `apiMutation` for all of them (today they fail with `403 csrf_failed`) |
 
-### 5c. Uploaders vs cp-web's draft (`docs/api/organizer-photographers.md`, 2026-10-22)
+### 5c. Uploaders vs cp-web's draft (`docs/api/organizer-uploaders.md`, 2026-10-25)
+
+Done in cp-web `c37cce4`: the rename from "photographer" (P0), event codes in paths (P1), own photos only (P2), upload `200` (P3),
+`uploader_access_not_found` handling (P6). Still open:
 
 | # | Draft (cp-web) | cp-core | Action in cp-web |
 | --- | --- | --- | --- |
-| P0 | "Photographer": `/api/organizer/photographers`, `/api/photographer/…`, `photographer_home`, `photographerAccesses`, `photographerName`, `{photographer}`/`{photographers}`, codes `*photographer*` | **Uploader** everywhere: `/api/organizer/uploaders`, `/api/uploader/…`, `uploader_home`, `uploaderAccesses`, `uploaderName`, `{uploader}`/`{uploaders}`, codes `*uploader*` (e.g. `uploader_already_exists`, `uploader_access_not_found`). "Photographer" stays the future account role | Rename paths, types, routes (`/photographer` → `/uploader`), mocks and docs (`organizer-photographers.md`); the Turkish UI label is Ozgur's choice |
-| P1 | Uploader endpoints by `eventId` | The event code, as everywhere (`id` = code) | — |
-| P2 | Photo list / delete over all event photos (mocks) | Only the photos uploaded with this phone, for this organizer | Expect a shorter list; the organizer still sees everything (with `uploadedBy`) |
-| P3 | Upload answers `201` (mock) | `200`, like the organizer upload | Check `response.ok`, not `201` |
 | P4 | `user` for an uploader = the mock profile | `id: ""` when the phone has no account; real user object when it has one | Don't key anything on `user.id` in the uploader area |
 | P5 | Any phone with accesses → `uploader_home` | Organizer accounts get `organizer_home` (with `uploaderAccesses`) | Offer "upload for another organizer" when `uploaderAccesses` is not empty |
-| P6 | Unknown/revoked access | `404 uploader_access_not_found` | Back to `/uploader` |
 | P7 | Cover URL under `/api/organizer/…` | `…/accesses/{accessId}/events/{code}/cover/thumb.jpg` | Use `coverThumbnailUrl` as given |
 | P8 | Uploader = all of the organizer's events (and `technical-todo.md`: "etkinlik bazlı atama … netleştir") | Decided: per event. `eventCodes` in POST, `PATCH …/uploaders/{id}` to change, `events` in the uploader object, `?event=` filter; the uploader's event list holds only the assigned ones | Event picker in the add/edit form (or an "Uploaders" box on the event page using `?event=` + PATCH); show `events` in the list |
 
 ## 6. Not yet in this API
 
-Live iyzico payments (sandbox now), emailing the documents after payment, account-based discounts, organizer activity feed, participant access revoke, choosing the cover from
-the event's photos, covers for participants (`coverThumbnailUrl` in `/api/me/events`),
-real SMS delivery, email login. Ask before building screens that need them.
+Live iyzico payments (sandbox now), real OTP delivery (WhatsApp; SMS parked), an event QR code, event frames,
+push notifications (new photos of you, end of event), a WhatsApp message to a newly added uploader, emailing the documents after payment,
+discounts and coupons, organizer activity feed, participant access revoke, choosing the cover from the event's photos,
+covers for participants (`coverThumbnailUrl` in `/api/me/events`), email login. Ask before building screens that need them.
