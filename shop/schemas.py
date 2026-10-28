@@ -77,6 +77,7 @@ class PurchaseDetailOut(Out):
 
 
 CatalogResponse = envelope("ShopCatalogResponse", CatalogOut, "products_retrieved")
+PromoAppliedResponse = envelope("PromoAppliedResponse", CatalogOut, "promo_applied")
 PurchaseListResponse = envelope("PurchaseListResponse", PurchaseListOut, "purchases_retrieved")
 PurchaseResponse = envelope("PurchaseResponse", PurchaseStartedOut, "purchase_started")
 PurchaseDetailResponse = envelope("PurchaseDetailResponse", PurchaseDetailOut, "purchase_retrieved")

@@ -87,6 +87,12 @@ class ShopApiTests(TestCase):
         self.assertCode(r, 200, "products_retrieved")
         cat = r.json()["data"]
         self.assertEqual(cat["creditBalance"], -12)
+        self.assertCode(c.post_json("/api/shop/promo", {"code": "nope"}), 422, "invalid_promo_code")
+        PromoCode.objects.create(code="welcome", type="fixed", value=500, product_ids=[999],
+                                 valid_from=timezone.now() - timedelta(days=1), valid_until=timezone.now() + timedelta(days=1))
+        r = c.post_json("/api/shop/promo", {"code": "WELCOME"})            # covers no product on sale: no change
+        self.assertCode(r, 200, "promo_applied")
+        self.assertEqual((r.json()["data"]["appliedPromo"], r.json()["data"]["products"]), ("WELCOME", cat["products"]))
         self.assertEqual([(p["name"]["tr"], p["title"], p["unitPrice"], p["discountPercent"]) for p in cat["products"]],
                          [("2000cr", {"tr": "Mini paket", "en": "Small pack"}, 2.0, 0),
                           ("5000cr", {"tr": "", "en": ""}, 1.5, 0)])        # no discount on this account
@@ -543,3 +549,63 @@ class PricingTests(TestCase):
         latest = Purchase.objects.latest("pk")
         self.assertEqual((latest.amount, latest.discount_source, latest.discount_percent, latest.promo_code),
                          (Decimal("1399"), "user", 30, ""))
+
+
+class PromoApplyTests(TestCase):
+    """POST /api/shop/promo: organizers only, one code per session, no reasons told, failures limited."""
+
+    def setUp(self):
+        cache.clear()
+        self.product = Product.objects.create(name_tr="2000cr", name_en="2000cr", credits=2000, price=4000)
+        self.org = User.objects.create_user("+905550000801", is_organizer=True, discount_percent=10)
+        now = timezone.now()
+        for code, start, end in [("Spring", now - timedelta(days=1), now + timedelta(days=1)),
+                                 ("later", now + timedelta(days=1), now + timedelta(days=2)),
+                                 ("old", now - timedelta(days=2), now - timedelta(days=1))]:
+            PromoCode.objects.create(code=code, type="percent", value=25, valid_from=start, valid_until=end)
+        PromoCode.objects.create(code="flat", type="fixed", value=1000, valid_from=now - timedelta(days=1),
+                                 valid_until=now + timedelta(days=1))
+
+    def _apply(self, code):
+        return self.client.post("/api/shop/promo", {"code": code}, content_type="application/json")
+
+    def _final(self):
+        return self.client.get("/api/shop/products").json()["data"]["products"][0]["finalPrice"]
+
+    def test_access(self):
+        self.assertEqual(self._apply("spring").status_code, 401)
+        self.client.force_login(User.objects.create_user("+905550000802", is_participant=True))
+        r = self._apply("spring")
+        self.assertEqual((r.status_code, r.json()["code"]), (403, "organizer_access_required"))
+
+    def test_apply_replace_and_clear(self):
+        self.client.force_login(self.org)
+        self.assertEqual(self._final(), 3600.0)                              # own 10 %
+        r = self._apply("  sPrInG ")
+        self.assertEqual((r.status_code, r.json()["code"], r.json()["data"]["appliedPromo"]), (200, "promo_applied", "SPRING"))
+        self.assertEqual(r.json()["data"]["products"][0]["finalPrice"], 3000.0)
+        self.assertEqual(self.client.session[pricing.SESSION_KEY], "spring")
+        self._apply("flat")                                                 # a new valid code replaces it
+        self.assertEqual(self._final(), 3000.0)
+        self.assertEqual(self.client.session[pricing.SESSION_KEY], "flat")
+        with self.assertLogs("cp.shop", "INFO") as logs:
+            for code, reason in [("later", "not_started"), ("old", "expired"), ("nope", "unknown"),
+                                 ("x" * 17, "malformed")]:
+                r = self._apply(code)
+                self.assertEqual((r.status_code, r.json()["code"], r.json()["message"]),
+                                 (422, "invalid_promo_code", "Geçersiz kod."))
+        self.assertEqual([line.rsplit(": ", 1)[1] for line in logs.output], ["not_started", "expired", "unknown", "malformed"])
+        self.assertNotIn(pricing.SESSION_KEY, self.client.session)          # an invalid code clears the session's
+        self.assertEqual(self._final(), 3600.0)
+
+    def test_rate_limit_counts_failures_only(self):
+        self.client.force_login(self.org)
+        for _ in range(6):
+            self.assertEqual(self._apply("spring").status_code, 200)        # successes don't count
+        for _ in range(4):
+            self.assertEqual(self._apply("nope").status_code, 422)
+        r = self._apply("spring")                                           # even a good code now: 429
+        self.assertEqual((r.status_code, r.json()["code"]), (429, "rate_limit_exceeded"))
+        other = User.objects.create_user("+905550000803", is_organizer=True)
+        self.client.force_login(other)                                      # per user
+        self.assertEqual(self._apply("spring").status_code, 200)

@@ -186,6 +186,7 @@ ILETIMERKEZI_API_HASH = env("CP_ILETIMERKEZI_API_HASH", "")
 ILETIMERKEZI_SENDER = env("CP_ILETIMERKEZI_SENDER", "")
 EVENT_LOOKUP_PER_MIN = 30   # public event lookups per IP
 CONTACT_PER_HOUR = 5        # contact form messages per IP per hour
+PROMO_FAILS = (4, 4 * 3600)  # wrong promo codes per user, per 4 hours (POST /api/shop/promo)
 # Non-production only: this string is accepted as the code of any OTP challenge and as the password
 # of any active account (accounts.backends.MasterPassBackend). Empty = off. `manage.py check` (and so
 # deploy.sh and runserver) refuses to run with it set while DEBUG is off.

@@ -5,6 +5,11 @@ import time
 from django.core.cache import cache
 
 
+def hits(key: str, window: int) -> int:
+    """How often `key` was counted (by allow) in the current window, without counting this call."""
+    return cache.get(f"rl:{key}:{int(time.time() // window)}", 0)
+
+
 def allow(key: str, limit: int, window: int) -> bool:
     """True while `key` has been hit at most `limit` times in the current `window` seconds."""
     bucket = f"rl:{key}:{int(time.time() // window)}"

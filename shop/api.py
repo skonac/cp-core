@@ -1,23 +1,27 @@
 """Shop API (/api/shop/…): the products on sale (public), buying one and the purchase history
 (organizer accounts: credits are spent on photo uploads). Shapes and codes: docs/api.md §3.7.
 One product per purchase, no cart. Payment: shop/payments.py (simulated until iyzico is connected)."""
+import logging
 from typing import Literal
 
 from django.conf import settings
 from django.http import HttpResponse
+from django.utils import timezone
 from ninja import Router
 from ninja.security import django_auth
 from pydantic import Field
 
 from accounts.models import User
 from common.api import ApiError, CamelSchema, errors, file_doc, respond
+from common.ratelimit import allow, hits
 
 from . import documents, pricing
 from . import schemas as S
 from .billing import billing_errors
-from .models import BillingProfile, Product, Purchase
+from .models import BillingProfile, Product, PromoCode, Purchase
 from .payments import PaymentError, start
 
+log = logging.getLogger("cp.shop")
 shop_router = Router(tags=["shop"], auth=django_auth)
 CALLBACK_PATH = "/api/shop/iyzico/callback"   # shop/views.py; iyzico sends the browser here after paying
 
@@ -71,6 +75,52 @@ def catalog_json(request) -> dict:
     return {"creditBalance": balance, "pricingVersion": pricing.pricing_version(on_sale, priced), "products": out,
             "appliedPromo": promo.code.upper() if promo else None,
             "documentsVersion": settings.SALES_DOCS_VERSION}
+
+
+class PromoIn(CamelSchema):
+    code: str
+
+
+def _promo_problem(code: str, now) -> str:
+    """Why a code can't be applied ("" = it can). Only logged, never told to the caller."""
+    if not code or len(code) > 16:
+        return "malformed"
+    promo = PromoCode.objects.filter(pk=code).first()
+    if promo is None:
+        return "unknown"
+    if now < promo.valid_from:
+        return "not_started"
+    if now >= promo.valid_until:
+        return "expired"
+    return ""
+
+
+@shop_router.post("/promo", response={200: S.PromoAppliedResponse, **errors(401, 403, 422, 429)})
+def apply_promo(request, data: PromoIn):
+    """Apply a promo code to this session (organizers). Matched case-insensitively. A valid code (it
+    exists and now is between its dates) replaces any earlier one and stays in the session until it
+    is replaced or the session ends; it counts on the products it covers instead of the account's own
+    discount, and stops counting by itself once it expires. Answers with the catalog as in GET
+    /api/shop/products (`appliedPromo` set).
+
+    Errors: 403 organizer_access_required · 422 invalid_promo_code (any reason; the session's code is
+    cleared) · 429 rate_limit_exceeded (4 wrong codes per 4 hours)."""
+    user = _organizer(request)
+    limit, window = settings.PROMO_FAILS
+    key = f"promo:{user.pk}"
+    if hits(key, window) >= limit:
+        log.info("promo code from user %s refused: rate limit", user.pk)
+        raise ApiError(429, "rate_limit_exceeded", "Çok fazla deneme. Biraz sonra tekrar dene.")
+    code = data.code.strip().lower()
+    problem = _promo_problem(code, timezone.now())
+    if problem:
+        allow(key, limit, window)
+        request.session.pop(pricing.SESSION_KEY, None)
+        log.info("promo code %r from user %s invalid: %s", code[:40], user.pk, problem)
+        raise ApiError(422, "invalid_promo_code", "Geçersiz kod.")
+    request.session[pricing.SESSION_KEY] = code
+    log.info("promo code %r applied for user %s", code, user.pk)
+    return respond(request, "promo_applied", catalog_json(request))
 
 
 HTML = "text/html; charset=utf-8"
