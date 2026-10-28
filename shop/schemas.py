@@ -27,7 +27,21 @@ class ProductOut(Out):
     discountPercent: int = Field(description="The discount applied to this product: the promo code's where it "
                                              "covers it, else the account's own; a fixed-amount promo as its "
                                              "rounded percent. 0: none.", examples=[20])
+    discountSource: Literal["user", "promo", "global"] | None = Field(
+        description="Why: the account's own discount, the session's promo code, the global discount; null: none.",
+        examples=["global"])
+    discountLabel: TextOut | None = Field(description="Shown next to the price: the global discount's title, or the "
+                                                      "promo code (uppercase); null for user discounts and none.",
+                                          examples=[{"tr": "LANSMANA ÖZEL", "en": "LANSMANA ÖZEL"}])
     featured: bool
+
+
+class GlobalDiscountOut(Out):
+    percent: int = Field(examples=[15])
+    title: TextOut = Field(description="Short label (also each product's discountLabel when it wins).",
+                           examples=[{"tr": "LANSMANA ÖZEL", "en": "LANSMANA ÖZEL"}])
+    banner: TextOut = Field(description="The site-wide line.",
+                            examples=[{"tr": "HERKESE LANSMANA ÖZEL %15 İNDİRİM!", "en": "HERKESE LANSMANA ÖZEL %15 İNDİRİM!"}])
 
 
 class CatalogOut(Out):
@@ -39,6 +53,8 @@ class CatalogOut(Out):
     products: list[ProductOut] = Field(description="On sale, in display order.")
     appliedPromo: str | None = Field(description="The session's promo code while it is valid (uppercase); null "
                                                  "when none or expired.", examples=["XMAS2027"])
+    globalDiscount: GlobalDiscountOut | None = Field(description="The discount for everyone (signed out too), "
+                                                                 "null when off.")
     documentsVersion: str = Field(description="Version of the ÖBF + MSS texts (GET /api/shop/obf, /mss); send back "
                                               "with a purchase.", examples=["001"])
 

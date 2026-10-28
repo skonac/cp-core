@@ -57,8 +57,8 @@ class Purchase(models.Model):
     currency = models.CharField(max_length=3)
     # The discount in amount (copies at purchase time): which one, its percent (null for a fixed-amount
     # promo), and the promo code as entered (lowercase; not a FK, codes may be deleted later).
-    discount_source = models.CharField(max_length=5, choices=[("none", "none"), ("user", "user"), ("promo", "promo")],
-                                       default="none")
+    discount_source = models.CharField(max_length=6, choices=[("none", "none"), ("user", "user"), ("promo", "promo"),
+                                                              ("global", "global")], default="none")
     discount_percent = models.PositiveSmallIntegerField(null=True, blank=True)
     promo_code = models.CharField(max_length=16, blank=True)
     status = models.CharField(max_length=8, choices=Status.choices, default=Status.PENDING)

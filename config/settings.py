@@ -187,6 +187,14 @@ ILETIMERKEZI_SENDER = env("CP_ILETIMERKEZI_SENDER", "")
 EVENT_LOOKUP_PER_MIN = 30   # public event lookups per IP
 CONTACT_PER_HOUR = 5        # contact form messages per IP per hour
 PROMO_FAILS = (4, 4 * 3600)  # wrong promo codes per user, per 4 hours (POST /api/shop/promo)
+# Discount on every product for everyone (signed out too), e.g. a launch offer; whole percent 0-100, 0 = off.
+# Change = edit the env + restart. TITLE: the short label next to a discounted price; BANNER: the site-wide
+# line. The _EN text is used for both languages unless a _TR one is set. shop/pricing.py.
+GLOBAL_DISCOUNT_VALUE = env("CP_DISCOUNT_VALUE", "0")
+GLOBAL_DISCOUNT_TITLE = {"en": env("CP_DISCOUNT_TITLE_EN", "")}
+GLOBAL_DISCOUNT_TITLE["tr"] = env("CP_DISCOUNT_TITLE_TR", "") or GLOBAL_DISCOUNT_TITLE["en"]
+GLOBAL_DISCOUNT_BANNER = {"en": env("CP_DISCOUNT_BANNER_EN", "")}
+GLOBAL_DISCOUNT_BANNER["tr"] = env("CP_DISCOUNT_BANNER_TR", "") or GLOBAL_DISCOUNT_BANNER["en"]
 # Non-production only: this string is accepted as the code of any OTP challenge and as the password
 # of any active account (accounts.backends.MasterPassBackend). Empty = off. `manage.py check` (and so
 # deploy.sh and runserver) refuses to run with it set while DEBUG is off.

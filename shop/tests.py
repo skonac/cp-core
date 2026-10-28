@@ -490,7 +490,8 @@ class PricingTests(TestCase):
             (self.p2, self.org, None, ("1999", "1599.00", "user", 20, 20, "")),       # 1599.20 → whole TL down
             (self.p1, self.org, self.promo, ("3600", "1800.00", "promo", 50, 50, "xmas2027")),
             (self.p2, self.org, self.promo, ("1999", "1599.00", "user", 20, 20, "")),  # not covered: own discount
-            (self.p1, self.org, fixed, ("3600", "3500.00", "promo", None, 3, "f")),
+            (self.p1, self.org, fixed, ("3600", "2880.00", "user", 20, 20, "")),      # 20 % beats 100 TL off
+            (self.p1, User(discount_percent=0), fixed, ("3600", "3500.00", "promo", None, 3, "f")),
             (self.p1, self.org, big, ("3600", "0.00", "promo", None, 100, "g")),       # never below 0
             (self.p2, User(discount_percent=0), None, ("1999", "1999", "none", None, 0, "")),
         ]
@@ -609,3 +610,73 @@ class PromoApplyTests(TestCase):
         other = User.objects.create_user("+905550000803", is_organizer=True)
         self.client.force_login(other)                                      # per user
         self.assertEqual(self._apply("spring").status_code, 200)
+
+
+GLOBAL = {"GLOBAL_DISCOUNT_VALUE": "15", "GLOBAL_DISCOUNT_TITLE": {"tr": "LANSMANA ÖZEL", "en": "LANSMANA ÖZEL"},
+          "GLOBAL_DISCOUNT_BANNER": {"tr": "HERKESE %15!", "en": "HERKESE %15!"}}
+
+
+@override_settings(PAYMENT_PROVIDER="simulated", **GLOBAL)
+class GlobalDiscountTests(TestCase):
+    """CP_DISCOUNT_*: for everyone; the biggest discount wins (never stacked)."""
+
+    def setUp(self):
+        self.p1 = Product.objects.create(name_tr="a", name_en="a", credits=1000, price=4000)
+        self.p2 = Product.objects.create(name_tr="b", name_en="b", credits=2000, price=6000)
+        now = timezone.now()
+        self.promo = PromoCode.objects.create(code="ten", type="percent", value=10, valid_from=now - timedelta(days=1),
+                                              valid_until=now + timedelta(days=1))
+
+    def _catalog(self):
+        data = self.client.get("/api/shop/products").json()["data"]
+        return data, [(p["finalPrice"], p["discountPercent"], p["discountSource"], p["discountLabel"])
+                      for p in data["products"]]
+
+    def test_signed_out(self):
+        data, rows = self._catalog()
+        label = {"tr": "LANSMANA ÖZEL", "en": "LANSMANA ÖZEL"}
+        self.assertEqual(rows, [(3400.0, 15, "global", label), (5100.0, 15, "global", label)])
+        self.assertEqual(data["globalDiscount"], {"percent": 15, "title": label,
+                                                  "banner": {"tr": "HERKESE %15!", "en": "HERKESE %15!"}})
+        with self.settings(GLOBAL_DISCOUNT_VALUE="0"):
+            data, rows = self._catalog()
+            self.assertEqual((rows[0], data["globalDiscount"]), ((4000.0, 0, None, None), None))
+
+    def test_biggest_wins(self):
+        org = User.objects.create_user("+905550000901", is_organizer=True, discount_percent=20)
+        self.client.force_login(org)
+        session = self.client.session
+        session[pricing.SESSION_KEY] = "ten"
+        session.save()
+        _, rows = self._catalog()                       # user 20 > global 15 > promo 10
+        self.assertEqual([r[:3] for r in rows], [(3200.0, 20, "user"), (4800.0, 20, "user")])
+        PromoCode.objects.filter(pk="ten").update(type="fixed", value=1500, product_ids=[self.p1.pk])
+        data, rows = self._catalog()                    # p1: 1500 TL off beats 20 %; p2 not covered
+        self.assertEqual(rows, [(2500.0, 38, "promo", {"tr": "TEN", "en": "TEN"}), (4800.0, 20, "user", None)])
+        self.assertEqual(data["appliedPromo"], "TEN")
+        org.discount_percent = 15                       # tie with global: user
+        org.save()
+        PromoCode.objects.filter(pk="ten").update(type="percent", value=15, product_ids=[])
+        _, rows = self._catalog()                       # three-way tie: promo
+        self.assertEqual([r[2] for r in rows], ["promo", "promo"])
+
+    def test_purchase_and_check(self):
+        org = User.objects.create_user("+905550000902", is_organizer=True)
+        BillingProfile.objects.create(user=org, first_name="Ece", last_name="Yılmaz", identity_number="10000000146",
+                                      email="e@x.co", address="Cad. 1", district="Çankaya", city="Ankara")
+        self.client.force_login(org)
+        version = self._catalog()[0]["pricingVersion"]
+        r = self.client.post("/api/shop/purchases", {"productId": str(self.p1.pk), "pricingVersion": version,
+                                                     "documentsVersion": settings.SALES_DOCS_VERSION,
+                                                     "acceptedObf": True, "acceptedMss": True},
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 201, r.content[:300])
+        purchase = Purchase.objects.get()
+        self.assertEqual((purchase.amount, purchase.discount_source, purchase.discount_percent),
+                         (Decimal("3400"), "global", 15))
+        from .apps import check_global_discount
+        self.assertEqual(check_global_discount(), [])
+        for bad in ("15.5", "101", "abc", "-5"):
+            with self.settings(GLOBAL_DISCOUNT_VALUE=bad):
+                self.assertEqual([e.id for e in check_global_discount()], ["cp.E010"], bad)
+                self.assertEqual(pricing.global_percent(), 0)

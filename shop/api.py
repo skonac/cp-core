@@ -54,8 +54,18 @@ def products(request):
     the landing/pricing pages. `creditBalance` only with a session (null otherwise).
     Prices are this caller's (shop/pricing.py): `price` the list price, `finalPrice` after the one
     discount that applies (the session's promo code where it covers the product, else the account's
-    own discount), `discountPercent` that discount. Signed out: no discount."""
+    own discount, or the global one: the biggest wins), `discountPercent` / `discountSource` /
+    `discountLabel` that discount. Signed out: only the global discount (`globalDiscount`)."""
     return respond(request, "products_retrieved", catalog_json(request))
+
+
+def _label(price) -> dict | None:
+    """What to show next to a discounted price: the global discount's title, or the promo code."""
+    if price.source == "global":
+        return dict(settings.GLOBAL_DISCOUNT_TITLE)
+    if price.source == "promo":
+        return {"tr": price.promo_code.upper(), "en": price.promo_code.upper()}
+    return None
 
 
 def catalog_json(request) -> dict:
@@ -70,10 +80,13 @@ def catalog_json(request) -> dict:
                     "creditAmount": p.credits, "price": float(p.price), "finalPrice": float(price.final),
                     "currency": p.currency,
                     "unitPrice": round(float(price.final) / p.credits, 4) if p.credits else 0,
-                    "discountPercent": price.shown_percent, "featured": p.is_featured})
+                    "discountPercent": price.shown_percent,
+                    "discountSource": None if price.source == "none" else price.source,
+                    "discountLabel": _label(price), "featured": p.is_featured})
     balance = _balance(request.user) if request.user.is_authenticated else None
     return {"creditBalance": balance, "pricingVersion": pricing.pricing_version(on_sale, priced), "products": out,
             "appliedPromo": promo.code.upper() if promo else None,
+            "globalDiscount": pricing.global_discount(),
             "documentsVersion": settings.SALES_DOCS_VERSION}
 
 
