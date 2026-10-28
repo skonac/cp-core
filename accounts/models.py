@@ -3,7 +3,7 @@ import secrets
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
-from django.core.validators import RegexValidator
+from django.core.validators import MaxValueValidator, RegexValidator
 from django.db import models
 from django.utils import timezone
 
@@ -55,6 +55,9 @@ class User(AbstractBaseUser):
 
     credit_balance = models.IntegerField(default=0)
     credit_floor = models.IntegerField(null=True, blank=True)   # NULL = settings.CREDIT_FLOOR_DEFAULT
+    # Shop discount on every product, in percent; set in the admin. A valid promo code in the session
+    # replaces it for the products it covers (never stacked). design/core.md "discounts and promo codes".
+    discount_percent = models.PositiveSmallIntegerField(default=0, validators=[MaxValueValidator(100)])
 
     created_at = models.DateTimeField(default=timezone.now)
 

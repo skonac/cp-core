@@ -9,7 +9,11 @@ from decimal import Decimal
 from django.core.cache import cache
 from unittest import mock
 
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
+from django.utils import timezone
+from datetime import timedelta
 
 from accounts.models import User
 from common.testing import ApiClient
@@ -18,7 +22,7 @@ from credits.models import CreditTransaction
 
 from .apps import check_payment_provider, check_sales_documents
 from .billing import tckn_valid, vkn_valid
-from .models import BillingProfile, Product, Purchase
+from .models import BillingProfile, Product, PromoCode, Purchase
 from .documents import attach
 from .payments import complete, finish_iyzico, start
 
@@ -379,3 +383,66 @@ class DocumentsTests(TestCase):
             self.assertEqual([e.id for e in check_sales_documents()], ["cp.E008"])
         with self.settings(SALES_DOCS_VERSION="999"):
             self.assertEqual([e.id for e in check_sales_documents()], ["cp.E009"] * 5)
+
+
+class PromoCodeModelTests(TestCase):
+    """Admin-side rules of PromoCode and User.discount_percent (the pricing itself: later steps)."""
+
+    def _promo(self, **kw):
+        now = timezone.now()
+        data = {"code": "XMAS2027", "type": "percent", "value": Decimal("15"),
+                "valid_from": now - timedelta(days=1), "valid_until": now + timedelta(days=1)} | kw
+        return PromoCode(**data)
+
+    def test_lowercase_and_validity(self):
+        promo = self._promo(code=" XMAS2027 ", product_ids=[2, 3])
+        promo.full_clean()
+        promo.save()
+        self.assertEqual((promo.pk, str(promo)), ("xmas2027", "XMAS2027"))
+        now = timezone.now()
+        self.assertTrue(promo.is_valid_at(now))
+        self.assertFalse(promo.is_valid_at(promo.valid_until))
+        self.assertFalse(promo.is_valid_at(promo.valid_from - timedelta(seconds=1)))
+        self.assertEqual((promo.covers(2), promo.covers(4)), (True, False))
+        self.assertTrue(self._promo(code="all").covers(4))      # empty list: every product
+
+    def test_clean_rejects(self):
+        now = timezone.now()
+        for kw, field in [({"value": Decimal("0")}, "value"), ({"value": Decimal("101")}, "value"),
+                          ({"value": Decimal("12.5")}, "value"),
+                          ({"valid_until": now - timedelta(days=2)}, "valid_until"),
+                          ({"code": "A" * 17}, "code")]:
+            with self.assertRaises(ValidationError) as e:
+                self._promo(**kw).full_clean()
+            self.assertIn(field, e.exception.message_dict, kw)
+        self._promo(type="fixed", value=Decimal("250.50")).full_clean()   # fixed: any amount > 0
+
+    def test_db_constraints(self):
+        now = timezone.now()
+        for kw in [{"value": Decimal("150")}, {"valid_until": now - timedelta(days=2)}, {"value": Decimal("-1")}]:
+            with self.subTest(kw), self.assertRaises(IntegrityError), transaction.atomic():
+                PromoCode.objects.bulk_create([self._promo(**kw)])
+        with self.assertRaises(IntegrityError), transaction.atomic():     # save() lowercases; raw rows can't skip it
+            PromoCode.objects.bulk_create([self._promo(code="Upper")])
+
+    def test_user_discount(self):
+        user = User.objects.create_user("+905550000601")
+        self.assertEqual(user.discount_percent, 0)
+        user.discount_percent = 101
+        with self.assertRaises(ValidationError):
+            user.full_clean()
+
+    def test_admin(self):
+        staff = User.objects.create_user("+905550000602", is_staff=True)
+        self.client.force_login(staff)
+        r = self.client.post("/admin/shop/promocode/add/", {
+            "code": "Bahar26", "type": "fixed", "value": "100", "product_ids": "1,2",
+            "valid_from_0": "2026-03-01", "valid_from_1": "00:00:00",
+            "valid_until_0": "2026-04-01", "valid_until_1": "00:00:00", "note": ""})
+        self.assertEqual(r.status_code, 302, r.content.decode()[:2000])
+        promo = PromoCode.objects.get()
+        self.assertEqual((promo.code, promo.product_ids), ("bahar26", [1, 2]))
+        self.assertContains(self.client.get("/admin/shop/promocode/"), "BAHAR26")
+        self.assertEqual(self.client.get("/admin/shop/promocode/bahar26/change/").status_code, 200)
+        user = User.objects.create_user("+905550000603")
+        self.assertContains(self.client.get(f"/admin/accounts/user/{user.pk}/change/"), "discount_percent")

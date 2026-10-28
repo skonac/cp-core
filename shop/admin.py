@@ -1,8 +1,9 @@
 from django.contrib import admin
+from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 
-from .models import BillingProfile, Product, Purchase
+from .models import BillingProfile, Product, PromoCode, Purchase
 
 
 @admin.register(Product)
@@ -17,6 +18,31 @@ class ProductAdmin(admin.ModelAdmin):
         ("English", {"fields": ("name_en", "title_en", "description_en")}),
         (None, {"fields": ("credits", "price", "currency", "is_active", "is_featured", "sort_order")}),
     )
+
+
+@admin.register(PromoCode)
+class PromoCodeAdmin(admin.ModelAdmin):
+    """Discount codes. The code is saved lowercase (matched case-insensitively, shown uppercase)."""
+    list_display = ("shown_code", "type", "value", "valid_from", "valid_until", "products", "is_valid_now", "note")
+    list_filter = ("type",)
+    search_fields = ("code", "note")
+    fields = ("code", "type", "value", "valid_from", "valid_until", "product_ids", "note", "created_at")
+    readonly_fields = ("created_at",)
+
+    def get_readonly_fields(self, request, obj=None):
+        return ("code", "created_at") if obj else ("created_at",)     # the code is the key: add a new one instead
+
+    @admin.display(description="Code", ordering="code")
+    def shown_code(self, obj):
+        return obj.code.upper()
+
+    @admin.display(description="Products")
+    def products(self, obj):
+        return ", ".join(map(str, obj.product_ids)) or "all"
+
+    @admin.display(description="Valid now", boolean=True)
+    def is_valid_now(self, obj):
+        return obj.is_valid_at(timezone.now())
 
 
 @admin.register(BillingProfile)

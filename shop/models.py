@@ -1,8 +1,11 @@
 """Shop: Product (what we sell), Purchase (one buy of one product, with the payment provider's ids),
-BillingProfile (who pays: what the payment provider and the invoice need).
+BillingProfile (who pays: what the payment provider and the invoice need), PromoCode (discount codes).
 Paying for a product adds credits through credits.CreditTransaction (shop/payments.py). design/core.md."""
 from django.conf import settings
+from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 
@@ -50,8 +53,14 @@ class Purchase(models.Model):
     product_name_en = models.CharField(max_length=40)
     credits = models.PositiveIntegerField()
     list_price = models.DecimalField(max_digits=10, decimal_places=2)   # the product's regular price
-    amount = models.DecimalField(max_digits=10, decimal_places=2)       # charged (= list_price until discounts exist)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)       # charged: list_price after the discount
     currency = models.CharField(max_length=3)
+    # The discount in amount (copies at purchase time): which one, its percent (null for a fixed-amount
+    # promo), and the promo code as entered (lowercase; not a FK, codes may be deleted later).
+    discount_source = models.CharField(max_length=5, choices=[("none", "none"), ("user", "user"), ("promo", "promo")],
+                                       default="none")
+    discount_percent = models.PositiveSmallIntegerField(null=True, blank=True)
+    promo_code = models.CharField(max_length=16, blank=True)
     status = models.CharField(max_length=8, choices=Status.choices, default=Status.PENDING)
     provider = models.CharField(max_length=32)                      # settings.PAYMENT_PROVIDER: simulated | iyzico-sandbox | iyzico-production
     conversation_id = models.CharField(max_length=64, unique=True)  # our id for this attempt, sent to the provider
@@ -117,3 +126,59 @@ class BillingProfile(models.Model):
 
     def __str__(self):
         return f"{self.user} {self.company_name or (self.first_name + ' ' + self.last_name)}"
+
+
+class PromoCode(models.Model):
+    """A discount code, defined in the admin. Signed-in organizers apply one to their session
+    (POST /api/shop/promo); while now is between the dates it replaces the user's own discount on
+    the products it covers. Stored and matched lowercase, shown uppercase. design/core.md."""
+    class Type(models.TextChoices):
+        PERCENT = "percent"    # value = whole percent, 1-100
+        FIXED = "fixed"        # value = an amount off the price, in the product's currency (TRY)
+
+    code = models.CharField(max_length=16, primary_key=True)
+    type = models.CharField(max_length=7, choices=Type.choices)
+    value = models.DecimalField(max_digits=10, decimal_places=2)
+    valid_from = models.DateTimeField()
+    valid_until = models.DateTimeField()
+    # Product ids it covers; empty = every product. Plain ids, not a relation: a removed product just dangles.
+    product_ids = ArrayField(models.PositiveIntegerField(), blank=True, default=list,
+                             help_text="Product ids, comma-separated. Empty: every product.")
+    note = models.CharField(max_length=200, blank=True)              # for us: what the code is for
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-valid_until"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(code=Lower("code")), name="promocode_lowercase"),
+            models.CheckConstraint(condition=models.Q(valid_until__gt=models.F("valid_from")), name="promocode_dates"),
+            models.CheckConstraint(condition=models.Q(value__gt=0), name="promocode_value_positive"),
+            models.CheckConstraint(condition=~models.Q(type="percent") | models.Q(value__lte=100),
+                                   name="promocode_percent_max"),
+        ]
+
+    def __str__(self):
+        return self.code.upper()
+
+    def clean(self):
+        self.code = (self.code or "").strip().lower()
+        errors = {}
+        if self.value is not None:
+            if self.value <= 0:
+                errors["value"] = "Must be more than 0."
+            elif self.type == self.Type.PERCENT and (self.value > 100 or self.value != self.value.to_integral_value()):
+                errors["value"] = "A percent is a whole number from 1 to 100."
+        if self.valid_from and self.valid_until and self.valid_until <= self.valid_from:
+            errors["valid_until"] = "Must be after valid from."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().lower()
+        super().save(*args, **kwargs)
+
+    def is_valid_at(self, when) -> bool:
+        return self.valid_from <= when < self.valid_until
+
+    def covers(self, product_id: int) -> bool:
+        return not self.product_ids or product_id in self.product_ids
