@@ -31,10 +31,15 @@ class OrganizerEventOut(Out):
     coverThumbnailUrl: str | None = Field(description="Uploaded cover, else the first photo; null when neither.",
                                           examples=["/api/organizer/events/RK238/cover/thumb.jpg"])
     coverIsUploaded: bool = Field(description="False: the cover shown is the first photo.")
-    frameLandscapeUrl: str | None = Field(description="That slot's frame PNG; null when empty.",
+    frameLandscapeUrl: str | None = Field(description="That slot's frame PNG; null when empty (and in the uploader API).",
                                           examples=["/api/organizer/events/RK238/frame/landscape.png"])
-    framePortraitUrl: str | None = Field(description="That slot's frame PNG; null when empty.",
+    framePortraitUrl: str | None = Field(description="That slot's frame PNG; null when empty (and in the uploader API).",
                                          examples=["/api/organizer/events/RK238/frame/portrait.png"])
+    frameLandscapePreviewUrl: str | None = Field(description="That slot's frame on a stock photo; null when empty "
+                                                             "(and in the uploader API).",
+                                                 examples=["/api/organizer/events/RK238/frame/landscape/preview.jpg"])
+    framePortraitPreviewUrl: str | None = Field(description="That slot's frame on a stock photo; null when empty "
+                                                            "(and in the uploader API).", examples=[None])
     joinUrl: str | None = Field(description="Link for participants (QR content); null in the uploader API.",
                                 examples=["https://cleverphotos.org/?event=RK238"])
     createdAt: str = Field(examples=["2026-10-19T08:30:00+00:00"])

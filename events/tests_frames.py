@@ -2,13 +2,14 @@
 import io
 import os
 import zipfile
+from pathlib import Path
 
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from PIL import Image as PILImage
 
 from accounts.models import User
 from common.testing import TempMedia, jpeg, make_event
-from media.framing import framed_paths, served_relpath
+from media.framing import framed_paths, preview_relpath, served_relpath
 from media.ingest import delete_frame, ingest_frame, ingest_photo
 from media.storage import abspath, soft_delete
 
@@ -105,3 +106,56 @@ class FrameRenderingTests(TempMedia, TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             soft_delete(self.tall)
         self.assertFalse(fm.exists())                                      # framed files go with the photo
+
+
+class FramePreviewTests(TempMedia, TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user("+905550001101", is_organizer=True, credit_balance=10)
+        self.event = make_event(self.owner, type="sports")
+        self.client = Client()
+        self.client.force_login(self.owner)
+        self.url = f"/api/organizer/events/{self.event.code}/frame"
+
+    def test_preview(self):
+        self.assertEqual(self.client.get(f"{self.url}/landscape/preview.jpg").status_code, 404)   # empty slot
+        self.assertEqual(self.client.get(f"{self.url}/sideways/preview.jpg").status_code, 422)
+        ingest_frame(self.event, self.owner, frame_png((3000, 2000)), "landscape")
+        r = self.client.get(f"/api/organizer/events/{self.event.code}")
+        data = r.json()["data"]["event"]
+        self.assertEqual((data["frameLandscapePreviewUrl"], data["framePortraitPreviewUrl"]),
+                         (f"{self.url.replace(self.event.code, self.event.display_code)}/landscape/preview.jpg", None))
+        r = self.client.get(f"{self.url}/landscape/preview.jpg")
+        size, corner, middle = pixels(body(r))
+        self.assertEqual((size, near(corner, RED[:3]), near(middle, RED[:3])), ((1600, 1067), True, False))
+        self.event.refresh_from_db()
+        rel = preview_relpath(self.event, "landscape")
+        self.assertEqual(rel, f"events/{self.event.pk}/frame_preview_landscape.jpg")
+        with self.captureOnCommitCallbacks(execute=True):
+            ingest_frame(self.event, self.owner, frame_png((3000, 2000), BLUE), "landscape")
+        self.assertFalse(abspath(rel).exists())                            # a frame change drops it
+        self.assertTrue(near(pixels(body(self.client.get(f"{self.url}/landscape/preview.jpg")))[1], BLUE[:3]))
+
+    def test_stock_photo_choice(self):
+        from media.framing import stock_photo
+        folder = Path(self._media) / "samples"
+        folder.mkdir()
+        (folder / "default_portrait.jpg").write_bytes(jpeg(size=(1600, 2400)))
+        with override_settings(SAMPLES_DIR=folder):
+            self.assertEqual(stock_photo(self.event, "portrait").name, "default_portrait.jpg")
+            (folder / "sports_portrait.jpg").write_bytes(jpeg(size=(1600, 2400)))
+            self.assertEqual(stock_photo(self.event, "portrait").name, "sports_portrait.jpg")
+            self.assertIsNone(stock_photo(self.event, "landscape"))
+            ingest_frame(self.event, self.owner, frame_png((3000, 2000)), "landscape")
+            self.event.refresh_from_db()
+            with self.assertLogs("cp.media", "ERROR"):
+                self.assertIsNone(preview_relpath(self.event, "landscape"))   # no stock photo: 404, logged
+
+    def test_uploader_api_has_no_frame_urls(self):
+        from events.organizer_api import _stats, event_json
+        ingest_frame(self.event, self.owner, frame_png((3000, 2000)), "landscape")
+        self.event.refresh_from_db()
+        out = event_json(None, self.event, _stats([self.event])[self.event.id], base="/x", join_url=False,
+                         frames=False)
+        self.assertEqual({k: v for k, v in out.items() if k.startswith("frame")},
+                         dict.fromkeys(["frameLandscapeUrl", "framePortraitUrl", "frameLandscapePreviewUrl",
+                                        "framePortraitPreviewUrl"]))

@@ -2889,6 +2889,94 @@
         ]
       }
     },
+    "/api/organizer/events/{code}/frame/{orientation}/preview.jpg": {
+      "get": {
+        "operationId": "events_organizer_api_frame_preview",
+        "summary": "Frame Preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "orientation",
+            "schema": {
+              "title": "Orientation",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "That slot's frame on a stock photo, ~1600 px.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "description": "The frame on a sample photo of that orientation (for the event's type when we have one), so the\norganizer sees it before any photo is uploaded. Rendered once per frame change.\n\nErrors: 404 not_found (slot empty) · 422 invalid_orientation.",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
     "/api/organizer/events/{code}/photo-upload-check": {
       "post": {
         "operationId": "events_organizer_api_upload_check",
@@ -4643,9 +4731,87 @@
             }
           }
         },
-        "description": "The products on sale (managed in the admin) and the price version to buy with. Public: also for\nthe landing/pricing pages. `creditBalance` only with a session (null otherwise).",
+        "description": "The products on sale (managed in the admin) and the price version to buy with. Public: also for\nthe landing/pricing pages. `creditBalance` only with a session (null otherwise).\nPrices are this caller's (shop/pricing.py): `price` the list price, `finalPrice` after the one\ndiscount that applies (the session's promo code where it covers the product, else the account's\nown discount, or the global one: the biggest wins), `discountPercent` / `discountSource` /\n`discountLabel` that discount. Signed out: only the global discount (`globalDiscount`).",
         "tags": [
           "shop"
+        ]
+      }
+    },
+    "/api/shop/promo": {
+      "post": {
+        "operationId": "shop_api_apply_promo",
+        "summary": "Apply Promo",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromoAppliedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        },
+        "description": "Apply a promo code to this session (organizers). Matched case-insensitively. A valid code (it\nexists and now is between its dates) replaces any earlier one and stays in the session until it\nis replaced or the session ends; it counts on the products it covers instead of the account's own\ndiscount, and stops counting by itself once it expires. Answers with the catalog as in GET\n/api/shop/products (`appliedPromo` set).\n\nErrors: 403 organizer_access_required · 422 invalid_promo_code (any reason; the session's code is\ncleared) · 429 rate_limit_exceeded (4 wrong codes per 4 hours).",
+        "tags": [
+          "shop"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
         ]
       }
     },
@@ -8107,7 +8273,7 @@
                 "type": "null"
               }
             ],
-            "description": "That slot's frame PNG; null when empty.",
+            "description": "That slot's frame PNG; null when empty (and in the uploader API).",
             "examples": [
               "/api/organizer/events/RK238/frame/landscape.png"
             ],
@@ -8122,11 +8288,41 @@
                 "type": "null"
               }
             ],
-            "description": "That slot's frame PNG; null when empty.",
+            "description": "That slot's frame PNG; null when empty (and in the uploader API).",
             "examples": [
               "/api/organizer/events/RK238/frame/portrait.png"
             ],
             "title": "Frameportraiturl"
+          },
+          "frameLandscapePreviewUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "That slot's frame on a stock photo; null when empty (and in the uploader API).",
+            "examples": [
+              "/api/organizer/events/RK238/frame/landscape/preview.jpg"
+            ],
+            "title": "Framelandscapepreviewurl"
+          },
+          "framePortraitPreviewUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "That slot's frame on a stock photo; null when empty (and in the uploader API).",
+            "examples": [
+              null
+            ],
+            "title": "Frameportraitpreviewurl"
           },
           "joinUrl": {
             "anyOf": [
@@ -8172,6 +8368,8 @@
           "coverIsUploaded",
           "frameLandscapeUrl",
           "framePortraitUrl",
+          "frameLandscapePreviewUrl",
+          "framePortraitPreviewUrl",
           "joinUrl",
           "createdAt"
         ],
@@ -10033,7 +10231,7 @@
             "title": "Creditbalance"
           },
           "pricingVersion": {
-            "description": "Send back with a purchase; changes with any product or price change.",
+            "description": "Send back with a purchase; changes with any change to the prices this caller sees (products, discounts, promo validity).",
             "examples": [
               "3f9a1c0b2d4e"
             ],
@@ -10048,6 +10246,32 @@
             "title": "Products",
             "type": "array"
           },
+          "appliedPromo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The session's promo code while it is valid (uppercase); null when none or expired.",
+            "examples": [
+              "XMAS2027"
+            ],
+            "title": "Appliedpromo"
+          },
+          "globalDiscount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GlobalDiscountOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The discount for everyone (signed out too), null when off."
+          },
           "documentsVersion": {
             "description": "Version of the ÖBF + MSS texts (GET /api/shop/obf, /mss); send back with a purchase.",
             "examples": [
@@ -10061,9 +10285,50 @@
           "creditBalance",
           "pricingVersion",
           "products",
+          "appliedPromo",
+          "globalDiscount",
           "documentsVersion"
         ],
         "title": "CatalogOut",
+        "type": "object"
+      },
+      "GlobalDiscountOut": {
+        "additionalProperties": false,
+        "properties": {
+          "percent": {
+            "examples": [
+              15
+            ],
+            "title": "Percent",
+            "type": "integer"
+          },
+          "title": {
+            "$ref": "#/components/schemas/TextOut",
+            "description": "Short label (also each product's discountLabel when it wins).",
+            "examples": [
+              {
+                "en": "LANSMANA ÖZEL",
+                "tr": "LANSMANA ÖZEL"
+              }
+            ]
+          },
+          "banner": {
+            "$ref": "#/components/schemas/TextOut",
+            "description": "The site-wide line.",
+            "examples": [
+              {
+                "en": "HERKESE LANSMANA ÖZEL %15 İNDİRİM!",
+                "tr": "HERKESE LANSMANA ÖZEL %15 İNDİRİM!"
+              }
+            ]
+          }
+        },
+        "required": [
+          "percent",
+          "title",
+          "banner"
+        ],
+        "title": "GlobalDiscountOut",
         "type": "object"
       },
       "ProductOut": {
@@ -10113,10 +10378,19 @@
             "type": "integer"
           },
           "price": {
+            "description": "List price.",
             "examples": [
               3600.0
             ],
             "title": "Price",
+            "type": "number"
+          },
+          "finalPrice": {
+            "description": "What this caller pays: after the discount, rounded down to a whole TL (= price without a discount).",
+            "examples": [
+              2880.0
+            ],
+            "title": "Finalprice",
             "type": "number"
           },
           "currency": {
@@ -10127,20 +10401,57 @@
             "type": "string"
           },
           "unitPrice": {
-            "description": "Price per credit.",
+            "description": "finalPrice per credit.",
             "examples": [
-              1.8
+              1.44
             ],
             "title": "Unitprice",
             "type": "number"
           },
           "discountPercent": {
-            "description": "Against the product with the highest unit price.",
+            "description": "The discount applied to this product: the promo code's where it covers it, else the account's own; a fixed-amount promo as its rounded percent. 0: none.",
             "examples": [
-              10
+              20
             ],
             "title": "Discountpercent",
             "type": "integer"
+          },
+          "discountSource": {
+            "anyOf": [
+              {
+                "enum": [
+                  "user",
+                  "promo",
+                  "global"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why: the account's own discount, the session's promo code, the global discount; null: none.",
+            "examples": [
+              "global"
+            ],
+            "title": "Discountsource"
+          },
+          "discountLabel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TextOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Shown next to the price: the global discount's title, or the promo code (uppercase); null for user discounts and none.",
+            "examples": [
+              {
+                "en": "LANSMANA ÖZEL",
+                "tr": "LANSMANA ÖZEL"
+              }
+            ]
           },
           "featured": {
             "title": "Featured",
@@ -10154,9 +10465,12 @@
           "description",
           "creditAmount",
           "price",
+          "finalPrice",
           "currency",
           "unitPrice",
           "discountPercent",
+          "discountSource",
+          "discountLabel",
           "featured"
         ],
         "title": "ProductOut",
@@ -10226,6 +10540,59 @@
           "en"
         ],
         "title": "TextOut",
+        "type": "object"
+      },
+      "PromoAppliedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "promo_applied",
+            "default": "promo_applied",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CatalogOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "PromoAppliedResponse",
+        "type": "object"
+      },
+      "PromoIn": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "PromoIn",
         "type": "object"
       },
       "PurchaseListOut": {

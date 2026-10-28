@@ -3,6 +3,7 @@
     served_relpath(image, "d" | "m") -> the file to serve: framed when the event has a frame for the
                                         photo's orientation (rendered here on first use), else the plain one
     clear_framed(event)              -> after a frame change or removal: drop the event's framed files
+    preview_relpath(event, orientation) -> that slot's frame on a stock photo (samples/), or None
 
 A photo takes the frame of its orientation (square = landscape); an empty slot = no frame. The frame
 PNG is stretched to the photo's size and laid over it (overlay only: size and face boxes unchanged).
@@ -89,9 +90,54 @@ def served_relpath(image, rendition: str, event=None) -> str:
     return framed
 
 
+def stock_photo(event, orientation: str) -> Path | None:
+    """samples/<type>_<orientation>.jpg if it exists, else samples/default_<orientation>.jpg."""
+    for name in (f"{event.type}_{orientation}.jpg", f"default_{orientation}.jpg"):
+        path = Path(settings.SAMPLES_DIR) / name
+        if path.is_file():
+            return path
+    return None
+
+
+def preview_relpath(event, orientation: str) -> str | None:
+    """The slot's frame on a stock photo at display size, rendered on first use and kept as
+    events/<id>/frame_preview_<orientation>.jpg. None when the slot is empty or there is no stock photo."""
+    field = "frame_landscape_image" if orientation == "landscape" else "frame_portrait_image"
+    if getattr(event, f"{field}_id") is None:
+        return None
+    stock = stock_photo(event, orientation)
+    if stock is None:
+        log.error("no stock photo for the frame preview (%s, %s) in %s", event.type, orientation, settings.SAMPLES_DIR)
+        return None
+    rel = f"events/{event.pk}/frame_preview_{orientation}.jpg"
+    path = abspath(rel)
+    # Fresh = newer than the last frame change and than the stock photo (replacing a sample re-renders).
+    if _fresh(path, event.frame_changed_at) and path.stat().st_mtime >= stock.stat().st_mtime:
+        return rel
+    frame = getattr(event, field)
+    with PILImage.open(stock) as im:
+        im = im.convert("RGB")
+        im.thumbnail((settings.DISPLAY_SIDE, settings.DISPLAY_SIDE), PILImage.Resampling.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=95)
+    sized = io.BytesIO(buf.getvalue())
+    try:
+        data = render(sized, abspath(frame.relpath()), settings.DISPLAY_QUALITY)
+    except (OSError, ValueError) as e:
+        log.warning("event %s: frame preview (%s) failed: %s", event.pk, orientation, e)
+        return None
+    write_file(rel, data)
+    current = type(event).objects.filter(pk=event.pk).values_list("frame_changed_at", flat=True).first()
+    if current != event.frame_changed_at:
+        path.unlink(missing_ok=True)
+        return None
+    return rel
+
+
 def framed_paths(event) -> list[Path]:
     folder = abspath(f"events/{event.pk}")
-    return [p for pattern in ("*_fd.jpg", "*_fm.jpg") for p in folder.glob(pattern)] if folder.is_dir() else []
+    patterns = ("*_fd.jpg", "*_fm.jpg", "frame_preview_*.jpg")
+    return [p for pattern in patterns for p in folder.glob(pattern)] if folder.is_dir() else []
 
 
 def clear_framed(event) -> None:

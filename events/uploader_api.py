@@ -76,7 +76,7 @@ def _my_photos(access: UploaderAccess, event: Event):
 
 
 def _event_json(request, access, event, stats) -> dict:
-    return event_json(request, event, stats, base=_root(access), join_url=False)
+    return event_json(request, event, stats, base=_root(access), join_url=False, frames=False)
 
 
 def _balance(access) -> int:

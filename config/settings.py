@@ -152,6 +152,7 @@ UPLOAD_MAX_BYTES = 50 * 1024 * 1024          # per file
 MASTER_SIDE = 4000          # px, long edge; downloads and prints
 MASTER_QUALITY = 90
 DISPLAY_SIDE = 1600         # browsing, and the image the face worker receives
+SAMPLES_DIR = BASE_DIR / "samples"   # stock photos for the frame preview (samples/README.md)
 DISPLAY_QUALITY = 85
 THUMB_SIDE = 400
 THUMB_QUALITY = 80

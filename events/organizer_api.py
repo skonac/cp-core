@@ -20,7 +20,7 @@ from pydantic import Field
 from accounts.models import UploaderAccess, User
 from accounts.otp import E164, mask_phone, normalize_phone
 from common.api import ApiError, CamelSchema, errors, file_doc, respond
-from media.framing import served_relpath
+from media.framing import preview_relpath, served_relpath
 from media.ingest import FRAME_FIELDS, IngestError, delete_frame, event_cover, ingest_cover, ingest_frame, ingest_photo
 from media.matching import my_photos, selfie_states
 from media.models import Image
@@ -100,13 +100,15 @@ def _balance(user) -> int:
     return User.objects.values_list("credit_balance", flat=True).get(pk=user.pk)
 
 
-def _frame_url(event, image, orientation: str, base: str) -> str | None:
+def _frame_url(event, image, orientation: str, base: str, file: str) -> str | None:
     if image is None or image.deleted_at is not None:
         return None
-    return f"{base}/{event.display_code}/frame/{orientation}.png"
+    return f"{base}/{event.display_code}/frame/{file}"
 
 
-def event_json(request, event: Event, stats: dict, base: str = "/api/organizer/events", join_url: bool = True) -> dict:
+def event_json(request, event: Event, stats: dict, base: str = "/api/organizer/events", join_url: bool = True,
+               frames: bool = True) -> dict:
+    """frames=False (uploader API): no frame URLs, frames are the organizer's."""
     code = event.display_code
     uploaded = event.cover_image is not None and event.cover_image.deleted_at is None
     return {
@@ -119,8 +121,14 @@ def event_json(request, event: Event, stats: dict, base: str = "/api/organizer/e
         "participantCount": stats["participants"],
         "coverThumbnailUrl": f"{base}/{code}/cover/thumb.jpg" if uploaded or stats["total"] else None,
         "coverIsUploaded": uploaded,
-        "frameLandscapeUrl": _frame_url(event, event.frame_landscape_image, "landscape", base),
-        "framePortraitUrl": _frame_url(event, event.frame_portrait_image, "portrait", base),
+        **({"frameLandscapeUrl": _frame_url(event, event.frame_landscape_image, "landscape", base, "landscape.png"),
+            "framePortraitUrl": _frame_url(event, event.frame_portrait_image, "portrait", base, "portrait.png"),
+            "frameLandscapePreviewUrl": _frame_url(event, event.frame_landscape_image, "landscape", base,
+                                                   "landscape/preview.jpg"),
+            "framePortraitPreviewUrl": _frame_url(event, event.frame_portrait_image, "portrait", base,
+                                                  "portrait/preview.jpg")} if frames else
+           {"frameLandscapeUrl": None, "framePortraitUrl": None,
+            "frameLandscapePreviewUrl": None, "framePortraitPreviewUrl": None}),
         "joinUrl": request.build_absolute_uri(f"/?event={code}") if join_url else None,
         "createdAt": event.created_at.isoformat(),
     }
@@ -389,6 +397,20 @@ def frame_file(request, code: str, orientation: str):
     if image is None or image.deleted_at is not None:
         raise ApiError(404, "not_found", "Çerçeve yok.")
     return file_response(image.relpath(), content_type="image/png")
+
+
+@organizer_router.get("/events/{code}/frame/{orientation}/preview.jpg", response=errors(401, 403, 404, 422),
+                      openapi_extra=file_doc("image/jpeg", "That slot's frame on a stock photo, ~1600 px."))
+def frame_preview(request, code: str, orientation: str):
+    """The frame on a sample photo of that orientation (for the event's type when we have one), so the
+    organizer sees it before any photo is uploaded. Rendered once per frame change.
+
+    Errors: 404 not_found (slot empty) · 422 invalid_orientation."""
+    event = _event(request, code)
+    rel = preview_relpath(event, _orientation(orientation))
+    if rel is None:
+        raise ApiError(404, "not_found", "Çerçeve yok.")
+    return file_response(rel)
 
 
 # ---------------------------------------------------------------------------- uploads

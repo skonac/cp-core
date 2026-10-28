@@ -173,6 +173,7 @@ class OrganizerApiTests(TempMedia, TestCase):
                         "organizer_frame_updated")   # square counts as landscape
         self.assertEqual(c.get(f"{base}/frame/landscape.png")["Content-Type"], "image/png")
         self.assertEqual(c.get(f"{base}/frame/portrait.png").status_code, 200)
+        self.assertEqual(c.get(f"{base}/frame/portrait/preview.jpg")["Content-Type"], "image/jpeg")
         mismatch = SimpleUploadedFile("m.png", png((1800, 1200)), content_type="image/png")
         self.assertCode(self.post_form(f"{base}/frame?orientation=portrait", {"file": mismatch}),
                         422, "frame_wrong_orientation")
@@ -188,6 +189,7 @@ class OrganizerApiTests(TempMedia, TestCase):
         self.assertCode(c.delete_(f"{base}/frame?orientation=landscape"), 200, "organizer_frame_updated")
         self.assertIsNone(c.get(base).json()["data"]["event"]["frameLandscapeUrl"])
         self.assertCode(c.get(f"{base}/frame/landscape.png"), 404, "not_found")
+        self.assertCode(c.get(f"{base}/frame/landscape/preview.jpg"), 404, "not_found")
         self.assertCode(c.delete_(f"{base}/frame?orientation=landscape"), 200, "organizer_frame_updated")   # idempotent
 
         # --- participants
