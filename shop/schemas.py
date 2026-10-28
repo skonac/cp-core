@@ -19,19 +19,26 @@ class ProductOut(Out):
     title: TextOut = Field(examples=[{"tr": "Mini paket", "en": "Small pack"}])
     description: TextOut = Field(description="Subtitle.", examples=[{"tr": "Küçük düğünler için", "en": "For small weddings"}])
     creditAmount: int = Field(description="Credits the product adds to the account.", examples=[2000])
-    price: float = Field(examples=[3600.0])
+    price: float = Field(description="List price.", examples=[3600.0])
+    finalPrice: float = Field(description="What this caller pays: after the discount, rounded down to a whole TL "
+                                          "(= price without a discount).", examples=[2880.0])
     currency: str = Field(examples=["TRY"])
-    unitPrice: float = Field(description="Price per credit.", examples=[1.8])
-    discountPercent: int = Field(description="Against the product with the highest unit price.", examples=[10])
+    unitPrice: float = Field(description="finalPrice per credit.", examples=[1.44])
+    discountPercent: int = Field(description="The discount applied to this product: the promo code's where it "
+                                             "covers it, else the account's own; a fixed-amount promo as its "
+                                             "rounded percent. 0: none.", examples=[20])
     featured: bool
 
 
 class CatalogOut(Out):
     creditBalance: int | None = Field(description="Signed in: the balance (may be negative). Signed out: null.",
                                       examples=[1840])
-    pricingVersion: str = Field(description="Send back with a purchase; changes with any product or price change.",
+    pricingVersion: str = Field(description="Send back with a purchase; changes with any change to the prices this caller sees "
+                                            "(products, discounts, promo validity).",
                                 examples=["3f9a1c0b2d4e"])
     products: list[ProductOut] = Field(description="On sale, in display order.")
+    appliedPromo: str | None = Field(description="The session's promo code while it is valid (uppercase); null "
+                                                 "when none or expired.", examples=["XMAS2027"])
     documentsVersion: str = Field(description="Version of the ÖBF + MSS texts (GET /api/shop/obf, /mss); send back "
                                               "with a purchase.", examples=["001"])
 

@@ -1,6 +1,6 @@
 """Buying a product (design/core.md, "Shop").
 
-    start(user, product, ip, billing, profile, callback_url, user_agent) -> (Purchase, page URL)
+    start(user, product, ip, billing, profile, callback_url, user_agent, price) -> (Purchase, page URL)
     finish_iyzico(token) -> Purchase       after iyzico's return
     complete(purchase, ...)                the one place where a purchase adds credits
 
@@ -21,7 +21,7 @@ from django.utils import timezone
 from accounts.models import User
 from credits.models import CreditTransaction
 
-from . import documents, iyzico
+from . import documents, iyzico, pricing
 from .models import Product, Purchase
 
 log = logging.getLogger("cp.payments")
@@ -33,14 +33,18 @@ class PaymentError(Exception):
         self.code, self.message = code, message
 
 
-def _new(user, product: Product, ip: str | None, billing: dict | None, user_agent: str = "") -> Purchase:
+def _new(user, product: Product, ip: str | None, billing: dict | None, user_agent: str = "",
+         price: "pricing.Price | None" = None) -> Purchase:
     """The pending purchase with the sales documents the buyer accepted (shop/documents.py), in one
-    transaction: no purchase without its documents."""
+    transaction: no purchase without its documents. price: shop/pricing.py (default: the user's own
+    discount, no promo)."""
+    price = price or pricing.price_for(product, user, None)
     with transaction.atomic():
         purchase = Purchase.objects.create(
             user=user, product=product, product_name_tr=product.name_tr, product_name_en=product.name_en,
             credits=product.credits,
-            list_price=product.price, amount=product.price, currency=product.currency,
+            list_price=price.list_price, amount=price.final, currency=product.currency,
+            discount_source=price.source, discount_percent=price.percent, promo_code=price.promo_code,
             provider=settings.PAYMENT_PROVIDER, conversation_id="cp_" + secrets.token_hex(12), ip=ip or None,
             billing=billing)
         documents.attach(purchase, user_agent)
@@ -74,12 +78,12 @@ def fail(purchase: Purchase, code: str, message: str = "", response: dict | None
 
 
 def start(user, product: Product, ip: str | None, billing: dict, profile, callback_url: str,
-          user_agent: str = "") -> tuple[Purchase, str | None]:
+          user_agent: str = "", price: "pricing.Price | None" = None) -> tuple[Purchase, str | None]:
     """Begin a purchase. -> (purchase, payment page URL or None).
     simulated: paid at once, no page. iyzico-*: pending, the browser goes to iyzico's page; the
     callback (finish_iyzico) completes or fails it. Raises PaymentError when iyzico refuses or can't be reached."""
     provider = settings.PAYMENT_PROVIDER
-    purchase = _new(user, product, ip, billing, user_agent)
+    purchase = _new(user, product, ip, billing, user_agent, price)
     if provider == "simulated":
         return complete(purchase, payment_id=f"SIM-{purchase.pk}", response={"simulated": True, "status": "success"}), None
     try:

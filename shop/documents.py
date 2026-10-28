@@ -83,13 +83,14 @@ def _page(version: str, lang: str, title: str, bodies: list[str]) -> str:
                                           "bodies": [mark_safe(b) for b in bodies]})
 
 
-def preview(kind: str, locale: str, user, billing: dict, product) -> str:
-    """One text filled for this user and product, before a purchase exists: order number "–", date now."""
+def preview(kind: str, locale: str, user, billing: dict, product, amount=None) -> str:
+    """One text filled for this user and product, before a purchase exists: order number "–", date now.
+    amount: what this buyer would pay (shop/pricing.py); default the list price."""
     version = settings.SALES_DOCS_VERSION
     title = product.title_tr if locale == "tr" else (product.title_en or product.title_tr)
     name = product.name_tr if locale == "tr" else (product.name_en or product.name_tr)
     ctx = {"buyer": _buyer(billing, user.phone),
-           "order": _order(locale, EMPTY, timezone.now(), name, title, product.credits, product.price, product.currency)}
+           "order": _order(locale, EMPTY, timezone.now(), name, title, product.credits, product.price if amount is None else amount, product.currency)}
     return _page(version, locale, TITLES[(kind, locale)], [_render(version, f"{kind}_{locale}", ctx)])
 
 

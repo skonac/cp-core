@@ -1,7 +1,6 @@
 """Shop API (/api/shop/…): the products on sale (public), buying one and the purchase history
 (organizer accounts: credits are spent on photo uploads). Shapes and codes: docs/api.md §3.7.
 One product per purchase, no cart. Payment: shop/payments.py (simulated until iyzico is connected)."""
-import hashlib
 from typing import Literal
 
 from django.conf import settings
@@ -13,7 +12,7 @@ from pydantic import Field
 from accounts.models import User
 from common.api import ApiError, CamelSchema, errors, file_doc, respond
 
-from . import documents
+from . import documents, pricing
 from . import schemas as S
 from .billing import billing_errors
 from .models import BillingProfile, Product, Purchase
@@ -37,11 +36,6 @@ def _on_sale() -> list[Product]:
     return list(Product.objects.filter(is_active=True))
 
 
-def _pricing_version(products) -> str:
-    text = ";".join(f"{p.pk}:{p.credits}:{p.price}:{p.currency}" for p in products)
-    return hashlib.sha256(text.encode()).hexdigest()[:12]
-
-
 def purchase_json(p: Purchase) -> dict:
     return {"id": str(p.pk), "productId": str(p.product_id),
             "productName": {"tr": p.product_name_tr, "en": p.product_name_en},
@@ -53,23 +47,30 @@ def purchase_json(p: Purchase) -> dict:
 @shop_router.get("/products", auth=None, response={200: S.CatalogResponse})
 def products(request):
     """The products on sale (managed in the admin) and the price version to buy with. Public: also for
-    the landing/pricing pages. `creditBalance` only with a session (null otherwise)."""
+    the landing/pricing pages. `creditBalance` only with a session (null otherwise).
+    Prices are this caller's (shop/pricing.py): `price` the list price, `finalPrice` after the one
+    discount that applies (the session's promo code where it covers the product, else the account's
+    own discount), `discountPercent` that discount. Signed out: no discount."""
+    return respond(request, "products_retrieved", catalog_json(request))
+
+
+def catalog_json(request) -> dict:
     on_sale = _on_sale()
-    top_unit = max((float(p.price) / p.credits for p in on_sale if p.credits), default=0)
+    priced, promo = pricing.prices(request, on_sale)
     out = []
     for p in on_sale:
-        unit = float(p.price) / p.credits if p.credits else 0
+        price = priced[p.pk]
         out.append({"id": str(p.pk), "name": {"tr": p.name_tr, "en": p.name_en},
                     "title": {"tr": p.title_tr, "en": p.title_en},
                     "description": {"tr": p.description_tr, "en": p.description_en},
-                    "creditAmount": p.credits, "price": float(p.price), "currency": p.currency,
-                    "unitPrice": round(unit, 4),
-                    "discountPercent": round((1 - unit / top_unit) * 100) if top_unit else 0,
-                    "featured": p.is_featured})
+                    "creditAmount": p.credits, "price": float(p.price), "finalPrice": float(price.final),
+                    "currency": p.currency,
+                    "unitPrice": round(float(price.final) / p.credits, 4) if p.credits else 0,
+                    "discountPercent": price.shown_percent, "featured": p.is_featured})
     balance = _balance(request.user) if request.user.is_authenticated else None
-    return respond(request, "products_retrieved", {
-        "creditBalance": balance, "pricingVersion": _pricing_version(on_sale), "products": out,
-        "documentsVersion": settings.SALES_DOCS_VERSION})
+    return {"creditBalance": balance, "pricingVersion": pricing.pricing_version(on_sale, priced), "products": out,
+            "appliedPromo": promo.code.upper() if promo else None,
+            "documentsVersion": settings.SALES_DOCS_VERSION}
 
 
 HTML = "text/html; charset=utf-8"
@@ -91,7 +92,8 @@ def _document(request, kind: str, product_id: str, locale: str) -> HttpResponse:
     profile = _profile(user)
     if profile is None or not profile.is_complete:
         raise ApiError(422, "billing_profile_required", "Önce fatura bilgilerini doldur.")
-    return _html(documents.preview(kind, locale, user, billing_json(profile)["billing"], product))
+    price = pricing.price_for(product, user, pricing.session_promo(request))
+    return _html(documents.preview(kind, locale, user, billing_json(profile)["billing"], product, price.final))
 
 
 @shop_router.get("/obf", response=errors(401, 403, 404, 422), openapi_extra=file_doc(HTML, "The filled form"))
@@ -155,7 +157,8 @@ def create_purchase(request, data: PurchaseIn):
     product = next((p for p in on_sale if str(p.pk) == data.product_id), None)
     if product is None:
         raise ApiError(404, "not_found", "Ürün bulunamadı.")
-    if data.pricing_version != _pricing_version(on_sale):
+    priced, _ = pricing.prices(request, on_sale)
+    if data.pricing_version != pricing.pricing_version(on_sale, priced):
         raise ApiError(409, "pricing_changed", "Fiyatlar güncellendi; ürünleri yeniden yükle.")
     profile = _profile(user)
     if profile is None or not profile.is_complete:
@@ -168,7 +171,7 @@ def create_purchase(request, data: PurchaseIn):
     try:
         purchase, page_url = start(user, product, request.META.get("REMOTE_ADDR"), billing_json(profile)["billing"],
                                    profile, request.build_absolute_uri(CALLBACK_PATH),
-                                   request.META.get("HTTP_USER_AGENT", ""))
+                                   request.META.get("HTTP_USER_AGENT", ""), priced[product.pk])
     except PaymentError as e:
         raise ApiError(502, e.code, e.message) from None
     return respond(request, "purchase_started", {"purchase": purchase_json(purchase), "paymentPageUrl": page_url,

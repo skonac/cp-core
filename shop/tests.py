@@ -6,6 +6,7 @@ import json
 import re
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.cache import cache
 from unittest import mock
 
@@ -22,6 +23,7 @@ from credits.models import CreditTransaction
 
 from .apps import check_payment_provider, check_sales_documents
 from .billing import tckn_valid, vkn_valid
+from . import pricing
 from .models import BillingProfile, Product, PromoCode, Purchase
 from .documents import attach
 from .payments import complete, finish_iyzico, start
@@ -87,7 +89,7 @@ class ShopApiTests(TestCase):
         self.assertEqual(cat["creditBalance"], -12)
         self.assertEqual([(p["name"]["tr"], p["title"], p["unitPrice"], p["discountPercent"]) for p in cat["products"]],
                          [("2000cr", {"tr": "Mini paket", "en": "Small pack"}, 2.0, 0),
-                          ("5000cr", {"tr": "", "en": ""}, 1.5, 25)])
+                          ("5000cr", {"tr": "", "en": ""}, 1.5, 0)])        # no discount on this account
         self.assertEqual(cat["products"][0]["description"], {"tr": "Küçük etkinlikler", "en": ""})
         self.assertCode(c.get("/api/shop/purchases"), 200, "purchases_retrieved")
         pid, version = cat["products"][0]["id"], cat["pricingVersion"]
@@ -446,3 +448,98 @@ class PromoCodeModelTests(TestCase):
         self.assertEqual(self.client.get("/admin/shop/promocode/bahar26/change/").status_code, 200)
         user = User.objects.create_user("+905550000603")
         self.assertContains(self.client.get(f"/admin/accounts/user/{user.pk}/change/"), "discount_percent")
+
+
+@override_settings(PAYMENT_PROVIDER="simulated")
+class PricingTests(TestCase):
+    """shop/pricing.py and where it is used: the catalog, the ÖBF/MSS preview, purchase creation."""
+
+    def setUp(self):
+        self.p1 = Product.objects.create(name_tr="2000cr", name_en="2000cr", credits=2000, price=3600)
+        self.p2 = Product.objects.create(name_tr="5000cr", name_en="5000cr", credits=5000, price=Decimal("1999"))
+        self.org = User.objects.create_user("+905550000701", is_organizer=True, discount_percent=20)
+        BillingProfile.objects.create(user=self.org, first_name="Ece", last_name="Yılmaz",
+                                      identity_number="10000000146", email="e@x.co", address="Cad. 1",
+                                      district="Çankaya", city="Ankara")
+        now = timezone.now()
+        self.promo = PromoCode.objects.create(code="Xmas2027", type="percent", value=50, product_ids=[self.p1.pk],
+                                              valid_from=now - timedelta(days=1), valid_until=now + timedelta(days=1))
+
+    def _use(self, user, code="xmas2027"):
+        self.client.force_login(user)
+        session = self.client.session
+        session[pricing.SESSION_KEY] = code
+        session.save()
+
+    def _catalog(self):
+        data = self.client.get("/api/shop/products").json()["data"]
+        return data, {p["id"]: (p["price"], p["finalPrice"], p["discountPercent"]) for p in data["products"]}
+
+    def test_price_for(self):
+        P = PromoCode
+        fixed = P(code="f", type="fixed", value=Decimal("100"), valid_from=timezone.now(), valid_until=timezone.now())
+        big = P(code="g", type="fixed", value=Decimal("5000"), valid_from=timezone.now(), valid_until=timezone.now())
+        cases = [
+            (self.p1, self.org, None, ("3600", "2880.00", "user", 20, 20, "")),
+            (self.p2, self.org, None, ("1999", "1599.00", "user", 20, 20, "")),       # 1599.20 → whole TL down
+            (self.p1, self.org, self.promo, ("3600", "1800.00", "promo", 50, 50, "xmas2027")),
+            (self.p2, self.org, self.promo, ("1999", "1599.00", "user", 20, 20, "")),  # not covered: own discount
+            (self.p1, self.org, fixed, ("3600", "3500.00", "promo", None, 3, "f")),
+            (self.p1, self.org, big, ("3600", "0.00", "promo", None, 100, "g")),       # never below 0
+            (self.p2, User(discount_percent=0), None, ("1999", "1999", "none", None, 0, "")),
+        ]
+        for product, user, promo, want in cases:
+            pr = pricing.price_for(product, user, promo)
+            self.assertEqual((str(pr.list_price), str(pr.final), pr.source, pr.percent, pr.shown_percent,
+                              pr.promo_code), want, (product, promo))
+
+    def test_catalog(self):
+        data, prices = self._catalog()                                      # signed out: list prices
+        self.assertEqual((prices[str(self.p1.pk)], data["appliedPromo"]), ((3600.0, 3600.0, 0), None))
+        anon_version = data["pricingVersion"]
+        self.client.force_login(self.org)                                   # own discount everywhere
+        data, prices = self._catalog()
+        self.assertEqual(prices, {str(self.p1.pk): (3600.0, 2880.0, 20), str(self.p2.pk): (1999.0, 1599.0, 20)})
+        self.assertIsNone(data["appliedPromo"])
+        self.assertEqual(data["products"][0]["unitPrice"], 1.44)
+        own_version = data["pricingVersion"]
+        self._use(self.org)                                                 # promo on p1, own discount on p2
+        data, prices = self._catalog()
+        self.assertEqual(prices, {str(self.p1.pk): (3600.0, 1800.0, 50), str(self.p2.pk): (1999.0, 1599.0, 20)})
+        self.assertEqual(data["appliedPromo"], "XMAS2027")
+        self.assertEqual(len({anon_version, own_version, data["pricingVersion"]}), 3)
+        PromoCode.objects.filter(pk="xmas2027").update(valid_until=timezone.now() - timedelta(seconds=1))
+        data, prices = self._catalog()                                      # expired: back to the own discount
+        self.assertEqual((prices[str(self.p1.pk)], data["appliedPromo"], data["pricingVersion"]),
+                         ((3600.0, 2880.0, 20), None, own_version))
+
+    def test_promo_only_for_organizers(self):
+        guest = User.objects.create_user("+905550000702", is_participant=True, discount_percent=10)
+        self._use(guest)
+        data, prices = self._catalog()
+        self.assertEqual((prices[str(self.p1.pk)], data["appliedPromo"]), ((3600.0, 3240.0, 10), None))
+
+    def test_preview_and_purchase(self):
+        self._use(self.org)
+        mss = self.client.get(f"/api/shop/mss?product={self.p1.pk}").content.decode()
+        self.assertIn("1.800,00", mss)
+        self.assertNotIn("3.600,00", mss)
+        version = self._catalog()[0]["pricingVersion"]
+        body = {"productId": str(self.p1.pk), "pricingVersion": version, "documentsVersion": settings.SALES_DOCS_VERSION,
+                "acceptedObf": True, "acceptedMss": True}
+        r = self.client.post("/api/shop/purchases", body, content_type="application/json")
+        self.assertEqual(r.status_code, 201, r.content[:300])
+        purchase = Purchase.objects.get()
+        self.assertEqual((purchase.list_price, purchase.amount, purchase.discount_source, purchase.discount_percent,
+                          purchase.promo_code), (Decimal("3600"), Decimal("1800"), "promo", 50, "xmas2027"))
+        self.assertIn("1.800,00", purchase.docs_html)
+        self.org.discount_percent = 30                                      # a shown price changed: refused
+        self.org.save()
+        body["productId"] = str(self.p2.pk)
+        r = self.client.post("/api/shop/purchases", body, content_type="application/json")
+        self.assertEqual((r.status_code, r.json()["code"]), (409, "pricing_changed"))
+        body["pricingVersion"] = self._catalog()[0]["pricingVersion"]
+        self.assertEqual(self.client.post("/api/shop/purchases", body, content_type="application/json").status_code, 201)
+        latest = Purchase.objects.latest("pk")
+        self.assertEqual((latest.amount, latest.discount_source, latest.discount_percent, latest.promo_code),
+                         (Decimal("1399"), "user", 30, ""))
