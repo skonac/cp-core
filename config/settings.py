@@ -222,7 +222,7 @@ KVKK_LOCALES = ("tr", "en")
 
 # Sales documents (design/core.md, "Checkout documents"): Ön Bilgilendirme Formu + Mesafeli Satış
 # Sözleşmesi, TR + EN: legal/{obf,mss}_{tr,en}_<v>.html + sales_page_<v>.html. A published version is never edited.
-SALES_DOCS_VERSION = env("CP_SALES_DOCS_VERSION", "001")
+SALES_DOCS_VERSION = env("CP_SALES_DOCS_VERSION", "002")
 
 WORKER_TOKEN = env("CP_WORKER_TOKEN", "")
 WORKER_LEASE = 120          # seconds a claimed job belongs to its worker

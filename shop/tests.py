@@ -140,7 +140,7 @@ class ShopApiTests(TestCase):
         r = c.get("/api/shop/mss", {"product": pid, "locale": "en"})
         self.assertContains(r, "Distance Sales Agreement")
         self.assertContains(r, "TRY 4,000.00")
-        self.assertEqual(cat["documentsVersion"], "001")
+        self.assertEqual(cat["documentsVersion"], settings.SALES_DOCS_VERSION)
         buy = {"productId": pid, "pricingVersion": version}
         self.assertCode(c.post_json("/api/shop/purchases", buy), 409, "documents_changed")
         buy["documentsVersion"] = cat["documentsVersion"]
@@ -165,7 +165,7 @@ class ShopApiTests(TestCase):
         self.assertEqual((page.status_code, page["X-Frame-Options"]), (200, "SAMEORIGIN"))
         stored = Purchase.objects.get()
         self.assertEqual(page.content.decode(), stored.docs_html)
-        self.assertEqual((stored.docs_version, stored.user_agent, stored.ip), ("001", "TestBrowser/1.0", "127.0.0.1"))
+        self.assertEqual((stored.docs_version, stored.user_agent, stored.ip), (settings.SALES_DOCS_VERSION, "TestBrowser/1.0", "127.0.0.1"))
         self.assertCode(c.get("/api/shop/purchases/99999/documents"), 404, "not_found")
         self.assertEqual(r.json()["data"]["purchase"]["status"], "paid")
         self.assertCode(c.get("/api/shop/purchases/99999"), 404, "not_found")
@@ -359,7 +359,7 @@ class DocumentsTests(TestCase):
             self.assertIn(text, html)
         self.assertNotIn("{{", html)
         self.assertEqual(purchase.docs_sha256, hashlib.sha256(html.encode()).hexdigest())
-        self.assertEqual((purchase.user_agent, purchase.docs_version), ("Mozilla/5.0 (iPhone)", "001"))
+        self.assertEqual((purchase.user_agent, purchase.docs_version), ("Mozilla/5.0 (iPhone)", settings.SALES_DOCS_VERSION))
         self.assertIsNotNone(purchase.docs_accepted_at)
         self.product.title_tr = "Yeni ad"                    # later product changes don't touch the stored page
         self.product.save()
@@ -530,7 +530,7 @@ class PricingTests(TestCase):
         self._use(self.org)
         mss = self.client.get(f"/api/shop/mss?product={self.p1.pk}").content.decode()
         self.assertIn("1.800,00", mss)
-        self.assertNotIn("3.600,00", mss)
+        self.assertNotRegex(mss, r"Toplam bedel \(KDV dahil\)</th><td>3\.600,00")    # the total is the discounted one
         version = self._catalog()[0]["pricingVersion"]
         body = {"productId": str(self.p1.pk), "pricingVersion": version, "documentsVersion": settings.SALES_DOCS_VERSION,
                 "acceptedObf": True, "acceptedMss": True}
@@ -680,3 +680,69 @@ class GlobalDiscountTests(TestCase):
             with self.settings(GLOBAL_DISCOUNT_VALUE=bad):
                 self.assertEqual([e.id for e in check_global_discount()], ["cp.E010"], bad)
                 self.assertEqual(pricing.global_percent(), 0)
+
+
+@override_settings(PAYMENT_PROVIDER="iyzico-sandbox", SALES_DOCS_VERSION="002")
+class FreePurchaseAndDocumentsTests(TestCase):
+    """Step 4: 0 TL skips iyzico. Step 5: the ÖBF/MSS (version 002) show list price, discount and which one."""
+
+    def setUp(self):
+        self.product = Product.objects.create(name_tr="2000cr", name_en="2000cr", credits=2000, price=4000)
+        self.org = User.objects.create_user("+905550001201", is_organizer=True, discount_percent=20)
+        BillingProfile.objects.create(user=self.org, first_name="Ece", last_name="Yılmaz", identity_number="10000000146",
+                                      email="e@x.co", address="Cad. 1", district="Çankaya", city="Ankara")
+        now = timezone.now()
+        PromoCode.objects.create(code="hediye", type="fixed", value=5000, valid_from=now - timedelta(days=1),
+                                 valid_until=now + timedelta(days=1))
+        PromoCode.objects.create(code="yarim", type="percent", value=50, valid_from=now - timedelta(days=1),
+                                 valid_until=now + timedelta(days=1))
+        self.client.force_login(self.org)
+
+    def _use(self, code):
+        session = self.client.session
+        session[pricing.SESSION_KEY] = code
+        session.save()
+
+    def _buy(self):
+        version = self.client.get("/api/shop/products").json()["data"]["pricingVersion"]
+        return self.client.post("/api/shop/purchases", {
+            "productId": str(self.product.pk), "pricingVersion": version, "documentsVersion": settings.SALES_DOCS_VERSION,
+            "acceptedObf": True, "acceptedMss": True}, content_type="application/json")
+
+    def test_free_purchase_skips_iyzico(self):
+        self._use("hediye")
+        with mock.patch("shop.iyzico._send", side_effect=AssertionError("iyzico must not be called")):
+            r = self._buy()
+        self.assertEqual(r.status_code, 201, r.content[:300])
+        data = r.json()["data"]
+        self.assertEqual((data["purchase"]["status"], data["purchase"]["amount"], data["paymentPageUrl"],
+                          data["creditBalance"]), ("paid", 0.0, None, 2000))
+        purchase = Purchase.objects.get()
+        self.assertEqual((purchase.provider, purchase.provider_payment_id, purchase.discount_source),
+                         ("free", f"FREE-{purchase.pk}", "promo"))
+        self.assertIn("4.000,00 TL (Promosyon kodu HEDIYE)", purchase.docs_html.replace("<td>", "").replace("</td>", ""))
+        self.assertEqual(CreditTransaction.objects.get().delta, 2000)
+
+    def test_documents_show_the_discount(self):
+        mss = self.client.get(f"/api/shop/mss?product={self.product.pk}").content.decode()   # own 20 %
+        self.assertIn("Liste fiyatı (KDV dahil)</th><td>4.000,00 TL", mss)
+        self.assertIn("800,00 TL (Hesap indirimi, %20)", mss)
+        self.assertIn("Toplam bedel (KDV dahil)</th><td>3.200,00 TL", mss)
+        obf_en = self.client.get(f"/api/shop/obf?product={self.product.pk}&locale=en").content.decode()
+        self.assertIn("TRY 800.00 (Account discount, 20%)", obf_en)
+        self._use("yarim")
+        with mock.patch("shop.iyzico._send", FakeIyzico()):
+            self.assertEqual(self._buy().status_code, 201)
+        html = Purchase.objects.get().docs_html
+        self.assertIn("2.000,00 TL (Promosyon kodu YARIM, %50)", html)
+        self.assertIn("TRY 2,000.00 (Promo code YARIM, 50%)", html)
+        with self.settings(GLOBAL_DISCOUNT_VALUE="60", GLOBAL_DISCOUNT_TITLE={"tr": "LANSMANA ÖZEL", "en": "LAUNCH"}):
+            mss = self.client.get(f"/api/shop/mss?product={self.product.pk}").content.decode()
+            self.assertIn("2.400,00 TL (LANSMANA ÖZEL, %60)", mss)
+        self.org.discount_percent = 0
+        self.org.save()
+        self.client.session.flush()
+        self.client.force_login(self.org)
+        mss = self.client.get(f"/api/shop/mss?product={self.product.pk}").content.decode()
+        self.assertNotIn("Liste fiyatı", mss)                              # no discount: no extra rows
+        self.assertIn("Toplam bedel (KDV dahil)</th><td>4.000,00 TL", mss)

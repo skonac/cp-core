@@ -156,7 +156,7 @@ def _document(request, kind: str, product_id: str, locale: str) -> HttpResponse:
     if profile is None or not profile.is_complete:
         raise ApiError(422, "billing_profile_required", "Önce fatura bilgilerini doldur.")
     price = pricing.price_for(product, user, pricing.session_promo(request))
-    return _html(documents.preview(kind, locale, user, billing_json(profile)["billing"], product, price.final))
+    return _html(documents.preview(kind, locale, user, billing_json(profile)["billing"], product, price))
 
 
 @shop_router.get("/obf", response=errors(401, 403, 404, 422), openapi_extra=file_doc(HTML, "The filled form"))
@@ -203,7 +203,8 @@ def create_purchase(request, data: PurchaseIn):
     browser there. After paying, iyzico brings the browser back to us, we settle the purchase and
     redirect to the shop page (`/organizer/credits?purchase=<id>&status=paid|failed|pending`); read
     the result with GET /api/shop/purchases/{id}. Simulated (dev servers): `paid` at once,
-    `paymentPageUrl` null.
+    `paymentPageUrl` null. A purchase discounted to 0 TL is `paid` at once with `paymentPageUrl` null
+    too, on every server (no payment provider involved).
 
     Needs a complete billing profile (`PUT /api/me/billing`); it is copied into the purchase. The buyer
     must have ticked both checkboxes (ÖBF and MSS, GET /api/shop/obf and /mss): `acceptedObf` and

@@ -62,7 +62,7 @@ class Purchase(models.Model):
     discount_percent = models.PositiveSmallIntegerField(null=True, blank=True)
     promo_code = models.CharField(max_length=16, blank=True)
     status = models.CharField(max_length=8, choices=Status.choices, default=Status.PENDING)
-    provider = models.CharField(max_length=32)                      # settings.PAYMENT_PROVIDER: simulated | iyzico-sandbox | iyzico-production
+    provider = models.CharField(max_length=32)                      # settings.PAYMENT_PROVIDER: simulated | iyzico-sandbox | iyzico-production; "free" for 0 TL
     conversation_id = models.CharField(max_length=64, unique=True)  # our id for this attempt, sent to the provider
     provider_token = models.CharField(max_length=200, blank=True)   # iyzico checkout form token
     provider_payment_id = models.CharField(max_length=64, blank=True)   # iyzico paymentId once paid

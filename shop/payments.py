@@ -80,10 +80,16 @@ def fail(purchase: Purchase, code: str, message: str = "", response: dict | None
 def start(user, product: Product, ip: str | None, billing: dict, profile, callback_url: str,
           user_agent: str = "", price: "pricing.Price | None" = None) -> tuple[Purchase, str | None]:
     """Begin a purchase. -> (purchase, payment page URL or None).
+    0 TL (fully discounted): paid at once, provider "free", no page, whatever the provider.
     simulated: paid at once, no page. iyzico-*: pending, the browser goes to iyzico's page; the
     callback (finish_iyzico) completes or fails it. Raises PaymentError when iyzico refuses or can't be reached."""
     provider = settings.PAYMENT_PROVIDER
     purchase = _new(user, product, ip, billing, user_agent, price)
+    if purchase.amount == 0:      # fully discounted: nothing to charge, no payment provider
+        Purchase.objects.filter(pk=purchase.pk).update(provider="free")
+        purchase.provider = "free"
+        log.info("purchase %s: 0 %s, no payment needed", purchase.pk, purchase.currency)
+        return complete(purchase, payment_id=f"FREE-{purchase.pk}", response={"free": True}), None
     if provider == "simulated":
         return complete(purchase, payment_id=f"SIM-{purchase.pk}", response={"simulated": True, "status": "success"}), None
     try:

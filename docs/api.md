@@ -8,7 +8,7 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-28 (frames: photos + preview) · API version 0.7
+Last updated: 2026-10-29 (discounts, promo codes, ÖBF/MSS 002) · API version 0.7
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then §5 ("Changes from cp-web's drafts"),
 > which lists every place where this API still differs from `cp-web/docs/api/*.md` and the MSW mocks. Update
@@ -19,6 +19,7 @@ Last updated: 2026-10-28 (frames: photos + preview) · API version 0.7
 
 | Date | Change | Where |
 | --- | --- | --- |
+| 2026-10-29 | Discounts: products get `finalPrice`, `discountSource`, `discountLabel`; `discountPercent` is now the discount applied to that product (no longer "against the highest unit price"); top level `appliedPromo`, `globalDiscount`; `pricingVersion` covers the caller's prices. `POST /api/shop/promo`. A purchase discounted to 0 TL is paid at once (no iyzico). ÖBF/MSS version `002` shows list price and discount | §3.7 |
 | 2026-10-28 | Frame preview: `GET /api/organizer/events/{code}/frame/{orientation}/preview.jpg` (the frame on a stock photo), `frameLandscapePreviewUrl`/`framePortraitPreviewUrl` on the event object. In the uploader API all four frame URLs are now null (they pointed at paths that don't exist there) | §3.6, §3.10 |
 | 2026-10-28 | Photos framed: with a frame in the photo's orientation slot, every `display.jpg`, `download` and ZIP serves the framed photo (thumbnails stay plain). Same URLs, no new fields. | §3.6 |
 | 2026-10-28 | Event frames (upload + storage, step 1 of 2): `POST`/`DELETE /api/organizer/events/{code}/frame?orientation=`, `GET …/frame/{orientation}.png`, `frameLandscapeUrl`/`framePortraitUrl` on the event object. Rendering photos with the frame (step 2) is not built yet | §3.6 |
@@ -94,7 +95,7 @@ Every response except files and `204` is:
 | 409 | `pricing_changed` | Purchase with an old `pricingVersion` |
 | 410 | `event_expired`, `otp_expired` | |
 | 422 | `billing_profile_required` | Purchase before the billing profile is complete (§3.8) |
-| 422 | `validation_error`, `invalid_phone_number`, `invalid_role`, `invalid_otp`, `explicit_consent_required`, `unsupported_file_type`, `unreadable_image`, `file_too_large`, `file_required`, `invalid_slot`, `invalid_event_settings`, `too_many_files`, `invalid_orientation`, `frame_size_out_of_range`, `frame_wrong_orientation` | |
+| 422 | `validation_error`, `invalid_phone_number`, `invalid_role`, `invalid_otp`, `explicit_consent_required`, `unsupported_file_type`, `unreadable_image`, `file_too_large`, `file_required`, `invalid_slot`, `invalid_event_settings`, `too_many_files`, `invalid_orientation`, `frame_size_out_of_range`, `frame_wrong_orientation`, `invalid_promo_code` | |
 | 423 | `event_access_closed` | The organizer closed access |
 | 429 | `rate_limit_exceeded`, `download_limit_reached` | |
 | 500 | `internal_error` | Bug; quote the `requestId` |
@@ -527,14 +528,42 @@ not filled in (fall back to the other language, or hide it).
   "products": [ { "id": "2", "name": { "tr": "2000cr", "en": "2000cr" },
                   "title": { "tr": "Mini paket", "en": "Small pack" },
                   "description": { "tr": "Küçük düğünler için", "en": "For small weddings" },
-                  "creditAmount": 2000, "price": 3600.0, "currency": "TRY",
-                  "unitPrice": 1.8, "discountPercent": 10, "featured": true } ],
-  "documentsVersion": "001" }
+                  "creditAmount": 2000, "price": 3600.0, "finalPrice": 3060.0, "currency": "TRY",
+                  "unitPrice": 1.53, "discountPercent": 15, "discountSource": "global",
+                  "discountLabel": { "tr": "LANSMANA ÖZEL", "en": "LANSMANA ÖZEL" }, "featured": true } ],
+  "appliedPromo": null,
+  "globalDiscount": { "percent": 15, "title": { "tr": "LANSMANA ÖZEL", "en": "LANSMANA ÖZEL" },
+                      "banner": { "tr": "HERKESE LANSMANA ÖZEL %15 İNDİRİM!", "en": "HERKESE LANSMANA ÖZEL %15 İNDİRİM!" } },
+  "documentsVersion": "002" }
 ```
 
-No session needed. `creditBalance` is `null` when signed out. `products`: the ones on sale, in display order. `discountPercent` is against the product with the highest unit price.
-`pricingVersion` changes whenever a product or price changes; send it back with a purchase. `documentsVersion` is the
-version of the sales documents below; send it back with a purchase too.
+No session needed. `creditBalance` is `null` when signed out. `products`: the ones on sale, in display order.
+`price` is the list price, `finalPrice` what this caller pays (show `price` struck through when they differ),
+`unitPrice` = `finalPrice` per credit.
+
+**Discounts.** At most one per product, never stacked; the biggest that applies wins (tie: promo, then account,
+then global):
+
+- **global** (`globalDiscount`, set on the server; `null` when off): everyone, signed out too. Show `banner` site-wide.
+- **account** (`discountSource: "user"`): a percentage set on the account by us; signed in only.
+- **promo code** (`discountSource: "promo"`): applied to the session with `POST /api/shop/promo` (below); organizers only.
+  It may cover only some products.
+
+Per product: `discountPercent` (0 = none; a fixed-amount promo shows its rounded equivalent), `discountSource`
+(`user` / `promo` / `global` / `null`), `discountLabel` (`{tr, en}` to show next to the price: the global `title`,
+or the promo code; `null` for account discounts and none). Final prices are rounded down to a whole TL and never go
+below 0. `appliedPromo`: the session's code (uppercase) while it is valid, else `null` (an expired code just stops
+counting; prices fall back to the next discount).
+
+`pricingVersion` changes whenever any price this caller sees changes (a product, a discount, a promo expiring); send it
+back with a purchase. `documentsVersion` is the version of the sales documents below; send it back with a purchase too.
+
+**`POST /api/shop/promo`** `{ "code": "xmas2027" }` (organizers) → `200 promo_applied`, the same `data` as
+`GET /api/shop/products` with the code applied. Case and spaces don't matter. A valid code replaces the session's
+previous one and stays until it is replaced or the session ends (sign-out). Errors: `422 invalid_promo_code` for any
+reason (unknown, not started, expired: never told apart; the session's current code is cleared too) ·
+`429 rate_limit_exceeded` (4 wrong codes per 4 hours per account; then even a correct code waits) · `403
+organizer_access_required`.
 
 **Sales documents.** Before paying, the buyer must read and accept two texts: the **Ön Bilgilendirme Formu** (ÖBF,
 preliminary information form) and the **Mesafeli Satış Sözleşmesi** (MSS, distance sales agreement). Near the pay
@@ -548,7 +577,8 @@ switch; the text is an HTML page filled for the signed-in user and the chosen pr
 
 **`GET /api/shop/obf?product=<id>&locale=tr|en`**, **`GET /api/shop/mss?product=<id>&locale=tr|en`** →
 `200 text/html` (a complete page; show it in an `iframe` with `src` = the URL, or fetch it and use `srcdoc`). The
-order number shows as "–" and the date is now; the stored copy gets both. Errors (JSON): `404 not_found` (product not
+order number shows as "–" and the date is now; the stored copy gets both. With a discount the order block shows the
+list price, the discount (amount and which one) and the total (from version `002`). Errors (JSON): `404 not_found` (product not
 on sale), `422 billing_profile_required` (fill the billing profile first: the texts show the buyer's details).
 
 When the purchase is created (below), the four texts (ÖBF and MSS, Turkish and English) are stored with it, with the
@@ -569,7 +599,7 @@ purchase time. `status`: `pending` (payment not finished), `paid` (credits added
 the buyer accepted for this purchase (`null` on purchases from before the documents existed); show it as a link
 ("Sözleşme" / "Agreement") in the purchase history.
 
-**`POST /api/shop/purchases`** `{ "productId": "2", "pricingVersion": "3f9a1c0b2d4e", "documentsVersion": "001",
+**`POST /api/shop/purchases`** `{ "productId": "2", "pricingVersion": "3f9a1c0b2d4e", "documentsVersion": "002",
 "acceptedObf": true, "acceptedMss": true }` →
 `201 purchase_started` `{ "purchase": {…}, "paymentPageUrl": "https://sandbox-cpp.iyzipay.com?token=…", "creditBalance": 1840 }`.
 
@@ -586,6 +616,7 @@ The payment runs on iyzico's page (card data never reaches us):
 
 On development servers the payment can also be **simulated**: then the purchase is `paid` at once, the credits are
 added, and `paymentPageUrl` is `null`; skip the redirect. Handle both: `paymentPageUrl` null → done, else redirect.
+A purchase discounted to 0 TL works the same way on every server: `paid` at once, `paymentPageUrl` `null`, no iyzico.
 Errors: `404 not_found` (product not on sale), `409 pricing_changed` (reload the products), `422 validation_error`,
 `422 billing_profile_required` (show the billing form, §3.8, then buy again), `409 documents_changed` (the texts
 changed: reload the products, untick both boxes, show the texts again), `422 documents_not_accepted` (a checkbox not
@@ -778,5 +809,5 @@ Done in cp-web `c37cce4`: the rename from "photographer" (P0), event codes in pa
 ## 6. Not yet in this API
 
 Live iyzico payments (sandbox now), real OTP delivery (WhatsApp; SMS parked), push notifications (new photos of you, end of event), a WhatsApp message to a newly added uploader, emailing the documents after payment,
-discounts and coupons, organizer activity feed, participant access revoke, choosing the cover from the event's photos,
+organizer activity feed, participant access revoke, choosing the cover from the event's photos,
 covers for participants (`coverThumbnailUrl` in `/api/me/events`), email login. Ask before building screens that need them.

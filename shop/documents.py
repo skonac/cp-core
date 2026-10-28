@@ -72,10 +72,29 @@ def _product_name(name: str, title: str) -> str:
     return f"{name} – {title}" if title else name
 
 
-def _order(locale: str, number: str, when, name: str, title: str, credits: int, amount, currency: str) -> dict:
+def _discount_note(locale: str, source: str, percent: int | None, promo_code: str) -> str:
+    """Which discount, in words: "Promosyon kodu XMAS2027, %20" / "Account discount, 20%"."""
+    pct = "" if percent is None else (f"%{percent}" if locale == "tr" else f"{percent}%")
+    if source == "promo":
+        what = f"{'Promosyon kodu' if locale == 'tr' else 'Promo code'} {promo_code.upper()}"
+    elif source == "user":
+        what = "Hesap indirimi" if locale == "tr" else "Account discount"
+    else:   # global
+        what = settings.GLOBAL_DISCOUNT_TITLE.get(locale) or ("Kampanya indirimi" if locale == "tr" else "Campaign discount")
+    return f"{what}, {pct}" if pct else what
+
+
+def _order(locale: str, number: str, when, name: str, title: str, credits: int, amount, currency: str,
+           list_price=None, source: str = "none", percent: int | None = None, promo_code: str = "") -> dict:
+    """discount: None, or list price, the amount off and which discount (templates from version 002)."""
+    discount = None
+    if source != "none" and list_price is not None and Decimal(list_price) > Decimal(amount):
+        discount = {"list_amount": _money(list_price, currency, locale),
+                    "amount_off": _money(Decimal(list_price) - Decimal(amount), currency, locale),
+                    "note": _discount_note(locale, source, percent, promo_code)}
     return {"number": number, "date": timezone.localtime(when).strftime("%d.%m.%Y %H:%M"),
             "product": _product_name(name, title), "credits": _count(credits, locale),
-            "amount": _money(amount, currency, locale)}
+            "amount": _money(amount, currency, locale), "discount": discount}
 
 
 def _page(version: str, lang: str, title: str, bodies: list[str]) -> str:
@@ -83,14 +102,16 @@ def _page(version: str, lang: str, title: str, bodies: list[str]) -> str:
                                           "bodies": [mark_safe(b) for b in bodies]})
 
 
-def preview(kind: str, locale: str, user, billing: dict, product, amount=None) -> str:
+def preview(kind: str, locale: str, user, billing: dict, product, price=None) -> str:
     """One text filled for this user and product, before a purchase exists: order number "–", date now.
-    amount: what this buyer would pay (shop/pricing.py); default the list price."""
+    price: what this buyer would pay (shop/pricing.Price); default the list price, no discount."""
     version = settings.SALES_DOCS_VERSION
     title = product.title_tr if locale == "tr" else (product.title_en or product.title_tr)
     name = product.name_tr if locale == "tr" else (product.name_en or product.name_tr)
     ctx = {"buyer": _buyer(billing, user.phone),
-           "order": _order(locale, EMPTY, timezone.now(), name, title, product.credits, product.price if amount is None else amount, product.currency)}
+           "order": _order(locale, EMPTY, timezone.now(), name, title, product.credits,
+                           product.price if price is None else price.final, product.currency,
+                           *(() if price is None else (price.list_price, price.source, price.percent, price.promo_code)))}
     return _page(version, locale, TITLES[(kind, locale)], [_render(version, f"{kind}_{locale}", ctx)])
 
 
@@ -106,7 +127,8 @@ def attach(purchase, user_agent: str = "") -> None:
             name, title = purchase.product_name_tr, product.title_tr
         else:
             name, title = purchase.product_name_en or purchase.product_name_tr, product.title_en or product.title_tr
-        order = _order(loc, purchase.number, now, name, title, purchase.credits, purchase.amount, purchase.currency)
+        order = _order(loc, purchase.number, now, name, title, purchase.credits, purchase.amount, purchase.currency,
+                       purchase.list_price, purchase.discount_source, purchase.discount_percent, purchase.promo_code)
         bodies.append(_render(version, f"{kind}_{loc}", {"buyer": buyer, "order": order}))
     html = _page(version, "tr", f"{TITLES[('mss', 'tr')]} {purchase.number}", bodies)
     purchase.docs_version, purchase.docs_html, purchase.docs_accepted_at = version, html, now

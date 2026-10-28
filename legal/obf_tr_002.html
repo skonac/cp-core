@@ -1,0 +1,75 @@
+<h1>Ön Bilgilendirme Formu</h1>
+<p class="sub">Clever Photos kontör paketi satışı · Sürüm 002 · 29 Ekim 2026</p>
+
+<p>Bu form, 6502 sayılı Tüketicinin Korunması Hakkında Kanun ve Mesafeli Sözleşmeler Yönetmeliği uyarınca, sözleşme kurulmadan ve ödeme yapılmadan önce Alıcı’yı bilgilendirmek amacıyla sunulur.</p>
+
+<h2>1. Satıcı</h2>
+<table class="kv">
+<tr><th>Ad soyad / ticaret unvanı</th><td>Sabiha Pınar Gesli – Clever Photos</td></tr>
+<tr><th>Adres</th><td>Güvenlik Caddesi No: 36A, Ayrancı, Çankaya / Ankara</td></tr>
+<tr><th>Vergi dairesi / vergi no</th><td>Hitit Vergi Dairesi / 23252752794</td></tr>
+<tr><th>Telefon</th><td>+90 538 417 56 84</td></tr>
+<tr><th>E-posta</th><td>pinar@slothcoffeeshop.com</td></tr>
+<tr><th>İnternet sitesi</th><td>cleverphotos.org</td></tr>
+</table>
+
+<h2>2. Alıcı</h2>
+<table class="kv">
+<tr><th>Ad soyad / unvan</th><td>{{ buyer.name }}</td></tr>
+<tr><th>Adres</th><td>{{ buyer.address }}</td></tr>
+<tr><th>E-posta</th><td>{{ buyer.email }}</td></tr>
+<tr><th>Telefon</th><td>{{ buyer.phone }}</td></tr>
+</table>
+
+<h2>3. Ürün ve temel nitelikleri</h2>
+<table class="kv">
+<tr><th>Ürün</th><td>{{ order.product }}</td></tr>
+<tr><th>Kontör miktarı</th><td>{{ order.credits }}</td></tr>
+{% if order.discount %}<tr><th>Liste fiyatı (KDV dahil)</th><td>{{ order.discount.list_amount }}</td></tr>
+<tr><th>İndirim</th><td>{{ order.discount.amount_off }} ({{ order.discount.note }})</td></tr>
+{% endif %}<tr><th>Toplam bedel (KDV dahil)</th><td>{{ order.amount }}</td></tr>
+<tr><th>Teslim masrafı</th><td>Yoktur</td></tr>
+</table>
+<ul>
+<li>Kontör, Clever Photos Platformu’na etkinlik fotoğrafı yüklemek için kullanılan dijital kullanım birimidir. 1 kontör, 1 fotoğraf yükleme hakkı verir.</li>
+<li>Platform’a yüklenen ve Platform tarafından kabul edilen her fotoğraf için 1 kontör düşülür. Sonradan silinen fotoğraflar ve içinde yüz bulunmayan fotoğraflar için kontör iade edilmez.</li>
+<li>Kontörler nakde çevrilemez ve başka bir hesaba devredilemez.</li>
+<li>Hesapta 3 (üç) yıl boyunca hiç kontör kullanılmaz ve yeni kontör paketi satın alınmazsa, kalan kontörler bu sürenin sonunda geçerliliğini yitirir.</li>
+</ul>
+
+<h2>4. Ödeme ve teslim</h2>
+<ul>
+<li>Fiyatlar Türk lirası cinsindendir ve KDV dahildir.</li>
+<li>Ödeme, İyzi Ödeme ve Elektronik Para Hizmetleri A.Ş. (iyzico) altyapısı ile kredi kartı veya banka kartıyla tek seferde alınır. Kart bilgileri Satıcı’ya iletilmez ve saklanmaz.</li>
+<li>Kontörler, ödeme onaylandığı anda elektronik ortamda Alıcı’nın Platform hesabına tanımlanır. Fiziksel teslimat yapılmaz.</li>
+<li>Fatura, e-Fatura mükellefi Alıcı’lar için e-Fatura, diğer Alıcı’lar için e-Arşiv fatura olarak düzenlenir ve Alıcı’nın e-posta adresine gönderilir.</li>
+</ul>
+
+<h2>5. Cayma hakkı</h2>
+<ul>
+<li>Kontörler ödeme onaylandığı anda hesaba tanımlandığından ve hizmetin ifasına Alıcı’nın onayı ile hemen başlandığından, Mesafeli Sözleşmeler Yönetmeliği’nin 15. maddesinin birinci fıkrasının (g) ve (ğ) bentleri uyarınca cayma hakkı bulunmamaktadır.</li>
+<li>Bununla birlikte Satıcı, tüketici olan Alıcı’ya şu imkânı tanır: Satın alma tarihinden sonra hesapta hiç kontör kullanılmamışsa (fotoğraf yüklenmemişse), Alıcı sözleşmenin kurulduğu tarihten itibaren 14 (on dört) gün içinde, gerekçe göstermeksizin ve cezai şart ödemeksizin sözleşmeden cayabilir.</li>
+<li>Cayma bildirimi, bu süre içinde sipariş numarası belirtilerek pinar@slothcoffeeshop.com adresine e-posta ile yapılır.</li>
+<li>Satıcı, bildirimin kendisine ulaştığı tarihten itibaren 14 (on dört) gün içinde bedelin tamamını ödemenin yapıldığı kart aracılığıyla, masrafsız olarak iade eder ve ilgili kontörleri hesaptan düşer.</li>
+<li>Satın almadan sonra hesapta kontör kullanılmaya başlandığında bu cayma imkânı sona erer; kısmi iade yapılmaz.</li>
+</ul>
+
+<h2>6. Dijital hizmetin işlevselliği ve uyumluluğu</h2>
+<p>Platform, internet bağlantısı olan bir cihazda güncel bir web tarayıcısı ile kullanılır; ayrıca bir yazılım kurulması gerekmez. Hizmete erişim, cep telefonu numarasına SMS ile gönderilen tek kullanımlık kod ile giriş yapılarak sağlanır.</p>
+
+<h2>7. Siparişin verilmesi ve sözleşmenin saklanması</h2>
+<ul>
+<li>Sipariş, Platform’da kontör paketinin seçilmesi, fatura bilgilerinin girilmesi, bu formun ve Mesafeli Satış Sözleşmesi’nin onaylanması ve ödemenin iyzico ödeme sayfasında tamamlanması adımlarıyla verilir.</li>
+<li>Alıcı, ödeme sayfasına geçmeden önce seçtiği paketi ve fatura bilgilerini görebilir ve düzeltebilir.</li>
+<li>Bu form ve Mesafeli Satış Sözleşmesi Alıcı’nın e-posta adresine gönderilir ve Alıcı’nın Platform hesabından erişilebilir durumda tutulur. Satıcı sipariş kayıtlarını mevzuatta öngörülen süre boyunca saklar.</li>
+<li>Sözleşme dili Türkçedir. İngilizce çeviri bilgi amaçlıdır.</li>
+<li>Kişisel veriler Platform’da yayımlanan Aydınlatma Metni’ne uygun olarak işlenir.</li>
+</ul>
+
+<h2>8. Şikâyet ve uyuşmazlıklar</h2>
+<p>Alıcı, talep ve şikâyetlerini Bölüm 1’deki iletişim bilgileri üzerinden Satıcı’ya iletebilir. Tüketici olan Alıcı, Ticaret Bakanlığı’nca her yıl ilan edilen parasal sınırlar dahilinde yerleşim yerinin bulunduğu veya tüketici işlemini yaptığı yerdeki Tüketici Hakem Heyeti’ne, bu sınırları aşan uyuşmazlıklarda Tüketici Mahkemesi’ne başvurabilir. Tüketici Hakem Heyeti başvuruları e-Devlet üzerinden Tüketici Bilgi Sistemi (TÜBİS) aracılığıyla da yapılabilir.</p>
+
+<div class="box">
+<p style="margin:0">Alıcı, bu Ön Bilgilendirme Formu’nu okuduğunu, sözleşme kurulmadan ve ödeme yapılmadan önce yukarıdaki bilgilerin kendisine elektronik ortamda verildiğini ve kontörlerin ödeme onaylandığı anda hesabına tanımlanmasını onayladığını kabul eder.</p>
+<p class="small" style="margin:6pt 0 0">Tarih: {{ order.date }} · Sipariş no: {{ order.number }}</p>
+</div>
