@@ -22,6 +22,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from accounts import kvkk
+from media.framing import served_relpath
 from media.ingest import IngestError, ingest_selfie
 from media.matching import my_photos
 from media.models import DownloadLog, Image
@@ -108,8 +109,8 @@ def photo_page(request, code, seq):
 def photo_file(request, code, seq, rendition):
     if rendition not in ("d", "t"):
         raise Http404
-    _, image = _visible_photo(request, code, seq)
-    return file_response(image.relpath(rendition))
+    event, image = _visible_photo(request, code, seq)
+    return file_response(served_relpath(image, rendition, event))
 
 
 @login_required
@@ -123,7 +124,7 @@ def photo_download(request, code, seq):
         return redirect("participant:photo", code=event.code, seq=image.seq)
     DownloadLog.objects.create(user=request.user, image=image, ip=request.META.get("REMOTE_ADDR"))
     name = settings.DOWNLOAD_NAME.format(code=event.code, seq=image.seq)
-    return file_response(image.relpath("m"), download_name=name)
+    return file_response(served_relpath(image, "m", event), download_name=name)
 
 
 @login_required

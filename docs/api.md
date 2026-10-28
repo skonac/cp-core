@@ -8,7 +8,7 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-28 (frames step 1) · API version 0.7
+Last updated: 2026-10-28 (frames on photos) · API version 0.7
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then §5 ("Changes from cp-web's drafts"),
 > which lists every place where this API still differs from `cp-web/docs/api/*.md` and the MSW mocks. Update
@@ -19,6 +19,7 @@ Last updated: 2026-10-28 (frames step 1) · API version 0.7
 
 | Date | Change | Where |
 | --- | --- | --- |
+| 2026-10-28 | Photos framed: with a frame in the photo's orientation slot, every `display.jpg`, `download` and ZIP serves the framed photo (thumbnails stay plain). Same URLs, no new fields. Frame preview on a stock photo: next | §3.6 |
 | 2026-10-28 | Event frames (upload + storage, step 1 of 2): `POST`/`DELETE /api/organizer/events/{code}/frame?orientation=`, `GET …/frame/{orientation}.png`, `frameLandscapeUrl`/`framePortraitUrl` on the event object. Rendering photos with the frame (step 2) is not built yet | §3.6 |
 | 2026-10-28 | Event QR code: `GET /api/organizer/events/{code}/qr?width=` (SVG) | §3.6 |
 | 2026-10-25 | Uploaders are assigned to **events**: `eventCodes` when adding one, `PATCH /api/organizer/uploaders/{id}` to change them, `events` in the uploader object, `?event=` filter | §3.10, §5c P8 |
@@ -390,7 +391,7 @@ allows an overdraft down to a floor, so a balance of −12 is shown as −12.
 | `processedPhotoCount` / `pendingPhotoCount` / `failedPhotoCount` | Face processing: finished / waiting or running / failed |
 | `participantCount` | People who opened the event (the organizer not counted) |
 | `coverThumbnailUrl` | The uploaded cover; without one, the first photo; `null` when neither exists. `coverIsUploaded` tells which |
-| `frameLandscapeUrl` / `framePortraitUrl` | That slot's uploaded frame PNG; `null` when empty. Not yet used to frame any photo (step 2) |
+| `frameLandscapeUrl` / `framePortraitUrl` | That slot's uploaded frame PNG; `null` when empty |
 | `joinUrl` | The link for participants; put it in the QR code |
 
 **`GET /api/organizer/dashboard`** → `200 organizer_dashboard_retrieved`:
@@ -424,8 +425,7 @@ not in the gallery; replaces the previous uploaded cover. `DELETE /api/organizer
 Files: `GET …/cover/thumb.jpg` (~400 px), `GET …/cover/display.jpg` (~1600 px).
 
 **Frame.** Two slots per event, `landscape` and `portrait`: a PNG overlay the organizer uploads, kept
-exactly as given (no re-encoding - transparency survives) for later use framing photos (not built yet;
-today this is upload and storage only). `POST /api/organizer/events/{code}/frame?orientation=landscape|portrait`
+exactly as given (no re-encoding - transparency survives). `POST /api/organizer/events/{code}/frame?orientation=landscape|portrait`
 — `multipart/form-data`: `file` (PNG). Free; replaces that slot's previous frame. Checks: PNG; long side
 1600–4000 px; pixel shape must match the slot (a landscape-shaped PNG for `landscape`, portrait-shaped for
 `portrait`; a square PNG counts as landscape). The alpha channel and how much of it is transparent are not
@@ -435,6 +435,11 @@ an already-empty slot). Both → `200 organizer_frame_updated` `{ event }`. Erro
 `file_too_large`, `frame_size_out_of_range`, `frame_wrong_orientation`.
 File: `GET …/frame/{orientation}.png` → `200 image/png`, that slot's frame exactly as uploaded; `404 not_found`
 when that slot is empty. The event object carries `frameLandscapeUrl`/`framePortraitUrl` (null when empty).
+**Framed photos.** A photo takes the frame of its orientation (square = landscape; an empty slot = no frame),
+stretched to the photo's size and laid over it, so the image size and `matchedFace` boxes stay valid. With a frame,
+every `displayUrl` (participant, organizer, uploader), `download` and `download.zip` serves the framed photo; the
+URLs don't change. Thumbnails stay unframed. A framed file is made on first request (≈ 0.1 s display, ≈ 0.5 s full
+size; a ZIP renders as it streams) and kept; a frame change or removal applies to every photo from the next request.
 
 **`POST /api/organizer/events/{code}/photo-upload-check`** `{ "photoCount": 240 }` → `200 photo_upload_eligibility_checked`:
 
@@ -765,7 +770,7 @@ Done in cp-web `c37cce4`: the rename from "photographer" (P0), event codes in pa
 
 ## 6. Not yet in this API
 
-Live iyzico payments (sandbox now), real OTP delivery (WhatsApp; SMS parked), framing photos with the
-uploaded event frame (rendering + preview; upload/storage is built), push notifications (new photos of you, end of event), a WhatsApp message to a newly added uploader, emailing the documents after payment,
+Live iyzico payments (sandbox now), real OTP delivery (WhatsApp; SMS parked), a preview of the event
+frame on a stock photo, push notifications (new photos of you, end of event), a WhatsApp message to a newly added uploader, emailing the documents after payment,
 discounts and coupons, organizer activity feed, participant access revoke, choosing the cover from the event's photos,
 covers for participants (`coverThumbnailUrl` in `/api/me/events`), email login. Ask before building screens that need them.

@@ -17,6 +17,7 @@ from ninja.security import APIKeyCookie
 from accounts.models import UploaderAccess, User
 from accounts.uploader import access_json, active_accesses, session_phone
 from common.api import ApiError, errors, file_doc, respond
+from media.framing import served_relpath
 from media.ingest import IngestError, event_cover, ingest_photo
 from media.models import Image
 from media.storage import file_response, soft_delete
@@ -217,7 +218,7 @@ def _photo_file(request, access_id: str, code: str, photo_id: str, rendition: st
     image = _my_photos(access, event).filter(seq=int(photo_id)).first() if photo_id.isdigit() else None
     if image is None:
         raise ApiError(404, "photo_not_found", "Fotoğraf bulunamadı.")
-    return file_response(image.relpath(rendition))
+    return file_response(served_relpath(image, rendition, event))
 
 
 @uploader_router.get("/accesses/{access_id}/events/{code}/photos/{photo_id}/thumb.jpg", response=errors(401, 404),

@@ -11,6 +11,7 @@ from ninja.security import django_auth
 
 from common.api import ApiError, CamelSchema, errors, file_doc, respond
 from common.ratelimit import allow
+from media.framing import served_relpath
 from media.matching import Match, my_matches, photo_match, similarity_to_user
 from media.models import DownloadLog, FaceRejection, Image
 from media.storage import abspath, file_response
@@ -239,7 +240,8 @@ def photo_thumb(request, code: str, photo_id: str):
 @events_router.get("/{code}/photos/{photo_id}/display.jpg", response=errors(401, 403, 404, 410, 423),
                    openapi_extra=file_doc("image/jpeg", "~1600 px, for viewing"))
 def photo_display(request, code: str, photo_id: str):
-    return file_response(_visible_photo(request, code, photo_id)[1].relpath("d"))
+    event, image = _visible_photo(request, code, photo_id)
+    return file_response(served_relpath(image, "d", event))
 
 
 @events_router.get("/{code}/photos/{photo_id}/download", response=errors(401, 403, 404, 410, 423, 429),
@@ -252,7 +254,7 @@ def photo_download(request, code: str, photo_id: str):
             >= settings.DOWNLOAD_CAP_PER_PHOTO_PER_DAY:
         raise ApiError(429, "download_limit_reached", "Bu fotoğrafı bugün yeterince indirdin. Yarın tekrar dene.")
     DownloadLog.objects.create(user=request.user, image=image, ip=request.META.get("REMOTE_ADDR"))
-    return file_response(image.relpath("m"),
+    return file_response(served_relpath(image, "m", event),
                          download_name=settings.DOWNLOAD_NAME.format(code=event.code, seq=image.seq))
 
 
@@ -291,7 +293,9 @@ def download_zip(request, code: str, view: str = "mine", photos: str = "", all: 
         raise ApiError(429, "download_limit_reached", "Bu fotoğrafları bugün yeterince indirdin. Yarın tekrar dene.")
     ip = request.META.get("REMOTE_ADDR")
     DownloadLog.objects.bulk_create([DownloadLog(user=request.user, image=p, ip=ip) for p in allowed])
-    entries = [(settings.DOWNLOAD_NAME.format(code=event.code, seq=p.seq), abspath(p.relpath("m"))) for p in allowed]
+    # Framed masters render while the ZIP streams (one at a time), not all before the first byte.
+    entries = [(settings.DOWNLOAD_NAME.format(code=event.code, seq=p.seq),
+                lambda p=p: abspath(served_relpath(p, "m", event))) for p in allowed]
     response = StreamingHttpResponse(stream_zip(entries), content_type="application/zip")
     response["Content-Disposition"] = f'attachment; filename="{settings.ZIP_NAME.format(code=event.code, view=view)}"'
     response["X-Photos-Included"] = str(len(allowed))

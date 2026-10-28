@@ -1,6 +1,6 @@
 """Stream a ZIP of files without building it in memory or on disk.
 
-    stream_zip([(name_in_zip, path), ...]) -> iterator of bytes
+    stream_zip([(name_in_zip, path or a function returning one), ...]) -> iterator of bytes
 
 Entries are stored, not compressed (JPEGs don't shrink). zipfile writes to any object with
 write(); here that object is a small buffer emptied after every chunk, so memory stays at about
@@ -39,6 +39,7 @@ def stream_zip(entries: list[tuple[str, Path]]):
     sink = _Sink()
     with zipfile.ZipFile(sink, mode="w", compression=zipfile.ZIP_STORED, allowZip64=True) as zf:
         for name, path in entries:
+            path = path() if callable(path) else path       # resolved when its turn comes
             info = zipfile.ZipInfo.from_file(path, arcname=name)
             info.compress_type = zipfile.ZIP_STORED
             with open(path, "rb") as src, zf.open(info, mode="w", force_zip64=True) as dst:

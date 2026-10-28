@@ -20,6 +20,7 @@ from pydantic import Field
 from accounts.models import UploaderAccess, User
 from accounts.otp import E164, mask_phone, normalize_phone
 from common.api import ApiError, CamelSchema, errors, file_doc, respond
+from media.framing import served_relpath
 from media.ingest import FRAME_FIELDS, IngestError, delete_frame, event_cover, ingest_cover, ingest_frame, ingest_photo
 from media.matching import my_photos, selfie_states
 from media.models import Image
@@ -497,7 +498,7 @@ def _photo_file(request, code: str, photo_id: str, rendition: str):
     image = _photos(event).filter(seq=int(photo_id)).first() if photo_id.isdigit() else None
     if image is None:
         raise ApiError(404, "photo_not_found", "Fotoğraf bulunamadı.")
-    return file_response(image.relpath(rendition))
+    return file_response(served_relpath(image, rendition, event))
 
 
 @organizer_router.get("/events/{code}/photos/{photo_id}/thumb.jpg", response=errors(401, 403, 404),

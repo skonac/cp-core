@@ -23,6 +23,7 @@ from pillow_heif import register_heif_opener
 from accounts.models import User
 from events.models import Event
 
+from .framing import clear_framed
 from .models import Image
 from .storage import abspath, soft_delete, write_file
 
@@ -310,6 +311,7 @@ def ingest_frame(event: Event, uploader: User, data: bytes, orientation: str) ->
             Event.objects.filter(pk=event.pk).update(**{field: image, "frame_changed_at": now})
             setattr(event, field, image)
             event.frame_changed_at = now
+            clear_framed(event)          # framed photos re-render with the new frame (media/framing.py)
     except BaseException:
         _remove(written)
         raise
@@ -329,3 +331,4 @@ def delete_frame(event: Event, orientation: str) -> None:
         Event.objects.filter(pk=event.pk).update(**{field: None, "frame_changed_at": now})
         setattr(event, field, None)
         event.frame_changed_at = now
+        clear_framed(event)

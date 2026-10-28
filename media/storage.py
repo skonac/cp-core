@@ -4,6 +4,7 @@ Serving: in production nginx sends the bytes (X-Accel-Redirect to an internal lo
 so Python only decides who may see a file. In dev (CP_X_ACCEL=0) Django streams it.
 """
 import os
+import secrets
 from pathlib import Path
 
 from django.conf import settings
@@ -20,7 +21,7 @@ def write_file(relpath: str, data: bytes) -> Path:
     """Write via a temp file + rename, so a reader never sees half a JPEG."""
     path = abspath(relpath)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
+    tmp = path.with_name(f"{path.name}.{secrets.token_hex(4)}.tmp")   # two writers never share a temp file
     tmp.write_bytes(data)
     os.replace(tmp, path)
     return path
@@ -46,5 +47,5 @@ def soft_delete(image) -> None:
     image.deleted_at = timezone.now()
     image.save(update_fields=["deleted_at"])
     image.faces.all().delete()
-    paths = [abspath(image.relpath(r)) for r in ("m", "d", "t")]
+    paths = [abspath(image.relpath(r)) for r in ("m", "d", "t", "fd", "fm")]   # fd/fm: framed (media/framing.py)
     transaction.on_commit(lambda: [p.unlink(missing_ok=True) for p in paths])
