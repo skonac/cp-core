@@ -1986,6 +1986,8 @@
                       "sports",
                       "graduation",
                       "corporate",
+                      "holiday",
+                      "vacation",
                       "other"
                     ],
                     "title": "Type",
@@ -6709,6 +6711,8 @@
               "sports",
               "graduation",
               "corporate",
+              "holiday",
+              "vacation",
               "other"
             ],
             "title": "Type",
@@ -7262,6 +7266,8 @@
               "sports",
               "graduation",
               "corporate",
+              "holiday",
+              "vacation",
               "other"
             ],
             "title": "Type",
@@ -8142,6 +8148,8 @@
               "sports",
               "graduation",
               "corporate",
+              "holiday",
+              "vacation",
               "other"
             ],
             "title": "Type",
@@ -8474,6 +8482,8 @@
               "sports",
               "graduation",
               "corporate",
+              "holiday",
+              "vacation",
               "other"
             ],
             "title": "Type",
@@ -8622,6 +8632,8 @@
                   "sports",
                   "graduation",
                   "corporate",
+                  "holiday",
+                  "vacation",
                   "other"
                 ],
                 "type": "string"

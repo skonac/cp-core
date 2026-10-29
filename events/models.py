@@ -19,6 +19,8 @@ class Event(models.Model):
         SPORTS = "sports"
         GRADUATION = "graduation"
         CORPORATE = "corporate"
+        HOLIDAY = "holiday"
+        VACATION = "vacation"
         OTHER = "other"
 
     code = models.CharField(max_length=8, unique=True, editable=False)
