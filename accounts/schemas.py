@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import Field
 
 from common.api import Out, envelope
+from events.types import EventType
 
 Role = Literal["participant", "organizer", "photographer", "admin"]
 SelfieState = Literal["no_selfie", "selfie_processing", "selfie_rejected", "ready"]
@@ -72,7 +73,7 @@ class ConsentOut(Out):
 class MyEventOut(Out):
     code: str = Field(examples=["RK238"])
     name: str = Field(examples=["Derya & Can"])
-    type: Literal["wedding", "sports", "graduation", "corporate", "holiday", "vacation", "other"]
+    type: EventType
     date: str = Field(examples=["2026-06-12"])
     locationLabel: str | None = Field(examples=["İstanbul"])
     status: Literal["active", "access_closed", "expired"]

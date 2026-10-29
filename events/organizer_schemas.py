@@ -6,8 +6,8 @@ from pydantic import Field
 
 from accounts.schemas import UploaderAccessOut
 from common.api import Out, envelope
+from events.types import EventType
 
-EventType = Literal["wedding", "sports", "graduation", "corporate", "holiday", "vacation", "other"]
 EventStatus = Literal["active", "access_closed", "expired"]
 
 

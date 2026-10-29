@@ -21,6 +21,7 @@ from . import schemas as S
 from .codes import normalize_code
 from .models import Event
 from .participant import Access, access_for, may_see_photo, public_status, touch_membership
+from .types import event_types_json
 
 public_router = Router(tags=["events"])
 events_router = Router(tags=["events"], auth=django_auth)
@@ -89,6 +90,12 @@ def _seq(photo_id: str) -> int:
 
 
 # ---------------------------------------------------------------------------- public
+
+@public_router.get("/event-types", auth=None, response={200: S.EventTypesResponse})
+def event_types(request):
+    """The event types, in display order, with their labels (tr, en): fill the type pickers from this."""
+    return respond(request, "event_types_retrieved", {"eventTypes": event_types_json()})
+
 
 @public_router.get("/events/{code}", auth=None, response={200: S.PublicEventResponse, **errors(404, 410, 423, 429)})
 def public_event(request, code: str):

@@ -6,12 +6,25 @@ from pydantic import Field
 
 from accounts.schemas import Matching
 from common.api import Out, envelope
+from events.types import EventType
+
+
+class EventTypeOut(Out):
+    value: str = Field(examples=["wedding"])
+    label: dict[str, str] = Field(description="{tr, en}", examples=[{"tr": "Düğün", "en": "Wedding"}])
+
+
+class EventTypesOut(Out):
+    eventTypes: list[EventTypeOut] = Field(description="In display order.")
+
+
+EventTypesResponse = envelope("EventTypesResponse", EventTypesOut, "event_types_retrieved")
 
 
 class PublicEventOut(Out):
     code: str = Field(examples=["RK238"])
     name: str = Field(examples=["Derya & Can"])
-    type: Literal["wedding", "sports", "graduation", "corporate", "holiday", "vacation", "other"]
+    type: EventType
     date: str = Field(examples=["2026-06-12"])
     locationLabel: str | None = Field(examples=["İstanbul"])
     status: Literal["active"] = Field(description="Closed/expired events answer 423/410 instead.")

@@ -828,6 +828,29 @@
         }
       }
     },
+    "/api/public/event-types": {
+      "get": {
+        "operationId": "events_api_event_types",
+        "summary": "Event Types",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventTypesResponse"
+                }
+              }
+            }
+          }
+        },
+        "description": "The event types, in display order, with their labels (tr, en): fill the type pickers from this.",
+        "tags": [
+          "events"
+        ]
+      }
+    },
     "/api/public/events/{code}": {
       "get": {
         "operationId": "events_api_public_event",
@@ -7241,6 +7264,96 @@
           "message"
         ],
         "title": "ContactIn",
+        "type": "object"
+      },
+      "EventTypeOut": {
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "examples": [
+              "wedding"
+            ],
+            "title": "Value",
+            "type": "string"
+          },
+          "label": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "{tr, en}",
+            "examples": [
+              {
+                "en": "Wedding",
+                "tr": "Düğün"
+              }
+            ],
+            "title": "Label",
+            "type": "object"
+          }
+        },
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "EventTypeOut",
+        "type": "object"
+      },
+      "EventTypesOut": {
+        "additionalProperties": false,
+        "properties": {
+          "eventTypes": {
+            "description": "In display order.",
+            "items": {
+              "$ref": "#/components/schemas/EventTypeOut"
+            },
+            "title": "Eventtypes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "eventTypes"
+        ],
+        "title": "EventTypesOut",
+        "type": "object"
+      },
+      "EventTypesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "event_types_retrieved",
+            "default": "event_types_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EventTypesOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "EventTypesResponse",
         "type": "object"
       },
       "PublicEventOut": {

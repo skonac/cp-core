@@ -20,7 +20,7 @@ Last updated: 2026-10-29 (discounts, promo codes, ÖBF/MSS 002) · API version 0
 | Date | Change | Where |
 | --- | --- | --- |
 | 2026-10-29 | Discounts: products get `finalPrice`, `discountSource`, `discountLabel`; `discountPercent` is now the discount applied to that product (no longer "against the highest unit price"); top level `appliedPromo`, `globalDiscount`; `pricingVersion` covers the caller's prices. `POST /api/shop/promo`. A purchase discounted to 0 TL is paid at once (no iyzico). ÖBF/MSS version `002` shows list price and discount | §3.7 |
-| 2026-10-29 | Event types `holiday` and `vacation` | §3.6 |
+| 2026-10-29 | Event types `holiday` and `vacation`; `GET /api/public/event-types` lists all types with their tr/en labels (use it instead of a list in cp-web) | §3.5, §3.6 |
 | 2026-10-29 | `frameLandscapeUrl`/`framePortraitUrl` now point at the preview (the frame on a sample photo, JPEG); `frameLandscapePreviewUrl`/`framePortraitPreviewUrl` removed. The uploaded PNG stays at `…/frame/{orientation}.png` | §3.6 |
 | 2026-10-28 | Frame preview: `GET /api/organizer/events/{code}/frame/{orientation}/preview.jpg` (the frame on a stock photo), `frameLandscapePreviewUrl`/`framePortraitPreviewUrl` on the event object. In the uploader API all four frame URLs are now null (they pointed at paths that don't exist there) | §3.6, §3.10 |
 | 2026-10-28 | Photos framed: with a frame in the photo's orientation slot, every `display.jpg`, `download` and ZIP serves the framed photo (thumbnails stay plain). Same URLs, no new fields. | §3.6 |
@@ -261,6 +261,11 @@ Errors: `403 consent_required`, `422 unsupported_file_type | unreadable_image | 
 
 ### 3.5 Events and gallery
 
+**`GET /api/public/event-types`** (no session needed) → `200 event_types_retrieved`
+`{ "eventTypes": [ { "value": "wedding", "label": { "tr": "Düğün", "en": "Wedding" } }, … ] }`: every event type
+in display order with its label. Fill the type pickers (create event, settings) and show an event's type from this;
+the API accepts exactly these `value`s. Today: wedding, sports, graduation, corporate, holiday, vacation, other.
+
 **`GET /api/public/events/{code}`** (no session needed; the welcome screen) → `200 event_retrieved`:
 
 ```json
@@ -388,7 +393,7 @@ allows an overdraft down to a floor, so a balance of −12 is shown as −12.
 
 | Field | Notes |
 | --- | --- |
-| `type` | `wedding`, `sports`, `graduation`, `corporate`, `holiday`, `vacation`, `other` |
+| `type` | One of the `value`s from `GET /api/public/event-types` (§3.5) |
 | `hasFaceSearch` | Photos go to face matching ("photos of me"). Off: participants only browse all |
 | `allowsBrowseAll` | Participants may browse all photos. Must be `true` when `hasFaceSearch` is `false` |
 | `requiresConsent` | Participants need KVKK consent to enter (default `true`) |

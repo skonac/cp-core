@@ -5,6 +5,7 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
+from . import types as event_types
 from .codes import new_event_code
 
 
@@ -14,18 +15,9 @@ class Event(models.Model):
         CLOSED = "closed"      # owner closed access; uploads and processing continue
         EXPIRED = "expired"    # final: media removed or moved, nothing works except metadata
 
-    class Type(models.TextChoices):
-        WEDDING = "wedding"
-        SPORTS = "sports"
-        GRADUATION = "graduation"
-        CORPORATE = "corporate"
-        HOLIDAY = "holiday"
-        VACATION = "vacation"
-        OTHER = "other"
-
     code = models.CharField(max_length=8, unique=True, editable=False)
     name = models.CharField(max_length=200)
-    type = models.CharField(max_length=16, choices=Type.choices, default=Type.WEDDING)
+    type = models.CharField(max_length=16, choices=event_types.CHOICES, default="wedding")   # events/types.py
     date = models.DateField()
     city = models.CharField(max_length=120, blank=True)      # "İstanbul"
     venue = models.CharField(max_length=120, blank=True)     # "Çırağan Sarayı"; a place name, never a street address

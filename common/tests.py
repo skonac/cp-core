@@ -52,6 +52,12 @@ class ApiContractTests(TempMedia, TestCase):
         self.assertCode(c.get("/api/health"), 200, "ok")
         self.assertCode(c.get("/api/me"), 401, "authentication_required")
         self.assertCode(c.get("/api/auth/csrf"), 200, "csrf_set")
+        r = c.get("/api/public/event-types")
+        self.assertCode(r, 200, "event_types_retrieved")
+        types = r.json()["data"]["eventTypes"]
+        self.assertEqual([t["value"] for t in types],
+                         ["wedding", "sports", "graduation", "corporate", "holiday", "vacation", "other"])
+        self.assertEqual(types[5]["label"], {"tr": "Seyahat", "en": "Vacation"})
         r = c.get(f"/api/public/events/{code.lower()}")
         self.assertCode(r, 200, "event_retrieved")
         self.assertEqual(r.json()["data"]["code"], code)
