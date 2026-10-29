@@ -121,14 +121,12 @@ def event_json(request, event: Event, stats: dict, base: str = "/api/organizer/e
         "participantCount": stats["participants"],
         "coverThumbnailUrl": f"{base}/{code}/cover/thumb.jpg" if uploaded or stats["total"] else None,
         "coverIsUploaded": uploaded,
-        **({"frameLandscapeUrl": _frame_url(event, event.frame_landscape_image, "landscape", base, "landscape.png"),
-            "framePortraitUrl": _frame_url(event, event.frame_portrait_image, "portrait", base, "portrait.png"),
-            "frameLandscapePreviewUrl": _frame_url(event, event.frame_landscape_image, "landscape", base,
-                                                   "landscape/preview.jpg"),
-            "framePortraitPreviewUrl": _frame_url(event, event.frame_portrait_image, "portrait", base,
-                                                  "portrait/preview.jpg")} if frames else
-           {"frameLandscapeUrl": None, "framePortraitUrl": None,
-            "frameLandscapePreviewUrl": None, "framePortraitPreviewUrl": None}),
+        # The frame as the organizer should see it: on a sample photo (the raw PNG stays at …/frame/<o>.png).
+        **({"frameLandscapeUrl": _frame_url(event, event.frame_landscape_image, "landscape", base,
+                                            "landscape/preview.jpg"),
+            "framePortraitUrl": _frame_url(event, event.frame_portrait_image, "portrait", base,
+                                           "portrait/preview.jpg")} if frames else
+           {"frameLandscapeUrl": None, "framePortraitUrl": None}),
         "joinUrl": request.build_absolute_uri(f"/?event={code}") if join_url else None,
         "createdAt": event.created_at.isoformat(),
     }

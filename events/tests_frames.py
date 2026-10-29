@@ -122,11 +122,12 @@ class FramePreviewTests(TempMedia, TestCase):
         ingest_frame(self.event, self.owner, frame_png((3000, 2000)), "landscape")
         r = self.client.get(f"/api/organizer/events/{self.event.code}")
         data = r.json()["data"]["event"]
-        self.assertEqual((data["frameLandscapePreviewUrl"], data["framePortraitPreviewUrl"]),
+        self.assertEqual((data["frameLandscapeUrl"], data["framePortraitUrl"]),
                          (f"{self.url.replace(self.event.code, self.event.display_code)}/landscape/preview.jpg", None))
         r = self.client.get(f"{self.url}/landscape/preview.jpg")
         size, corner, middle = pixels(body(r))
-        self.assertEqual((size, near(corner, RED[:3]), near(middle, RED[:3])), ((1600, 1067), True, False))
+        self.assertEqual((max(size) <= 1600, round(size[0] / size[1], 1), near(corner, RED[:3]), near(middle, RED[:3])),
+                         (True, 1.5, True, False))                    # display size at most, never upscaled
         self.event.refresh_from_db()
         rel = preview_relpath(self.event, "landscape")
         self.assertEqual(rel, f"events/{self.event.pk}/frame_preview_landscape.jpg")
@@ -157,5 +158,4 @@ class FramePreviewTests(TempMedia, TestCase):
         out = event_json(None, self.event, _stats([self.event])[self.event.id], base="/x", join_url=False,
                          frames=False)
         self.assertEqual({k: v for k, v in out.items() if k.startswith("frame")},
-                         dict.fromkeys(["frameLandscapeUrl", "framePortraitUrl", "frameLandscapePreviewUrl",
-                                        "framePortraitPreviewUrl"]))
+                         dict.fromkeys(["frameLandscapeUrl", "framePortraitUrl"]))

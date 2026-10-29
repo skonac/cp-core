@@ -163,7 +163,7 @@ class OrganizerApiTests(TempMedia, TestCase):
         land = SimpleUploadedFile("land.png", png((1800, 1200)), content_type="image/png")
         r = self.post_form(f"{base}/frame?orientation=landscape", {"file": land})
         self.assertCode(r, 200, "organizer_frame_updated")
-        self.assertTrue(r.json()["data"]["event"]["frameLandscapeUrl"].endswith("/frame/landscape.png"))
+        self.assertTrue(r.json()["data"]["event"]["frameLandscapeUrl"].endswith("/frame/landscape/preview.jpg"))
         self.assertIsNone(r.json()["data"]["event"]["framePortraitUrl"])
         port = SimpleUploadedFile("port.png", png((1200, 1800)), content_type="image/png")
         self.assertCode(self.post_form(f"{base}/frame?orientation=portrait", {"file": port}), 200,

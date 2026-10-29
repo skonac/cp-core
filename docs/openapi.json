@@ -8273,9 +8273,9 @@
                 "type": "null"
               }
             ],
-            "description": "That slot's frame PNG; null when empty (and in the uploader API).",
+            "description": "That slot's frame shown on a sample photo (JPEG); null when empty (and in the uploader API).",
             "examples": [
-              "/api/organizer/events/RK238/frame/landscape.png"
+              "/api/organizer/events/RK238/frame/landscape/preview.jpg"
             ],
             "title": "Framelandscapeurl"
           },
@@ -8288,41 +8288,11 @@
                 "type": "null"
               }
             ],
-            "description": "That slot's frame PNG; null when empty (and in the uploader API).",
-            "examples": [
-              "/api/organizer/events/RK238/frame/portrait.png"
-            ],
-            "title": "Frameportraiturl"
-          },
-          "frameLandscapePreviewUrl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "That slot's frame on a stock photo; null when empty (and in the uploader API).",
-            "examples": [
-              "/api/organizer/events/RK238/frame/landscape/preview.jpg"
-            ],
-            "title": "Framelandscapepreviewurl"
-          },
-          "framePortraitPreviewUrl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "That slot's frame on a stock photo; null when empty (and in the uploader API).",
+            "description": "That slot's frame shown on a sample photo (JPEG); null when empty (and in the uploader API).",
             "examples": [
               null
             ],
-            "title": "Frameportraitpreviewurl"
+            "title": "Frameportraiturl"
           },
           "joinUrl": {
             "anyOf": [
@@ -8368,8 +8338,6 @@
           "coverIsUploaded",
           "frameLandscapeUrl",
           "framePortraitUrl",
-          "frameLandscapePreviewUrl",
-          "framePortraitPreviewUrl",
           "joinUrl",
           "createdAt"
         ],
