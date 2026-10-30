@@ -19,12 +19,12 @@ class SendError(Exception):
         self.retry, self.gone = retry, gone
 
 
-from . import iletimerkezi, log  # noqa: E402  (they import SendError from here)
+from . import iletimerkezi, log, zohomail  # noqa: E402  (they import SendError from here)
 
 
 
 SMS = {"log": log.sms, "iletimerkezi": iletimerkezi.sms}
-EMAIL = {"log": log.email}
+EMAIL = {"log": log.email, "zohomail": zohomail.email}
 PUSH = {"log": log.push}
 
 
@@ -38,7 +38,7 @@ def sms_route(phone: str, purpose: str) -> list[str]:
 
 
 def email_route(address: str, purpose: str) -> list[str]:
-    return ["log"]           # SendGrid, later
+    return ["log"] if settings.EMAIL_DELIVERY == "log" else ["zohomail"]
 
 
 def push_route(device) -> list[str]:

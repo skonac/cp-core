@@ -20,7 +20,7 @@ First install: `deploy.sh` creates `/etc/cp-core/env` from `.env.example` and st
 (created by the postgres superuser) and the media folder (`CP_MEDIA_ROOT`, `/photodisk`).
 
 Test data: `cp-core-manage import_photos`, `import_selfie`, `show_matches` (see `--help`). Providers from the server:
-`cp-core-manage iyzico_test`, `sms_test`.
+`cp-core-manage iyzico_test`, `sms_test`, `email_test`.
 
 Tests: `manage.py test --noinput` (needs Postgres with pgvector); every API response is checked against
 its declared schema, and a test fails when an endpoint is never called.

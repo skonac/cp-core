@@ -185,6 +185,15 @@ NOTIFY_KEEP_DAYS = 14       # the send log is temporary
 ILETIMERKEZI_API_KEY = env("CP_ILETIMERKEZI_API_KEY", "")
 ILETIMERKEZI_API_HASH = env("CP_ILETIMERKEZI_API_HASH", "")
 ILETIMERKEZI_SENDER = env("CP_ILETIMERKEZI_SENDER", "")
+# Email: "log" (nothing leaves the server, the text goes to the log) or "live" (Zoho Mail REST API,
+# notify/providers/zohomail.py). OAuth client + refresh token from a one-time consent (design/notifications.md),
+# the mailbox's account id, and the From (the mailbox's own address or one of its aliases).
+EMAIL_DELIVERY = env("CP_EMAIL_DELIVERY", "log")
+ZOHOMAIL_CLIENT_ID = env("CP_ZOHOMAIL_CLIENT_ID", "")
+ZOHOMAIL_CLIENT_SECRET = env("CP_ZOHOMAIL_CLIENT_SECRET", "")
+ZOHOMAIL_REFRESH_TOKEN = env("CP_ZOHOMAIL_REFRESH_TOKEN", "")
+ZOHOMAIL_ACCOUNT_ID = env("CP_ZOHOMAIL_ACCOUNT_ID", "")
+ZOHOMAIL_FROM = env("CP_ZOHOMAIL_FROM", "")
 EVENT_LOOKUP_PER_MIN = 30   # public event lookups per IP
 CONTACT_PER_HOUR = 5        # contact form messages per IP per hour
 PROMO_FAILS = (4, 4 * 3600)  # wrong promo codes per user, per 4 hours (POST /api/shop/promo)

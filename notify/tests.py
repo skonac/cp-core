@@ -14,7 +14,7 @@ from common.testing import ApiClient
 
 from . import dispatch, providers, sender
 from .models import Notification, PushDevice
-from .providers import SendError, iletimerkezi
+from .providers import SendError, iletimerkezi, zohomail
 
 
 def failing(retry=False, gone=False):
@@ -240,3 +240,124 @@ class IletimerkeziTests(TestCase):
             self.assertEqual([e.id for e in check_delivery()], ["cp.E011"])
         with self.settings(ILETIMERKEZI_SENDER="cleverphotos.org"):
             self.assertEqual([e.id for e in check_delivery()], ["cp.E012"])
+
+
+class FakeZoho:
+    """Stands in for urllib.request.urlopen: answers the token URL and the Mail API from queued (status, body)
+    pairs per URL kind ("token", "api"); records (url, headers, body)."""
+
+    def __init__(self, token=None, api=None):
+        self.answers = {"token": list(token or [(200, {"access_token": "AT1", "expires_in": 3600})]),
+                        "api": list(api or [(200, {"status": {"code": 200}, "data": {"messageId": "M1"}})])}
+        self.requests = []
+
+    def __call__(self, req, timeout=None):
+        import io
+        import json
+        import urllib.error
+        kind = "token" if req.full_url.startswith(zohomail.TOKEN_URL) else "api"
+        body = req.data.decode() if req.data else ""
+        self.requests.append((kind, req.full_url, dict(req.header_items()), body))
+        item = self.answers[kind].pop(0) if len(self.answers[kind]) > 1 else self.answers[kind][0]
+        if isinstance(item, Exception):
+            raise item
+        status, answer = item
+        raw = json.dumps(answer).encode()
+        if status != 200:
+            raise urllib.error.HTTPError(req.full_url, status, "x", {}, io.BytesIO(raw))
+        response = io.BytesIO(raw)
+        response.status = 200
+        return _Ctx(response)
+
+
+@override_settings(NOTIFY_SENDER="inline", EMAIL_DELIVERY="live", ZOHOMAIL_CLIENT_ID="cid", ZOHOMAIL_CLIENT_SECRET="sec",
+                   ZOHOMAIL_REFRESH_TOKEN="RT", ZOHOMAIL_ACCOUNT_ID="738", ZOHOMAIL_FROM="Clever Photos <contact@x.org>")
+class ZohomailTests(TestCase):
+    def setUp(self):
+        zohomail._token.update(value="", expires=0.0)
+
+    def test_send_through_dispatch_and_token_reused(self):
+        import json
+        fake = FakeZoho()
+        with mock.patch("urllib.request.urlopen", fake), self.captureOnCommitCallbacks(execute=True):
+            row = dispatch.email("a@b.com", "Konu", "<p>Merhaba</p>", kind="test")
+            dispatch.email("a@b.com", "Düz", "plain text", kind="test")
+        row.refresh_from_db()
+        self.assertEqual((row.status, row.provider, row.provider_ref), ("sent", "zohomail", "M1"))
+        kinds = [r[0] for r in fake.requests]
+        self.assertEqual(kinds, ["token", "api", "api"])          # one token for both mails
+        _, url, headers, body = fake.requests[0]
+        self.assertIn("grant_type=refresh_token", body)
+        self.assertIn("refresh_token=RT", body)
+        _, url, headers, body = fake.requests[1]
+        self.assertEqual(url, "https://mail.zoho.eu/api/accounts/738/messages")
+        self.assertEqual(headers["Authorization"], "Zoho-oauthtoken AT1")
+        sent = json.loads(body)
+        self.assertEqual((sent["fromAddress"], sent["toAddress"], sent["subject"], sent["mailFormat"]),
+                         ("Clever Photos <contact@x.org>", "a@b.com", "Konu", "html"))
+        self.assertEqual(json.loads(fake.requests[2][3])["mailFormat"], "plaintext")
+
+    def test_token_renewed_before_expiry(self):
+        fake = FakeZoho(token=[(200, {"access_token": "AT1", "expires_in": 200}),   # inside the early margin
+                               (200, {"access_token": "AT2", "expires_in": 3600})])
+        with mock.patch("urllib.request.urlopen", fake):
+            zohomail.email("a@b.com", "s", "t")
+            zohomail.email("a@b.com", "s", "t")
+        self.assertEqual([r[0] for r in fake.requests], ["token", "api", "token", "api"])
+        self.assertEqual(fake.requests[3][2]["Authorization"], "Zoho-oauthtoken AT2")
+
+    def test_401_renews_the_token_once(self):
+        fake = FakeZoho(token=[(200, {"access_token": "AT1", "expires_in": 3600}),
+                               (200, {"access_token": "AT2", "expires_in": 3600})],
+                        api=[(401, {"data": {"errorCode": "INVALID_OAUTHTOKEN"}, "status": {"code": 401}}),
+                             (200, {"status": {"code": 200}, "data": {"messageId": "M2"}})])
+        with mock.patch("urllib.request.urlopen", fake):
+            self.assertEqual(zohomail.email("a@b.com", "s", "t"), "M2")
+        self.assertEqual([r[0] for r in fake.requests], ["token", "api", "token", "api"])
+
+    def test_errors_final_or_retryable(self):
+        cases = [
+            ("rejected refresh token", FakeZoho(token=[(200, {"error": "invalid_code"})]), False),
+            ("token rate limit", FakeZoho(token=[(400, {"error": "Access Denied"})]), True),
+            ("token server down", FakeZoho(token=[(503, {})]), True),
+            ("unreachable", FakeZoho(token=[TimeoutError("timed out")]), True),
+            ("bad from address", FakeZoho(api=[(400, {"status": {"code": 400, "description": "Invalid Input"},
+                                                     "data": {"moreInfo": "Invalid fromAddress"}})]), False),
+            ("api down", FakeZoho(api=[(500, {})]), True),
+        ]
+        for name, fake, retry in cases:
+            zohomail._token.update(value="", expires=0.0)
+            with self.subTest(name), mock.patch("urllib.request.urlopen", fake):
+                with self.assertRaises(SendError) as e:
+                    zohomail.email("a@b.com", "s", "t")
+                self.assertEqual(e.exception.retry, retry)
+
+    def test_log_mode_sends_nothing(self):
+        with self.settings(EMAIL_DELIVERY="log"), mock.patch("urllib.request.urlopen") as urlopen, \
+                self.captureOnCommitCallbacks(execute=True):
+            row = dispatch.email("a@b.com", "s", "t", kind="test")
+        row.refresh_from_db()
+        self.assertEqual((row.status, row.provider), ("sent", "log"))
+        urlopen.assert_not_called()
+
+    def test_email_test_command(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+        fake = FakeZoho(api=[(200, {"status": {"code": 200}, "data": [
+            {"accountId": "738", "primaryEmailAddress": "admin@x.org",
+             "sendMailDetails": [{"fromAddress": "admin@x.org"}, {"fromAddress": "contact@x.org"}]}]}),
+            (200, {"status": {"code": 200}, "data": {"messageId": "M9"}})])
+        out = StringIO()
+        with mock.patch("urllib.request.urlopen", fake):
+            call_command("email_test", "a@b.com", "--accounts", stdout=out)
+        self.assertIn("738  admin@x.org  from: admin@x.org, contact@x.org", out.getvalue())
+        self.assertIn("sent via zohomail: M9", out.getvalue())
+
+    def test_check_needs_settings(self):
+        from notify.apps import check_email
+        self.assertEqual(check_email(), [])
+        with self.settings(ZOHOMAIL_REFRESH_TOKEN=""):
+            self.assertEqual([e.id for e in check_email()], ["cp.E014"])
+        with self.settings(EMAIL_DELIVERY="smtp"):
+            self.assertEqual([e.id for e in check_email()], ["cp.E013"])

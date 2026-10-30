@@ -20,4 +20,16 @@ def check_delivery(app_configs=None, **kwargs):
     if len(settings.ILETIMERKEZI_SENDER) > 11:
         return [checks.Error(f"CP_ILETIMERKEZI_SENDER={settings.ILETIMERKEZI_SENDER!r}: at most 11 characters "
                              "(the approved sender name, exactly as in the panel)", id="cp.E012")]
+    return check_email()
+
+
+def check_email():
+    from django.conf import settings
+    if settings.EMAIL_DELIVERY not in ("log", "live"):
+        return [checks.Error(f"CP_EMAIL_DELIVERY={settings.EMAIL_DELIVERY!r}: log or live", id="cp.E013")]
+    missing = [name for name in ("CLIENT_ID", "CLIENT_SECRET", "REFRESH_TOKEN", "ACCOUNT_ID", "FROM")
+               if not getattr(settings, f"ZOHOMAIL_{name}")]
+    if settings.EMAIL_DELIVERY == "live" and missing:
+        return [checks.Error("CP_EMAIL_DELIVERY=live needs " + ", ".join(f"CP_ZOHOMAIL_{m}" for m in missing),
+                             id="cp.E014")]
     return []
