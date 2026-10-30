@@ -2,7 +2,7 @@
 
     cp-core-manage email_test --accounts                    Zoho Mail: account id and from-addresses the token sees
     cp-core-manage email_test someone@example.com           one email through the router (CP_EMAIL_DELIVERY decides)
-    cp-core-manage email_test someone@example.com --via zohomail   one email through this provider, whatever the setting
+    cp-core-manage email_test someone@example.com --via cpaas      one email through this provider (cpaas, zohomail), whatever the setting
 """
 from django.core.management.base import BaseCommand, CommandError
 

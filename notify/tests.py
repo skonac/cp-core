@@ -14,7 +14,7 @@ from common.testing import ApiClient
 
 from . import dispatch, providers, sender
 from .models import Notification, PushDevice
-from .providers import SendError, iletimerkezi, zohomail
+from .providers import SendError, cpaas, iletimerkezi, zohomail
 
 
 def failing(retry=False, gone=False):
@@ -271,7 +271,8 @@ class FakeZoho:
 
 
 @override_settings(NOTIFY_SENDER="inline", EMAIL_DELIVERY="live", ZOHOMAIL_CLIENT_ID="cid", ZOHOMAIL_CLIENT_SECRET="sec",
-                   ZOHOMAIL_REFRESH_TOKEN="RT", ZOHOMAIL_ACCOUNT_ID="738", ZOHOMAIL_FROM="Clever Photos <contact@x.org>")
+                   ZOHOMAIL_REFRESH_TOKEN="RT", ZOHOMAIL_ACCOUNT_ID="738", ZOHOMAIL_FROM="Clever Photos <contact@x.org>",
+                   CPAAS_API_KEY="KEY", CPAAS_FROM="Clever Photos <noreply@x.org>", EMAIL_REPLY_TO="contact@x.org")
 class ZohomailTests(TestCase):
     def setUp(self):
         zohomail._token.update(value="", expires=0.0)
@@ -279,7 +280,9 @@ class ZohomailTests(TestCase):
     def test_send_through_dispatch_and_token_reused(self):
         import json
         fake = FakeZoho()
-        with mock.patch("urllib.request.urlopen", fake), self.captureOnCommitCallbacks(execute=True):
+        with mock.patch("urllib.request.urlopen", fake), \
+                mock.patch.object(providers, "email_route", lambda address, purpose: ["zohomail"]), \
+                self.captureOnCommitCallbacks(execute=True):   # sends on leaving: keep it innermost
             row = dispatch.email("a@b.com", "Konu", "<p>Merhaba</p>", kind="test")
             dispatch.email("a@b.com", "Düz", "plain text", kind="test")
         row.refresh_from_db()
@@ -350,14 +353,102 @@ class ZohomailTests(TestCase):
             (200, {"status": {"code": 200}, "data": {"messageId": "M9"}})])
         out = StringIO()
         with mock.patch("urllib.request.urlopen", fake):
-            call_command("email_test", "a@b.com", "--accounts", stdout=out)
+            call_command("email_test", "a@b.com", "--accounts", "--via", "zohomail", stdout=out)
         self.assertIn("738  admin@x.org  from: admin@x.org, contact@x.org", out.getvalue())
         self.assertIn("sent via zohomail: M9", out.getvalue())
 
     def test_check_needs_settings(self):
         from notify.apps import check_email
         self.assertEqual(check_email(), [])
-        with self.settings(ZOHOMAIL_REFRESH_TOKEN=""):
+        with self.settings(ZOHOMAIL_ACCOUNT_ID=""):        # fallback on but incomplete
             self.assertEqual([e.id for e in check_email()], ["cp.E014"])
+        with self.settings(ZOHOMAIL_REFRESH_TOKEN="", ZOHOMAIL_ACCOUNT_ID=""):   # fallback off: fine
+            self.assertEqual(check_email(), [])
+        with self.settings(CPAAS_API_KEY=""):
+            self.assertIn("CP_CPAAS_API_KEY", check_email()[0].msg)
         with self.settings(EMAIL_DELIVERY="smtp"):
             self.assertEqual([e.id for e in check_email()], ["cp.E013"])
+
+
+class FakeCpaas:
+    """Stands in for urllib.request.urlopen for CPaaS (and, after a failure, Zoho Mail via FakeZoho)."""
+
+    def __init__(self, status=201, answer=None, error=None, then=None):
+        self.status, self.error, self.then, self.requests = status, error, then, []
+        self.answer = answer or {"data": [{"code": "EM_104", "message": "Email request received"}],
+                                 "message": "OK", "request_id": "R1", "object": "email"}
+
+    def __call__(self, req, timeout=None):
+        import io
+        import json
+        import urllib.error
+        if not req.full_url.startswith(cpaas.URL):
+            return self.then(req, timeout)
+        self.requests.append((dict(req.header_items()), json.loads(req.data)))
+        if self.error:
+            raise self.error
+        raw = json.dumps(self.answer).encode()
+        if self.status >= 300:
+            raise urllib.error.HTTPError(req.full_url, self.status, "x", {}, io.BytesIO(raw))
+        response = io.BytesIO(raw)
+        response.status = self.status
+        return _Ctx(response)
+
+
+@override_settings(NOTIFY_SENDER="inline", EMAIL_DELIVERY="live", CPAAS_API_KEY="KEY",
+                   CPAAS_FROM="Clever Photos <noreply@x.org>", EMAIL_REPLY_TO="contact@x.org",
+                   ZOHOMAIL_CLIENT_ID="cid", ZOHOMAIL_CLIENT_SECRET="sec", ZOHOMAIL_REFRESH_TOKEN="RT",
+                   ZOHOMAIL_ACCOUNT_ID="738", ZOHOMAIL_FROM="Clever Photos <contact@x.org>")
+class CpaasTests(TestCase):
+    def setUp(self):
+        zohomail._token.update(value="", expires=0.0)
+
+    def test_send_body_and_request_id(self):
+        fake = FakeCpaas()
+        with mock.patch("urllib.request.urlopen", fake), self.captureOnCommitCallbacks(execute=True):
+            row = dispatch.email("Ayşe <a@b.com>", "Konu", "<p>Merhaba</p>", kind="test")
+            dispatch.email("a@b.com", "Düz", "plain text", kind="test")
+        row.refresh_from_db()
+        self.assertEqual((row.status, row.provider, row.provider_ref), ("sent", "cpaas", "R1"))
+        headers, body = fake.requests[0]
+        self.assertEqual(headers["Authorization"], "Zoho-enczapikey KEY")
+        self.assertEqual(body, {"from": {"address": "noreply@x.org", "name": "Clever Photos"},
+                                "to": [{"email_address": {"address": "a@b.com", "name": "Ayşe"}}],
+                                "subject": "Konu", "htmlbody": "<p>Merhaba</p>",
+                                "reply_to": [{"address": "contact@x.org"}]})
+        self.assertEqual(fake.requests[1][1]["textbody"], "plain text")
+        self.assertNotIn("htmlbody", fake.requests[1][1])
+
+    def test_no_reply_to_when_unset(self):
+        fake = FakeCpaas()
+        with self.settings(EMAIL_REPLY_TO=""), mock.patch("urllib.request.urlopen", fake):
+            cpaas.email("a@b.com", "s", "t")
+        self.assertNotIn("reply_to", fake.requests[0][1])
+
+    def test_errors_final_or_retryable(self):
+        bad = {"error": {"code": "TM_3301", "message": "Invalid API Token found",
+                         "details": [{"code": "SERR_157", "message": "Invalid API Token found"}]}}
+        for name, fake, retry in [("bad key", FakeCpaas(status=401, answer=bad), False),
+                                  ("server down", FakeCpaas(status=503, answer={}), True),
+                                  ("unreachable", FakeCpaas(error=TimeoutError("timed out")), True)]:
+            with self.subTest(name), mock.patch("urllib.request.urlopen", fake):
+                with self.assertRaises(SendError) as e:
+                    cpaas.email("a@b.com", "s", "t")
+                self.assertEqual(e.exception.retry, retry)
+        with mock.patch("urllib.request.urlopen", FakeCpaas(status=401, answer=bad)):
+            with self.assertRaisesRegex(SendError, "TM_3301 - Invalid API Token found"):
+                cpaas.email("a@b.com", "s", "t")
+
+    def test_falls_back_to_zoho_mail(self):
+        fake = FakeCpaas(status=503, answer={}, then=FakeZoho())
+        with mock.patch("urllib.request.urlopen", fake), self.captureOnCommitCallbacks(execute=True):
+            row = dispatch.email("a@b.com", "s", "t", kind="test")
+        row.refresh_from_db()
+        self.assertEqual((row.status, row.provider, row.provider_ref), ("sent", "zohomail", "M1"))
+
+    def test_route_without_the_fallback(self):
+        self.assertEqual(providers.email_route("a@b.com", "test"), ["cpaas", "zohomail"])
+        with self.settings(ZOHOMAIL_REFRESH_TOKEN=""):
+            self.assertEqual(providers.email_route("a@b.com", "test"), ["cpaas"])
+        with self.settings(EMAIL_DELIVERY="log"):
+            self.assertEqual(providers.email_route("a@b.com", "test"), ["log"])

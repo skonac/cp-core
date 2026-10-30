@@ -185,10 +185,15 @@ NOTIFY_KEEP_DAYS = 14       # the send log is temporary
 ILETIMERKEZI_API_KEY = env("CP_ILETIMERKEZI_API_KEY", "")
 ILETIMERKEZI_API_HASH = env("CP_ILETIMERKEZI_API_HASH", "")
 ILETIMERKEZI_SENDER = env("CP_ILETIMERKEZI_SENDER", "")
-# Email: "log" (nothing leaves the server, the text goes to the log) or "live" (Zoho Mail REST API,
-# notify/providers/zohomail.py). OAuth client + refresh token from a one-time consent (design/notifications.md),
-# the mailbox's account id, and the From (the mailbox's own address or one of its aliases).
+# Email: "log" (nothing leaves the server, the text goes to the log) or "live": Zoho CPaaS (ex-ZeptoMail,
+# notify/providers/cpaas.py; API key from its panel, From = any address on our verified domain), falling back
+# to the Zoho Mail mailbox (notify/providers/zohomail.py) when that is configured. Replies go to EMAIL_REPLY_TO.
 EMAIL_DELIVERY = env("CP_EMAIL_DELIVERY", "log")
+EMAIL_REPLY_TO = env("CP_EMAIL_REPLY_TO", "")
+CPAAS_API_KEY = env("CP_CPAAS_API_KEY", "")      # without the "Zoho-enczapikey " prefix
+CPAAS_FROM = env("CP_CPAAS_FROM", "")
+# Zoho Mail fallback: OAuth client + refresh token from a one-time consent (design/notifications.md), the
+# mailbox's account id, and the From (the mailbox's own address or one of its aliases).
 ZOHOMAIL_CLIENT_ID = env("CP_ZOHOMAIL_CLIENT_ID", "")
 ZOHOMAIL_CLIENT_SECRET = env("CP_ZOHOMAIL_CLIENT_SECRET", "")
 ZOHOMAIL_REFRESH_TOKEN = env("CP_ZOHOMAIL_REFRESH_TOKEN", "")

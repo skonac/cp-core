@@ -19,12 +19,12 @@ class SendError(Exception):
         self.retry, self.gone = retry, gone
 
 
-from . import iletimerkezi, log, zohomail  # noqa: E402  (they import SendError from here)
+from . import cpaas, iletimerkezi, log, zohomail  # noqa: E402  (they import SendError from here)
 
 
 
 SMS = {"log": log.sms, "iletimerkezi": iletimerkezi.sms}
-EMAIL = {"log": log.email, "zohomail": zohomail.email}
+EMAIL = {"log": log.email, "cpaas": cpaas.email, "zohomail": zohomail.email}
 PUSH = {"log": log.push}
 
 
@@ -38,7 +38,10 @@ def sms_route(phone: str, purpose: str) -> list[str]:
 
 
 def email_route(address: str, purpose: str) -> list[str]:
-    return ["log"] if settings.EMAIL_DELIVERY == "log" else ["zohomail"]
+    """Zoho CPaaS first; the Zoho Mail mailbox as the fallback when it is configured."""
+    if settings.EMAIL_DELIVERY == "log":
+        return ["log"]
+    return ["cpaas"] + (["zohomail"] if settings.ZOHOMAIL_REFRESH_TOKEN else [])
 
 
 def push_route(device) -> list[str]:
