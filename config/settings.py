@@ -119,6 +119,8 @@ TIME_ZONE = "Europe/Istanbul"
 USE_I18N = True
 USE_TZ = True   # timestamps stored in UTC (timestamptz)
 
+# Our pages may be framed by our own site only (cp-web shows legal texts and print previews in iframes)
+X_FRAME_OPTIONS = "SAMEORIGIN"
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]   # public files for outside parties (iyzico pulls the logo): /static/<name>
 

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Basılı materyal (iframe test)</title>
+<style>
+/* Test: theme previews as live iframes of the HTML template (no rendered images).
+   Each iframe is the sheet's full size in CSS px (420 x 594 mm = 1587.4 x 2245 px) scaled down with a
+   transform; the template is loaded with #raw so it shows the bare sheet. */
+:root { --bg: #f4f2ee; --card: #fff; --ink: #1f2522; --muted: #6b726e; --line: #e2ded6; --accent: #1d2b24; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+       font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+       padding-block: 28px; padding-left: max(16px, env(safe-area-inset-left, 0px));
+       padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1100px; margin: 0 auto; }
+h1 { margin: 0; font-size: 24px; }
+.sub { margin: 4px 0 22px; color: var(--muted); }
+.tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+.tabs span { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-size: 14px; }
+.tabs span.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 18px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.thumb { position: relative; width: 100%; aspect-ratio: 420 / 594; overflow: hidden; border-radius: 4px;
+         background: #ece8e1; cursor: zoom-in; }
+.thumb iframe { position: absolute; top: 0; left: 0; width: 1587.4px; height: 2245px; border: 0;
+                transform-origin: 0 0; pointer-events: none; }
+.name { font-weight: 600; font-size: 14px; }
+.meta { color: var(--muted); font-size: 13px; }
+.actions { display: flex; gap: 6px; }
+.actions button { flex: 1; font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 6px; cursor: pointer;
+                  border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+.actions button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.big { margin-top: 34px; }
+.big h2 { font-size: 17px; margin: 0 0 10px; }
+.big .thumb { max-width: 520px; cursor: default; }
+dialog { padding: 0; border: 0; background: transparent; max-width: none; max-height: none; }
+dialog::backdrop { background: rgba(20, 24, 22, .72); }
+dialog .thumb { cursor: zoom-out; }
+.note { margin-top: 28px; color: var(--muted); font-size: 13px; max-width: 70ch; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Basılı materyal</h1>
+  <p class="sub">Derya &amp; Can · 12 Eylül 2026 — her tema bu etkinliğin bilgileriyle</p>
+  <div class="tabs"><span class="on">Afiş</span><span>Masa kartı</span></div>
+
+  <div class="grid" id="grid"></div>
+
+  <section class="big">
+    <h2>Büyük önizleme (aynı iframe, daha büyük ölçek)</h2>
+    <div class="thumb" data-src="poster-wedding.html#raw"></div>
+  </section>
+
+  <p class="note">Test: all cards show the same template (poster-wedding.html) as live iframes, scaled down.
+    Tap a card for a full-screen preview. The buttons do nothing yet.</p>
+</div>
+
+<dialog id="zoom"><div class="thumb" id="zoomThumb"></div></dialog>
+
+<script>
+var THEMES = ["Gece Bahçesi", "Gece Bahçesi (2)", "Gece Bahçesi (3)", "Gece Bahçesi (4)"];
+var SHEET_W = 1587.4, SHEET_H = 2245;   /* 420 x 594 mm in CSS px */
+
+function fill(box) {
+  if (box.querySelector("iframe")) return;
+  var f = document.createElement("iframe");
+  f.src = box.dataset.src; f.loading = "lazy"; f.title = "Önizleme"; f.tabIndex = -1;
+  box.appendChild(f); fit(box);
+}
+function fit(box) {
+  var f = box.querySelector("iframe");
+  if (f) f.style.transform = "scale(" + (box.clientWidth / SHEET_W) + ")";
+}
+var ro = new ResizeObserver(function (entries) { entries.forEach(function (e) { fit(e.target); }); });
+
+var grid = document.getElementById("grid");
+THEMES.forEach(function (name) {
+  var card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = '<div class="thumb" data-src="poster-wedding.html#raw"></div>' +
+    '<div><div class="name"></div><div class="meta">Afiş · A2 (A3, A4 de olur)</div></div>' +
+    '<div class="actions"><button type="button" class="primary">PDF indir</button><button type="button">Görsel</button></div>';
+  card.querySelector(".name").textContent = name;
+  grid.appendChild(card);
+});
+document.querySelectorAll(".thumb[data-src]").forEach(function (box) { fill(box); ro.observe(box); });
+
+var dlg = document.getElementById("zoom"), zt = document.getElementById("zoomThumb");
+grid.addEventListener("click", function (e) {
+  if (!e.target.closest(".thumb")) return;
+  var h = window.innerHeight * 0.92, w = h * 420 / 594;
+  if (w > window.innerWidth * 0.94) { w = window.innerWidth * 0.94; }
+  zt.style.width = w + "px"; zt.dataset.src = "poster-wedding.html#raw";
+  dlg.showModal(); fill(zt); fit(zt); ro.observe(zt);
+});
+dlg.addEventListener("click", function () { dlg.close(); });
+</script>
+</body>
+</html>
