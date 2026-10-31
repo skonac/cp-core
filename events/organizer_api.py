@@ -19,12 +19,15 @@ from pydantic import Field
 
 from accounts.models import UploaderAccess, User
 from accounts.otp import E164, mask_phone, normalize_phone
+from common import ratelimit
 from common.api import ApiError, CamelSchema, errors, file_doc, respond
 from media.framing import preview_relpath, served_relpath
 from media.ingest import FRAME_FIELDS, IngestError, delete_frame, event_cover, ingest_cover, ingest_frame, ingest_photo
 from media.matching import my_photos, selfie_states
 from media.models import Image
 from media.storage import file_response, soft_delete
+from printing import render as print_render
+from printing import themes as print_themes
 
 from . import organizer_schemas as S
 from .codes import normalize_code
@@ -347,6 +350,79 @@ def cover_thumb(request, code: str):
                       openapi_extra=file_doc("image/jpeg", "Cover ~1600 px"))
 def cover_display(request, code: str):
     return _cover_file(request, code, "d")
+
+
+# ---------------------------------------------------------------------------- printed materials
+
+PRINT_PDF_WINDOW = 600   # one PDF per organizer + event + theme + format per 10 minutes (staff: no limit)
+
+
+@organizer_router.get("/events/{code}/print-themes", response={200: S.PrintThemesResponse, **errors(401, 403, 404)})
+def print_theme_list(request, code: str):
+    """Every print theme (poster, table card, …) with its formats, each filled with this event: show
+    `previewUrl` in iframes (with `#raw`) or a new tab, offer `pdfUrl` as the download. Add `?lang=tr|en` to
+    both. No per-event choice is stored: every theme is always available. design/core.md "Printed materials".
+
+    Errors: 404 event_not_found."""
+    event = _event(request, code)
+    base = f"/api/organizer/events/{event.display_code}/print"
+    return respond(request, "print_themes_retrieved", {"themes": [
+        {"id": t.id, "name": t.name, "eventTypes": t.event_types,
+         "formats": [{"format": f, "name": print_themes.FORMATS[f][2], "widthMm": print_themes.FORMATS[f][0],
+                      "heightMm": print_themes.FORMATS[f][1], "previewUrl": f"{base}/{t.id}/{f}.html",
+                      "pdfUrl": f"{base}/{t.id}/{f}.pdf"} for f in t.formats]}
+        for t in print_themes.all_themes()]})
+
+
+def _print_page(request, code: str, theme_id: str, fmt: str, lang: str):
+    """(event, theme, html, cover_url, cover_file) for the print endpoints."""
+    event = _event(request, code)
+    theme = print_themes.get(theme_id)
+    if theme is None or fmt not in theme.formats:
+        raise ApiError(404, "not_found", "Tema bulunamadı.")
+    lang = lang if lang in print_themes.LANGS else "tr"
+    cover_file = print_render.cover_path(event)        # only an uploaded cover; else the theme's own image
+    cover_url = f"/api/organizer/events/{event.display_code}/cover/display.jpg" if cover_file else None
+    join_url = request.build_absolute_uri(f"/?event={event.display_code}")
+    page = print_render.render_html(theme, fmt, event, lang, join_url, cover_url)
+    return event, theme, page, cover_url, cover_file
+
+
+@organizer_router.get("/events/{code}/print/{theme_id}/{fmt}.html", response=errors(401, 403, 404),
+                      openapi_extra=file_doc("text/html; charset=utf-8", "The theme filled with this event (preview)."))
+def print_preview(request, code: str, theme_id: str, fmt: str, lang: str = "tr"):
+    """The printed material as an HTML page, filled with the event's name, date, venue, QR code and cover
+    (else the theme's own image). New tab: fits the window. Iframe: append `#raw` for the bare sheet at its
+    real size (`widthMm` x `heightMm` at 96 px per inch), then scale the iframe down. Works on any event status.
+
+    Errors: 404 event_not_found, not_found (theme or format)."""
+    _, _, page, _, _ = _print_page(request, code, theme_id, fmt, lang)
+    response = HttpResponse(page, content_type="text/html; charset=utf-8")
+    response["Cache-Control"] = "private, no-cache"
+    return response
+
+
+@organizer_router.get("/events/{code}/print/{theme_id}/{fmt}.pdf", response=errors(401, 403, 404, 429),
+                      openapi_extra=file_doc("application/pdf", "The printed material as PDF (download)."))
+def print_pdf(request, code: str, theme_id: str, fmt: str, lang: str = "tr"):
+    """The same page as PDF at its real size (A2 poster, 74 x 210 mm table card), sent as a download
+    (`RK238-elegant-wedding-poster.pdf`). Rendered on request (1-3 s); show a spinner.
+
+    Errors: 404 event_not_found, not_found · 429 rate_limit_exceeded (one PDF per format per 10 minutes for
+    each theme), print_busy (the server is rendering other PDFs; try again in a few seconds)."""
+    event, theme, page, cover_url, cover_file = _print_page(request, code, theme_id, fmt, lang)
+    key = f"print-pdf:{request.user.pk}:{event.pk}:{theme.id}:{fmt}"
+    if not request.user.is_staff and ratelimit.hits(key, PRINT_PDF_WINDOW) >= 1:
+        raise ApiError(429, "rate_limit_exceeded", "Bu PDF az önce indirildi. 10 dakika sonra tekrar deneyebilirsin.")
+    try:
+        data = print_render.render_pdf(page, cover_url, cover_file)
+    except print_render.RenderBusy:
+        raise ApiError(429, "print_busy", "Sunucu şu an başka PDF'ler hazırlıyor. Birkaç saniye sonra tekrar dene.")
+    if not request.user.is_staff:
+        ratelimit.allow(key, 1, PRINT_PDF_WINDOW)      # counted only once a PDF was actually made
+    response = HttpResponse(data, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{event.display_code}-{theme.id}-{fmt}.pdf"'
+    return response
 
 
 # ---------------------------------------------------------------------------- frame

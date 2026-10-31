@@ -181,6 +181,31 @@ class ParticipantListOut(Out):
     counts: ParticipantCountsOut
 
 
+class PrintFormatOut(Out):
+    format: str = Field(examples=["poster"], description="poster | table")
+    name: dict[str, str] = Field(examples=[{"tr": "Afiş", "en": "Poster"}])
+    widthMm: int = Field(examples=[420])
+    heightMm: int = Field(examples=[594])
+    previewUrl: str = Field(examples=["/api/organizer/events/RK238/print/elegant-wedding/poster.html"],
+                            description="The page filled with this event. Add ?lang=tr|en. In an iframe: append "
+                                        "#raw (bare sheet at full size, scale the iframe); in a new tab: as is "
+                                        "(fits the window).")
+    pdfUrl: str = Field(examples=["/api/organizer/events/RK238/print/elegant-wedding/poster.pdf"],
+                        description="The PDF download. Add ?lang=tr|en. One per format per 10 minutes.")
+
+
+class PrintThemeOut(Out):
+    id: str = Field(examples=["elegant-wedding"])
+    name: dict[str, str] = Field(examples=[{"tr": "Zarif Düğün", "en": "Elegant Wedding"}])
+    eventTypes: list[str] = Field(examples=[["wedding"]], description="Types it was designed for; for sorting, "
+                                                                       "never for hiding a theme.")
+    formats: list[PrintFormatOut]
+
+
+class PrintThemesOut(Out):
+    themes: list[PrintThemeOut] = Field(description="In display order.")
+
+
 DashboardResponse = envelope("OrganizerDashboardResponse", DashboardOut, "organizer_dashboard_retrieved")
 EventListResponse = envelope("OrganizerEventListResponse", EventListOut, "organizer_events_retrieved")
 EventCreatedResponse = envelope("OrganizerEventCreatedResponse", EventDataOut, "organizer_event_created")
@@ -192,6 +217,7 @@ UploadCheckResponse = envelope("UploadCheckResponse", UploadCheckOut, "photo_upl
 UploadBatchResponse = envelope("UploadBatchResponse", UploadBatchOut, "organizer_photos_uploaded")
 PhotoListResponse = envelope("OrganizerPhotoListResponse", PhotoListOut, "organizer_photos_retrieved")
 PhotosDeletedResponse = envelope("OrganizerPhotosDeletedResponse", PhotoMutationOut, "organizer_photos_deleted")
+PrintThemesResponse = envelope("PrintThemesResponse", PrintThemesOut, "print_themes_retrieved")
 ParticipantListResponse = envelope("ParticipantListResponse", ParticipantListOut, "organizer_participants_retrieved")
 UploaderListResponse = envelope("UploaderListResponse", UploaderListOut, "organizer_uploaders_retrieved")
 UploaderResponse = envelope("UploaderResponse", UploaderDataOut, "organizer_uploader_created")

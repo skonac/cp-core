@@ -89,6 +89,25 @@ class OrganizerApiTests(TempMedia, TestCase):
                          event_qr_svg(f"http://testserver/?event={code}", 800))   # clamped down
         self.assertCode(c.get("/api/organizer/events/zzzzz/qr"), 404, "event_not_found")
 
+        # --- printed materials: theme list, preview HTML (with the uploaded cover), PDF once per 10 minutes
+        themes = c.get(f"{base}/print-themes").json()["data"]["themes"]
+        wedding = next(t for t in themes if t["id"] == "elegant-wedding")
+        poster = next(f for f in wedding["formats"] if f["format"] == "poster")
+        self.assertEqual((poster["widthMm"], poster["heightMm"]), (420, 594))
+        self.assertEqual(poster["previewUrl"], f"{base}/print/elegant-wedding/poster.html")
+        r = c.get(poster["previewUrl"], {"lang": "en"})
+        self.assertEqual(r["Content-Type"], "text/html; charset=utf-8")
+        self.assertContains(r, f"{base}/cover/display.jpg")            # its own cover, not the fallback
+        self.assertContains(r, "Welcome to our wedding")
+        self.assertCode(c.get(f"{base}/print/elegant-wedding/flyer.html"), 404, "not_found")
+        self.assertCode(c.get(f"{base}/print/nope/poster.html"), 404, "not_found")
+        r = c.get(poster["pdfUrl"])
+        self.assertEqual((r.status_code, r["Content-Type"]), (200, "application/pdf"))
+        self.assertIn(f'filename="{code}-elegant-wedding-poster.pdf"', r["Content-Disposition"])
+        self.assertTrue(r.content.startswith(b"%PDF"))
+        self.assertCode(c.get(poster["pdfUrl"]), 429, "rate_limit_exceeded")   # same format again
+        self.assertEqual(c.get(f"{base}/print/elegant-wedding/table.pdf").status_code, 200)   # other format: fine
+
         # --- read, list, edit
         self.assertCode(c.get(f"{base.lower()}"), 200, "organizer_event_retrieved")
         self.assertCode(c.get("/api/organizer/events/zzzzz"), 404, "event_not_found")

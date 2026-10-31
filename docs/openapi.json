@@ -2624,6 +2624,278 @@
         ]
       }
     },
+    "/api/organizer/events/{code}/print-themes": {
+      "get": {
+        "operationId": "events_organizer_api_print_theme_list",
+        "summary": "Print Theme List",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrintThemesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          }
+        },
+        "description": "Every print theme (poster, table card, …) with its formats, each filled with this event: show\n`previewUrl` in iframes (with `#raw`) or a new tab, offer `pdfUrl` as the download. Add `?lang=tr|en` to\nboth. No per-event choice is stored: every theme is always available. design/core.md \"Printed materials\".\n\nErrors: 404 event_not_found.",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/events/{code}/print/{theme_id}/{fmt}.html": {
+      "get": {
+        "operationId": "events_organizer_api_print_preview",
+        "summary": "Print Preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "theme_id",
+            "schema": {
+              "title": "Theme Id",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "fmt",
+            "schema": {
+              "title": "Fmt",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "default": "tr",
+              "title": "Lang",
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "The theme filled with this event (preview).",
+            "content": {
+              "text/html; charset=utf-8": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "description": "The printed material as an HTML page, filled with the event's name, date, venue, QR code and cover\n(else the theme's own image). New tab: fits the window. Iframe: append `#raw` for the bare sheet at its\nreal size (`widthMm` x `heightMm` at 96 px per inch), then scale the iframe down. Works on any event status.\n\nErrors: 404 event_not_found, not_found (theme or format).",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/events/{code}/print/{theme_id}/{fmt}.pdf": {
+      "get": {
+        "operationId": "events_organizer_api_print_pdf",
+        "summary": "Print Pdf",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "theme_id",
+            "schema": {
+              "title": "Theme Id",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "fmt",
+            "schema": {
+              "title": "Fmt",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "default": "tr",
+              "title": "Lang",
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "The printed material as PDF (download).",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "description": "The same page as PDF at its real size (A2 poster, 74 x 210 mm table card), sent as a download\n(`RK238-elegant-wedding-poster.pdf`). Rendered on request (1-3 s); show a spinner.\n\nErrors: 404 event_not_found, not_found · 429 rate_limit_exceeded (one PDF per format per 10 minutes for\neach theme), print_busy (the server is rendering other PDFs; try again in a few seconds).",
+        "tags": [
+          "organizer"
+        ],
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
     "/api/organizer/events/{code}/frame": {
       "post": {
         "operationId": "events_organizer_api_put_frame",
@@ -8883,6 +9155,183 @@
           "requestId"
         ],
         "title": "OrganizerCoverResponse",
+        "type": "object"
+      },
+      "PrintFormatOut": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "description": "poster | table",
+            "examples": [
+              "poster"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "examples": [
+              {
+                "en": "Poster",
+                "tr": "Afiş"
+              }
+            ],
+            "title": "Name",
+            "type": "object"
+          },
+          "widthMm": {
+            "examples": [
+              420
+            ],
+            "title": "Widthmm",
+            "type": "integer"
+          },
+          "heightMm": {
+            "examples": [
+              594
+            ],
+            "title": "Heightmm",
+            "type": "integer"
+          },
+          "previewUrl": {
+            "description": "The page filled with this event. Add ?lang=tr|en. In an iframe: append #raw (bare sheet at full size, scale the iframe); in a new tab: as is (fits the window).",
+            "examples": [
+              "/api/organizer/events/RK238/print/elegant-wedding/poster.html"
+            ],
+            "title": "Previewurl",
+            "type": "string"
+          },
+          "pdfUrl": {
+            "description": "The PDF download. Add ?lang=tr|en. One per format per 10 minutes.",
+            "examples": [
+              "/api/organizer/events/RK238/print/elegant-wedding/poster.pdf"
+            ],
+            "title": "Pdfurl",
+            "type": "string"
+          }
+        },
+        "required": [
+          "format",
+          "name",
+          "widthMm",
+          "heightMm",
+          "previewUrl",
+          "pdfUrl"
+        ],
+        "title": "PrintFormatOut",
+        "type": "object"
+      },
+      "PrintThemeOut": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "examples": [
+              "elegant-wedding"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "examples": [
+              {
+                "en": "Elegant Wedding",
+                "tr": "Zarif Düğün"
+              }
+            ],
+            "title": "Name",
+            "type": "object"
+          },
+          "eventTypes": {
+            "description": "Types it was designed for; for sorting, never for hiding a theme.",
+            "examples": [
+              [
+                "wedding"
+              ]
+            ],
+            "items": {
+              "type": "string"
+            },
+            "title": "Eventtypes",
+            "type": "array"
+          },
+          "formats": {
+            "items": {
+              "$ref": "#/components/schemas/PrintFormatOut"
+            },
+            "title": "Formats",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "eventTypes",
+          "formats"
+        ],
+        "title": "PrintThemeOut",
+        "type": "object"
+      },
+      "PrintThemesOut": {
+        "additionalProperties": false,
+        "properties": {
+          "themes": {
+            "description": "In display order.",
+            "items": {
+              "$ref": "#/components/schemas/PrintThemeOut"
+            },
+            "title": "Themes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "themes"
+        ],
+        "title": "PrintThemesOut",
+        "type": "object"
+      },
+      "PrintThemesResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "print_themes_retrieved",
+            "default": "print_themes_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PrintThemesOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "PrintThemesResponse",
         "type": "object"
       },
       "OrganizerFrameResponse": {

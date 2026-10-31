@@ -8,7 +8,7 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-29 (discounts, promo codes, ÖBF/MSS 002) · API version 0.7
+Last updated: 2026-10-31 (printed materials) · API version 0.7
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then §5 ("Changes from cp-web's drafts"),
 > which lists every place where this API still differs from `cp-web/docs/api/*.md` and the MSW mocks. Update
@@ -19,6 +19,7 @@ Last updated: 2026-10-29 (discounts, promo codes, ÖBF/MSS 002) · API version 0
 
 | Date | Change | Where |
 | --- | --- | --- |
+| 2026-10-31 | Printed materials (basılı materyal): `GET /api/organizer/events/{code}/print-themes`, each theme's formats (poster, table card) with `previewUrl` (HTML, for iframes and a new tab) and `pdfUrl` (download, one per format per 10 min) | §3.6, §5d |
 | 2026-10-29 | Discounts: products get `finalPrice`, `discountSource`, `discountLabel`; `discountPercent` is now the discount applied to that product (no longer "against the highest unit price"); top level `appliedPromo`, `globalDiscount`; `pricingVersion` covers the caller's prices. `POST /api/shop/promo`. A purchase discounted to 0 TL is paid at once (no iyzico). ÖBF/MSS version `002` shows list price and discount | §3.7 |
 | 2026-10-29 | Event types `holiday` and `vacation`; `GET /api/public/event-types` lists all types with their tr/en labels (use it instead of a list in cp-web) | §3.5, §3.6 |
 | 2026-10-29 | `frameLandscapeUrl`/`framePortraitUrl` now point at the preview (the frame on a sample photo, JPEG); `frameLandscapePreviewUrl`/`framePortraitPreviewUrl` removed. The uploaded PNG stays at `…/frame/{orientation}.png` | §3.6 |
@@ -428,6 +429,28 @@ silently clamped to 111–800. Works on any event status, including `expired` (d
 itself is gone). The content never changes, so the response is sent with
 `Cache-Control: private, max-age=31536000, immutable`. Errors: 404 event_not_found.
 
+**Printed materials (basılı materyal).** Print-ready posters and table cards with the event's name, date, venue,
+QR code and cover, in several themes. There is nothing to choose or save per event: every theme is always offered.
+
+- `GET /api/organizer/events/{code}/print-themes` → `200 print_themes_retrieved`
+  `{ themes: [{ id, name: {tr, en}, eventTypes, formats: [{ format, name: {tr, en}, widthMm, heightMm, previewUrl, pdfUrl }] }] }`,
+  in display order. `format`: `poster` (A2, 420 × 594 mm) or `table` (table card, 74 × 210 mm: the bottom 35 mm
+  folds back as a foot). `eventTypes`: what the theme was designed for; use it to sort (e.g. the event's own type
+  first), never to hide a theme. More themes appear here as they are added, with no change in cp-web.
+- `GET {previewUrl}?lang=tr|en` → `200 text/html`: the page filled with this event. Its cover is the event's
+  uploaded cover; without one, the theme's own image (not the first photo).
+  - **Thumbnails:** an `<iframe src="{previewUrl}?lang=tr#raw">` shows the bare sheet at its real size, i.e.
+    `widthMm × 96 / 25.4` by `heightMm × 96 / 25.4` CSS px (poster 1587 × 2245). Give the iframe that size, scale it
+    down with `transform: scale(boxWidth / thatWidth)` (`transform-origin: 0 0`) inside a box with
+    `aspect-ratio: widthMm / heightMm; overflow: hidden`, and set `loading="lazy"` and `pointer-events: none`.
+    Same origin, so the iframe is allowed (`X-Frame-Options: SAMEORIGIN`).
+  - **[Göster]:** open `{previewUrl}?lang=tr` in a new tab; the page scales itself to fit the window.
+- `GET {pdfUrl}?lang=tr|en` → `200 application/pdf` as a download (`RK238-elegant-wedding-poster.pdf`), rendered
+  on request in 1–3 s: show a spinner on the button. Works on any event status.
+  Errors: 404 event_not_found, not_found (theme or format) · 429 `rate_limit_exceeded` (that theme + format was
+  downloaded in the last 10 minutes; other formats and themes are not affected), `print_busy` (the server is
+  rendering other PDFs: try again in a few seconds).
+
 **Cover.** `POST /api/organizer/events/{code}/cover` — `multipart/form-data`: `file`. Free, not face-processed,
 not in the gallery; replaces the previous uploaded cover. `DELETE /api/organizer/events/{code}/cover` removes it
 (the first photo is shown instead). Both → `200 organizer_cover_updated` `{ event }`.
@@ -810,6 +833,13 @@ Done in cp-web `c37cce4`: the rename from "photographer" (P0), event codes in pa
 | P5 | Any phone with accesses → `uploader_home` | Organizer accounts get `organizer_home` (with `uploaderAccesses`) | Offer "upload for another organizer" when `uploaderAccesses` is not empty |
 | P7 | Cover URL under `/api/organizer/…` | `…/accesses/{accessId}/events/{code}/cover/thumb.jpg` | Use `coverThumbnailUrl` as given |
 | P8 | Uploader = all of the organizer's events (and `technical-todo.md`: "etkinlik bazlı atama … netleştir") | Decided: per event. `eventCodes` in POST, `PATCH …/uploaders/{id}` to change, `events` in the uploader object, `?event=` filter; the uploader's event list holds only the assigned ones | Event picker in the add/edit form (or an "Uploaders" box on the event page using `?event=` + PATCH); show `events` in the list |
+
+### 5d. New: printed materials (no draft in cp-web)
+
+A "Basılı materyal" section on the organizer's event page: tabs or rows per format (Afiş, Masa kartı), a card
+per theme with a live thumbnail (iframe, §3.6), the theme's name in the current language, and two buttons:
+**Göster** (new tab, `previewUrl?lang=…`) and **PDF** (`pdfUrl?lang=…`, spinner while it renders; on 429 show the
+message). Pass the interface language as `lang`. Sort themes whose `eventTypes` include the event's type first.
 
 ## 6. Not yet in this API
 
