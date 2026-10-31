@@ -24,7 +24,7 @@
 .when span { white-space: nowrap; }
 .dot { display: block; flex: none; width: 2.4mm; height: 2.4mm; background: var(--gold); transform: rotate(45deg); }
 
-.photo { flex: 1 1 auto; min-height: 120mm; margin-top: 14mm; width: 296mm; overflow: hidden;
+.photo { flex: 1 1 0; min-height: 0; margin-top: 14mm; width: 296mm; overflow: hidden;   /* basis 0: the photo's own size never counts */
          border-radius: 148mm 148mm 3mm 3mm; background: var(--blush); }
 .photo img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
 .spacer { flex: 1 1 auto; }
