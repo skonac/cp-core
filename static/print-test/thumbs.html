@@ -24,6 +24,8 @@ h1 { margin: 0; font-size: 24px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 .thumb { position: relative; width: 100%; aspect-ratio: 420 / 594; overflow: hidden; border-radius: 4px;
          background: #ece8e1; cursor: zoom-in; }
+.thumb.table { aspect-ratio: 74 / 210; }
+.grid.tables { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
 .thumb iframe { position: absolute; top: 0; left: 0; width: 1587.4px; height: 2245px; border: 0;
                 transform-origin: 0 0; pointer-events: none; }
 .name { font-weight: 600; font-size: 14px; }
@@ -49,6 +51,9 @@ dialog .thumb { cursor: zoom-out; }
 
   <div class="grid" id="grid"></div>
 
+  <h2 style="font-size:17px;margin:30px 0 12px">Masa kartı</h2>
+  <div class="grid tables" id="tables"></div>
+
   <section class="big">
     <h2>Büyük önizleme (aynı iframe, daha büyük ölçek)</h2>
     <div class="thumb" data-src="poster-wedding.html#raw"></div>
@@ -67,12 +72,13 @@ var SHEET_W = 1587.4, SHEET_H = 2245;   /* 420 x 594 mm in CSS px */
 function fill(box) {
   if (box.querySelector("iframe")) return;
   var f = document.createElement("iframe");
+  if (box.classList.contains("table")) { f.style.width = "279.7px"; f.style.height = "793.7px"; }
   f.src = box.dataset.src; f.loading = "lazy"; f.title = "Önizleme"; f.tabIndex = -1;
   box.appendChild(f); fit(box);
 }
 function fit(box) {
   var f = box.querySelector("iframe");
-  if (f) f.style.transform = "scale(" + (box.clientWidth / SHEET_W) + ")";
+  if (f) f.style.transform = "scale(" + (box.clientWidth / (box.classList.contains("table") ? 279.7 : SHEET_W)) + ")";
 }
 var ro = new ResizeObserver(function (entries) { entries.forEach(function (e) { fit(e.target); }); });
 
@@ -82,9 +88,19 @@ THEMES.forEach(function (name) {
   card.className = "card";
   card.innerHTML = '<div class="thumb" data-src="poster-wedding.html#raw"></div>' +
     '<div><div class="name"></div><div class="meta">Afiş · A2 (A3, A4 de olur)</div></div>' +
-    '<div class="actions"><button type="button" class="primary">PDF indir</button><button type="button">Görsel</button></div>';
+    '<div class="actions"><button type="button">Göster</button><button type="button" class="primary">PDF</button></div>';
   card.querySelector(".name").textContent = name;
   grid.appendChild(card);
+});
+var tables = document.getElementById("tables");
+THEMES.forEach(function (name) {
+  var card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = '<div class="thumb table" data-src="table-wedding.html#raw"></div>' +
+    '<div><div class="name"></div><div class="meta">Masa kartı · 74×210 mm</div></div>' +
+    '<div class="actions"><button type="button">Göster</button><button type="button" class="primary">PDF</button></div>';
+  card.querySelector(".name").textContent = name;
+  tables.appendChild(card);
 });
 document.querySelectorAll(".thumb[data-src]").forEach(function (box) { fill(box); ro.observe(box); });
 
