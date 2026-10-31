@@ -6,3 +6,4 @@ Pillow>=11
 pillow-heif>=0.22
 iyzipay==1.0.46
 segno>=1.6,<2
+weasyprint==66.0           # print PDFs; needs Pango on the server (libpango-1.0-0, libpangoft2-1.0-0)

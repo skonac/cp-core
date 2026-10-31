@@ -1,0 +1,30 @@
+{
+  "name": {"tr": "Zarif Düğün", "en": "Elegant Wedding"},
+  "order": 10,
+  "event_types": ["wedding"],
+  "fallback_image": "images/fallback.jpg",
+  "qr_dark": "#1d2b24",
+  "formats": ["poster", "table"],
+  "texts": {
+    "tr": {
+      "welcome": "Düğünümüze hoş geldiniz",
+      "welcome_short": "Hoş geldiniz",
+      "code": "Kod",
+      "headline": "Bu geceden fotoğraflarınız sizi bulsun",
+      "step1": "Telefonunuzun kamerasıyla QR kodu okutun",
+      "step2": "Telefon numaranızla girin, bir selfie çekin",
+      "step3": "Çekilen karelerden sizin olduklarınız telefonunuza gelsin",
+      "short_how": "Okutun, selfie çekin,<br>fotoğraflarınız sizi bulsun"
+    },
+    "en": {
+      "welcome": "Welcome to our wedding",
+      "welcome_short": "Welcome",
+      "code": "Code",
+      "headline": "Let tonight's photos of you find you",
+      "step1": "Scan the QR code with your phone's camera",
+      "step2": "Sign in with your phone number and take a selfie",
+      "step3": "The photos you're in arrive on your phone",
+      "short_how": "Scan, take a selfie,<br>your photos will find you"
+    }
+  }
+}

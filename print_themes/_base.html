@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ event.name }} · {{ theme_name }}</title>
+<link rel="stylesheet" href="{{ assets }}_fonts/fonts.css">
+<style>
+/* Shared by every theme (print_themes/README.md). Print/PDF: the sheet alone at its real size.
+   Screen: the sheet scaled to fit the window; with #raw the bare sheet at full size (thumbnail iframes). */
+@page { size: {{ fmt.width }}mm {{ fmt.height }}mm; margin: 0; }
+html, body { margin: 0; }
+.sheet { position: relative; box-sizing: border-box; width: {{ fmt.width }}mm; height: {{ fmt.height }}mm; overflow: hidden; }
+@media screen {
+  html, body { background: #d8d4cb; }
+  body { min-height: 100vh; padding-block: 24px; box-sizing: border-box;
+         padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .stage { margin: 0 auto; position: relative; }
+  .stage .sheet { position: absolute; top: 0; left: 0; transform-origin: 0 0;
+                  box-shadow: 0 2px 6px rgba(0,0,0,.16), 0 18px 48px rgba(0,0,0,.16); }
+  html.raw, html.raw body { background: transparent; }
+  html.raw body { padding: 0; min-height: 0; }
+  html.raw .stage { width: auto; height: auto; }
+  html.raw .stage .sheet { position: relative; transform: none; box-shadow: none; }
+}
+</style>
+<style>
+{% block style %}{% endblock %}
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+<main class="sheet sheet-{{ fmt.id }}" id="sheet" lang="{{ lang }}">
+{% block sheet %}{% endblock %}
+</main>
+</div>
+<script>
+(function () {   /* screen only; WeasyPrint does not run scripts */
+  if (location.hash === '#raw') { document.documentElement.classList.add('raw'); return; }
+  var stage = document.getElementById('stage'), sheet = document.getElementById('sheet');
+  function fit() {
+    var w = sheet.offsetWidth, h = sheet.offsetHeight, cs = getComputedStyle(document.body);
+    var availW = document.body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    var s = Math.min(availW / w, Math.max(window.innerHeight - 48, 320) / h);
+    sheet.style.transform = 'scale(' + s + ')';
+    stage.style.width = (w * s) + 'px'; stage.style.height = (h * s) + 'px';
+  }
+  window.addEventListener('resize', fit); fit();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+{% extends "staff/_base.html" %}
+{% block title %}Print themes{% endblock %}
+{% block staff %}
+<style>
+  .pt-theme { margin: 18px 0 30px; }
+  .pt-row { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+  .pt-item { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .pt-thumb { position: relative; overflow: hidden; border-radius: 3px; background: #ece8e1; border: 1px solid var(--line); }
+  .pt-thumb iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .pt-thumb.poster { width: 230px; aspect-ratio: 420 / 594; }
+  .pt-thumb.table { width: 92px; aspect-ratio: 74 / 210; }
+  .pt-links { display: flex; gap: 10px; }
+  .pt-pick { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; margin: 8px 0 4px; }
+</style>
+<h1>Print themes</h1>
+<p class="muted small">Every theme × format, filled with an event (its uploaded cover, else the theme's fallback image) and two
+  samples: a short name and a 60-character one. Thumbnails are the live HTML in iframes; PDF is WeasyPrint.
+  Themes live in <code>print_themes/</code> (README there).</p>
+<form class="pt-pick" method="get">
+  <label>Event <select name="event" onchange="this.form.submit()">
+    {% for e in events %}<option value="{{ e.display_code }}"{% if e.display_code == chosen %} selected{% endif %}>{{ e.display_code }} · {{ e.name|truncatechars:40 }}</option>{% endfor %}
+    <option value="short"{% if chosen == "short" %} selected{% endif %}>sample: short name</option>
+    <option value="long"{% if chosen == "long" %} selected{% endif %}>sample: long name</option>
+  </select></label>
+  <label>Language <select name="lang" onchange="this.form.submit()">
+    <option value="tr"{% if lang == "tr" %} selected{% endif %}>Türkçe</option>
+    <option value="en"{% if lang == "en" %} selected{% endif %}>English</option>
+  </select></label>
+</form>
+{% for row in rows %}
+<section class="pt-theme">
+  <h2>{{ row.name }} <span class="muted small">{{ row.theme.id }}</span></h2>
+  {% for f in row.formats %}
+  <h3 class="small muted">{{ f.name }} · {{ f.width }} × {{ f.height }} mm</h3>
+  <div class="pt-row">
+    {% for it in f.items %}
+    <div class="pt-item">
+      <div class="pt-thumb {{ f.id }}" data-src="{{ it.url }}#raw" data-w="{{ f.width }}" data-h="{{ f.height }}"></div>
+      <div><b>{{ it.source }}</b></div>
+      <div class="pt-links"><a href="{{ it.url }}" target="_blank" rel="noopener">Show</a>
+        <a href="{{ it.pdf }}" target="_blank" rel="noopener">PDF</a></div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</section>
+{% empty %}
+<p>No themes found in print_themes/.</p>
+{% endfor %}
+<script>
+  var MM = 96 / 25.4;
+  var ro = new ResizeObserver(function (es) { es.forEach(function (e) { scale(e.target); }); });
+  function scale(box) {
+    var f = box.querySelector('iframe');
+    if (f) f.style.transform = 'scale(' + box.clientWidth / (box.dataset.w * MM) + ')';
+  }
+  document.querySelectorAll('.pt-thumb').forEach(function (box) {
+    var f = document.createElement('iframe');
+    f.src = box.dataset.src; f.loading = 'lazy'; f.tabIndex = -1;
+    f.style.width = (box.dataset.w * MM) + 'px'; f.style.height = (box.dataset.h * MM) + 'px';
+    box.appendChild(f); scale(box); ro.observe(box);
+  });
+</script>
+{% endblock %}

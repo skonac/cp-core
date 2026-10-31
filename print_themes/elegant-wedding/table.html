@@ -1,0 +1,58 @@
+{% extends "_base.html" %}
+{% block style %}
+/* elegant-wedding / table card: sheet 74 x 210 mm on ~300 g stock. Face = top 175 mm; the bottom 35 mm (1/6)
+   folds back as the foot (blank), fold marked at both edges. */
+.sheet-table {
+  --paper: #fbf8f2; --ink: #1d2b24; --ink-soft: #4f5d55; --gold: #a8874a; --blush: #efe2d8;
+  --display: 'Cormorant Garamond', Garamond, 'Times New Roman', serif;
+  --body: 'Jost', 'Century Gothic', Arial, sans-serif;
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-weight: 300;
+}
+.face { position: absolute; top: 0; left: 0; width: 74mm; height: 175mm; box-sizing: border-box;
+        padding: 10mm 7mm 7mm; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.frame, .frame-inner { position: absolute; border: 0.35mm solid var(--gold); }
+.frame { top: 3.2mm; right: 3.2mm; bottom: 3.2mm; left: 3.2mm; }
+.frame-inner { top: 4.6mm; right: 4.6mm; bottom: 4.6mm; left: 4.6mm; border-width: 0.15mm; }
+
+.eyebrow { flex: none; margin: 0; padding-left: 0.34em; font-size: 5.6pt; font-weight: 500; letter-spacing: 0.34em;
+           text-transform: uppercase; color: var(--gold); }
+.names { flex: none; margin: 3mm 0 0; font-family: var(--display); font-style: italic; font-weight: 300; line-height: 0.98; }
+.names.s { font-size: 30pt; } .names.m { font-size: 25pt; } .names.l { font-size: 20pt; } .names.xl { font-size: 16pt; }
+.when { flex: none; margin: 3mm 0 0; font-size: 6.4pt; font-weight: 400; letter-spacing: 0.2em; text-transform: uppercase;
+        color: var(--ink-soft); line-height: 1.6; }
+.when .d { white-space: nowrap; }
+
+.photo { flex: 1 1 auto; min-height: 22mm; max-height: 36mm; margin-top: 4.5mm; width: 44mm; overflow: hidden;
+         border-radius: 22mm 22mm 1mm 1mm; background: var(--blush); }
+.photo img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; }
+
+.qr-card { flex: none; margin-top: 5mm; width: 52mm; padding: 3mm 3mm 2.4mm; box-sizing: border-box;
+           background: var(--blush); border-radius: 1.6mm; }
+.qr-code { display: block; width: 46mm; height: 46mm; }
+.code { margin: 1.8mm 0 0; font-size: 6.4pt; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; }
+.code b { font-weight: 500; }
+.how { flex: none; margin: 3.6mm 0 0; font-family: var(--display); font-style: italic; font-weight: 300; font-size: 11pt; line-height: 1.15; }
+.site { position: absolute; left: 0; right: 0; bottom: 8.2mm; margin: 0; padding-left: 0.3em; font-size: 5.2pt;
+        letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold); }
+
+.fold { position: absolute; top: 175mm; left: 0; width: 74mm; height: 0; border-top: 0.15mm dotted var(--gold); opacity: 0.45; }
+.fold-mark { position: absolute; top: 175mm; width: 3mm; height: 0; border-top: 0.3mm solid var(--gold); }
+.fold-mark.l { left: 0; } .fold-mark.r { right: 0; }
+{% endblock %}
+
+{% block sheet %}
+<section class="face">
+  <div class="frame"></div><div class="frame-inner"></div>
+  <p class="eyebrow">{{ t.welcome_short }}</p>
+  <h1 class="names {{ name_size }}">{{ event.name }}</h1>
+  <p class="when"><span class="d">{{ date }}</span>{% if event.venue or event.city %}<br><span>{{ event.venue }}{% if event.venue and event.city %} · {% endif %}{{ event.city }}</span>{% endif %}</p>
+  {% if photo %}<div class="photo"><img src="{{ photo }}" alt=""></div>{% endif %}
+  <div class="qr-card">
+    {{ qr }}
+    <p class="code">{{ t.code }} <b>{{ code }}</b></p>
+  </div>
+  <p class="how">{{ t.short_how|safe }}</p>
+  <p class="site">cleverphotos.org</p>
+</section>
+<div class="fold"></div><i class="fold-mark l"></i><i class="fold-mark r"></i>
+{% endblock %}

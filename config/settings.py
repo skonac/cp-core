@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "shop",       # Product, Purchase, payments (simulated until iyzico)
     "staff",      # staff data browser pages (/dj/staff/): no models
     "notify",     # PushDevice, Notification (temporary send log); providers, the in-process sender
+    "printing",   # print themes (posters, table cards): HTML preview + WeasyPrint PDF; no models
 ]
 
 AUTH_USER_MODEL = "accounts.User"   # must exist before the first migrate
@@ -201,6 +202,8 @@ ZOHOMAIL_CLIENT_SECRET = env("CP_ZOHOMAIL_CLIENT_SECRET", "")
 ZOHOMAIL_REFRESH_TOKEN = env("CP_ZOHOMAIL_REFRESH_TOKEN", "")
 ZOHOMAIL_ACCOUNT_ID = env("CP_ZOHOMAIL_ACCOUNT_ID", "")
 ZOHOMAIL_FROM = env("CP_ZOHOMAIL_FROM", "")
+PRINT_THEMES_DIR = BASE_DIR / "print_themes"   # printed materials: one folder per theme (README there)
+PRINT_RENDERS_AT_ONCE = 2   # WeasyPrint PDFs at the same time per process (each 100-200 MB for ~2 s)
 EVENT_LOOKUP_PER_MIN = 30   # public event lookups per IP
 CONTACT_PER_HOUR = 5        # contact form messages per IP per hour
 PROMO_FAILS = (4, 4 * 3600)  # wrong promo codes per user, per 4 hours (POST /api/shop/promo)

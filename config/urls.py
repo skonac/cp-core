@@ -8,6 +8,8 @@ from events.participant_views import home
 
 from shop.views import iyzico_callback, iyzico_webhook
 
+from printing.views import asset as print_asset
+
 from .api import api
 
 urlpatterns = [
@@ -16,6 +18,7 @@ urlpatterns = [
     path("api/shop/iyzico/callback", iyzico_callback),  # before api/: iyzico's return (browser redirect)
     path("api/shop/iyzico/webhook", iyzico_webhook),    # before api/: iyzico's server notification (JSON)
     path("api/notify/", include("notify.urls")),        # before api/: SMS providers' delivery reports
+    path("api/print/assets/<path:path>", print_asset),   # before api/: print theme files (fonts, images)
     path("api/", api.urls),                             # JSON API for cp-web; docs at /api/docs
     # Django pages (fallback UI and staff pages), all under /dj/: the rest of the site belongs to
     # cp-web (React), so nginx routes only /dj/ here. Login is phone + password until SMS sign-in exists.
