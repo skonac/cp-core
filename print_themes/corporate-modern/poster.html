@@ -1,0 +1,83 @@
+{% extends "_base.html" %}
+{% block style %}
+/* corporate-modern / poster, A2 420 x 594 mm. A navy band (300 mm) holds the logo (the event's cover, shown
+   whole on a white panel) and the event name; an amber rule; below on paper: QR card + three numbered steps.
+   Without a cover the band shows only the name, centred. */
+.sheet-poster {
+  --paper: #f6f5f1; --navy: #0f1d33; --navy-2: #1b2c4a; --ink: #0f1d33; --muted: #5b6577; --amber: #ffb627;
+  --mist: #b9c3d6;
+  --display: 'Archivo Expanded', 'Archivo', Arial, sans-serif;
+  --body: 'Archivo', Arial, sans-serif;
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-weight: 400;
+}
+.band { position: absolute; top: 0; left: 0; width: 420mm; height: 300mm; box-sizing: border-box;
+        padding: 52mm 28mm 0; background: var(--navy); color: #fff; overflow: hidden; text-align: center; }
+.band.no-logo { padding-top: 112mm; }   /* block layout, fixed offsets: flexbox here sized the title wrongly in WeasyPrint */
+.band-top { position: absolute; top: 22mm; left: 28mm; right: 28mm; display: flex; justify-content: space-between;
+            align-items: baseline; font-size: 15pt; font-weight: 600; letter-spacing: 0.28em; text-transform: uppercase; }
+.band-top .hi { color: var(--amber); }
+.band-top .d { color: var(--mist); white-space: nowrap; }
+.ring { position: absolute; right: -90mm; bottom: -110mm; width: 260mm; height: 260mm; border-radius: 50%;
+        border: 14mm solid var(--navy-2); }
+.ring.small { right: auto; left: -60mm; bottom: auto; top: -70mm; width: 150mm; height: 150mm; border-width: 8mm; }
+
+.logo { position: relative; margin: 0 auto; width: 220mm; height: 128mm; box-sizing: border-box; padding: 8mm;
+        background: #fff; border-radius: 4mm; }
+.logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.name { position: relative; margin: 16mm 0 0; font-family: var(--display);
+        font-weight: 800; line-height: 1.04; letter-spacing: -0.01em; }
+.no-logo .name { margin-top: 0; }
+.name.s { font-size: 64pt; } .name.m { font-size: 50pt; } .name.l { font-size: 40pt; } .name.xl { font-size: 32pt; }
+.no-logo .name.s { font-size: 92pt; } .no-logo .name.m { font-size: 72pt; } .no-logo .name.l { font-size: 56pt; } .no-logo .name.xl { font-size: 44pt; }
+.where { position: relative; margin: 8mm 0 0; font-size: 22pt; font-weight: 500; letter-spacing: 0.08em;
+         color: var(--mist); }
+.where span { white-space: nowrap; }
+.where .sep { color: var(--amber); padding: 0 3mm; }
+.rule { position: absolute; top: 300mm; left: 0; width: 420mm; height: 5mm; background: var(--amber); }
+
+.lower { position: absolute; top: 305mm; left: 0; width: 420mm; height: 289mm; box-sizing: border-box;
+         padding: 24mm 28mm 22mm; display: flex; gap: 20mm; align-items: flex-start; }
+.qr-card { flex: none; width: 172mm; box-sizing: border-box; padding: 7mm; background: #fff;
+           border: 0.8mm solid var(--navy); border-radius: 4mm; }
+.qr-code { display: block; width: 156mm; height: 156mm; }
+.code { margin: 4mm 0 0; display: flex; justify-content: space-between; align-items: baseline;
+        font-size: 15pt; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.code b { font-family: var(--display); font-weight: 800; font-size: 22pt; letter-spacing: 0.12em; color: var(--ink); }
+.how { flex: none; width: 172mm; padding-top: 2mm; }   /* fixed: WeasyPrint let a growing column overflow */
+.how h2 { margin: 0; font-family: var(--display); font-weight: 800; font-size: 38pt; line-height: 1.1; }
+.steps { margin: 14mm 0 0; padding: 0; list-style: none; }
+.steps li { display: flex; align-items: flex-start; gap: 7mm; margin-top: 11mm; font-size: 22pt; line-height: 1.35; }
+.steps li:first-child { margin-top: 0; }
+.steps .n { flex: none; width: 15mm; height: 15mm; border-radius: 50%; background: var(--amber); color: var(--navy);
+            font-family: var(--display); font-weight: 800; font-size: 20pt; line-height: 15mm; text-align: center; }
+.steps .t { padding-top: 1.6mm; }
+.site { position: absolute; left: 28mm; right: 28mm; bottom: 20mm; margin: 0; display: flex; justify-content: space-between;
+        font-size: 13pt; font-weight: 600; letter-spacing: 0.3em; text-transform: uppercase; color: var(--muted); }
+.site span:last-child { color: var(--ink); }
+{% endblock %}
+
+{% block sheet %}
+<section class="band{% if not photo %} no-logo{% endif %}">
+  <i class="ring"></i><i class="ring small"></i>
+  <div class="band-top"><span class="hi">{{ t.welcome|caps:lang }}</span><span class="d">{{ date|caps:lang }}</span></div>
+  {% if photo %}<div class="logo"><img src="{{ photo }}" alt=""></div>{% endif %}
+  <h1 class="name {{ name_size }}">{{ event.name }}</h1>
+  {% if event.venue or event.city %}<p class="where">{% if event.venue %}<span>{{ event.venue }}</span>{% endif %}{% if event.venue and event.city %}<span class="sep">/</span>{% endif %}{% if event.city %}<span>{{ event.city }}</span>{% endif %}</p>{% endif %}
+</section>
+<div class="rule"></div>
+<section class="lower">
+  <div class="qr-card">
+    {{ qr }}
+    <p class="code"><span>{{ t.code|caps:lang }}</span><b>{{ code }}</b></p>
+  </div>
+  <div class="how">
+    <h2>{{ t.headline }}</h2>
+    <ol class="steps">
+      <li><span class="n">1</span><span class="t">{{ t.step1 }}</span></li>
+      <li><span class="n">2</span><span class="t">{{ t.step2 }}</span></li>
+      <li><span class="n">3</span><span class="t">{{ t.step3 }}</span></li>
+    </ol>
+  </div>
+  <p class="site"><span>Clever Photos</span><span>cleverphotos.org</span></p>
+</section>
+{% endblock %}

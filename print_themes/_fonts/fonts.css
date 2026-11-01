@@ -5,3 +5,9 @@
 @font-face { font-family: 'Jost'; font-style: normal; font-weight: 300; src: url(jost-300.woff2) format('woff2'); }
 @font-face { font-family: 'Jost'; font-style: normal; font-weight: 400; src: url(jost-400.woff2) format('woff2'); }
 @font-face { font-family: 'Jost'; font-style: normal; font-weight: 500; src: url(jost-500.woff2) format('woff2'); }
+/* Archivo (corporate-modern): normal width 400/500/600; 'Archivo Expanded' = the wdth 125 instance, 500/800 */
+@font-face { font-family: 'Archivo'; font-style: normal; font-weight: 400; src: url(archivo-400.woff2) format('woff2'); }
+@font-face { font-family: 'Archivo'; font-style: normal; font-weight: 500; src: url(archivo-500.woff2) format('woff2'); }
+@font-face { font-family: 'Archivo'; font-style: normal; font-weight: 600; src: url(archivo-600.woff2) format('woff2'); }
+@font-face { font-family: 'Archivo Expanded'; font-style: normal; font-weight: 500; src: url(archivo-expanded-500.woff2) format('woff2'); }
+@font-face { font-family: 'Archivo Expanded'; font-style: normal; font-weight: 800; src: url(archivo-expanded-800.woff2) format('woff2'); }

@@ -98,7 +98,7 @@ class OrganizerApiTests(TempMedia, TestCase):
         r = c.get(poster["previewUrl"], {"lang": "en"})
         self.assertEqual(r["Content-Type"], "text/html; charset=utf-8")
         self.assertContains(r, f"{base}/cover/display.jpg")            # its own cover, not the fallback
-        self.assertContains(r, "Welcome to our wedding")
+        self.assertContains(r, "WELCOME TO OUR WEDDING")
         self.assertCode(c.get(f"{base}/print/elegant-wedding/flyer.html"), 404, "not_found")
         self.assertCode(c.get(f"{base}/print/nope/poster.html"), 404, "not_found")
         r = c.get(poster["pdfUrl"])

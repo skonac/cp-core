@@ -47,14 +47,14 @@
 
 {% block sheet %}
 <div class="frame"></div><div class="frame-inner"></div>
-<p class="eyebrow">{{ t.welcome }}</p>
+<p class="eyebrow">{{ t.welcome|caps:lang }}</p>
 <h1 class="names {{ name_size }}">{{ event.name }}</h1>
-<p class="when"><span>{{ date }}</span>{% if event.venue %}<i class="dot"></i><span>{{ event.venue }}</span>{% endif %}{% if event.city %}<i class="dot"></i><span>{{ event.city }}</span>{% endif %}</p>
+<p class="when"><span>{{ date|caps:lang }}</span>{% if event.venue %}<i class="dot"></i><span>{{ event.venue|caps:lang }}</span>{% endif %}{% if event.city %}<i class="dot"></i><span>{{ event.city|caps:lang }}</span>{% endif %}</p>
 {% if photo %}<div class="photo"><img src="{{ photo }}" alt=""></div>{% else %}<div class="spacer"></div>{% endif %}
 <section class="bottom">
   <div class="qr-card">
     {{ qr }}
-    <p class="code">{{ t.code }} <b>{{ code }}</b></p>
+    <p class="code">{{ t.code|caps:lang }} <b>{{ code }}</b></p>
   </div>
   <div class="how">
     <h2>{{ t.headline }}</h2>

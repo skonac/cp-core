@@ -1,0 +1,65 @@
+{% extends "_base.html" %}
+{% block style %}
+/* corporate-modern / table card: sheet 74 x 210 mm on ~300 g stock. Face = top 175 mm; the bottom 35 mm folds
+   back as the foot (blank), fold marked at both edges. Navy band (82 mm) with the logo panel and the name, amber
+   rule, then the QR card and a one-line how-to. Block layout with fixed offsets (no flexbox: WeasyPrint). */
+.sheet-table {
+  --paper: #f6f5f1; --navy: #0f1d33; --navy-2: #1b2c4a; --ink: #0f1d33; --muted: #5b6577; --amber: #ffb627;
+  --mist: #b9c3d6;
+  --display: 'Archivo Expanded', 'Archivo', Arial, sans-serif;
+  --body: 'Archivo', Arial, sans-serif;
+  background: var(--paper); color: var(--ink); font-family: var(--body); font-weight: 400;
+}
+.band { position: absolute; top: 0; left: 0; width: 74mm; height: 82mm; box-sizing: border-box;
+        padding: 15mm 6mm 0; background: var(--navy); color: #fff; overflow: hidden; text-align: center; }
+.band.no-logo { padding-top: 30mm; }
+.ring { position: absolute; right: -22mm; bottom: -30mm; width: 62mm; height: 62mm; border-radius: 50%;
+        border: 3.4mm solid var(--navy-2); }
+.hi { position: absolute; top: 6.5mm; left: 0; right: 0; margin: 0; font-size: 5.2pt; font-weight: 600;
+      letter-spacing: 0.3em; text-transform: uppercase; color: var(--amber); }
+.logo { position: relative; margin: 0 auto; width: 52mm; height: 30mm; box-sizing: border-box; padding: 2.4mm;
+        background: #fff; border-radius: 1.2mm; }
+.logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.name { position: relative; margin: 5mm 0 0; font-family: var(--display); font-weight: 800; line-height: 1.08; }
+.name.s { font-size: 14pt; } .name.m { font-size: 11.5pt; } .name.l { font-size: 9.5pt; } .name.xl { font-size: 8pt; }
+.no-logo .name.s { font-size: 17pt; } .no-logo .name.m { font-size: 13pt; } .no-logo .name.l { font-size: 11pt; } .no-logo .name.xl { font-size: 9.5pt; }
+.where { position: relative; margin: 2.4mm 0 0; font-size: 6pt; font-weight: 500; letter-spacing: 0.06em;
+         color: var(--mist); line-height: 1.45; }
+.where .d { white-space: nowrap; color: #fff; }
+.rule { position: absolute; top: 82mm; left: 0; width: 74mm; height: 1.6mm; background: var(--amber); }
+
+.qr-card { position: absolute; top: 92mm; left: 11mm; width: 52mm; box-sizing: border-box; padding: 2.6mm;
+           background: #fff; border: 0.3mm solid var(--navy); border-radius: 1.2mm; }
+.qr-code { display: block; width: 46.2mm; height: 46.2mm; }
+.code { display: table; width: 100%; margin: 1.4mm 0 0; font-size: 5pt; font-weight: 600; letter-spacing: 0.14em;
+        text-transform: uppercase; color: var(--muted); }   /* a table row, not floats: WeasyPrint */
+.code span, .code b { display: table-cell; vertical-align: middle; padding: 0 0.6mm; }
+.code b { text-align: right; font-family: var(--display); font-weight: 800; font-size: 7pt; letter-spacing: 0.1em;
+          color: var(--ink); }
+.how { position: absolute; top: 154mm; left: 6mm; right: 6mm; margin: 0; text-align: center;
+       font-family: var(--display); font-weight: 800; font-size: 7.2pt; line-height: 1.3; }
+.site { position: absolute; left: 0; right: 0; top: 166mm; margin: 0; text-align: center; font-size: 4.6pt;
+        font-weight: 600; letter-spacing: 0.3em; text-transform: uppercase; color: var(--muted); }
+
+.fold { position: absolute; top: 175mm; left: 0; width: 74mm; height: 0; border-top: 0.15mm dotted var(--navy); opacity: 0.35; }
+.fold-mark { position: absolute; top: 175mm; width: 3mm; height: 0; border-top: 0.3mm solid var(--navy); }
+.fold-mark.l { left: 0; } .fold-mark.r { right: 0; }
+{% endblock %}
+
+{% block sheet %}
+<section class="band{% if not photo %} no-logo{% endif %}">
+  <i class="ring"></i>
+  <p class="hi">{{ t.welcome|caps:lang }}</p>
+  {% if photo %}<div class="logo"><img src="{{ photo }}" alt=""></div>{% endif %}
+  <h1 class="name {{ name_size }}">{{ event.name }}</h1>
+  <p class="where"><span class="d">{{ date }}</span>{% if event.venue or event.city %}<br>{{ event.venue }}{% if event.venue and event.city %} / {% endif %}{{ event.city }}{% endif %}</p>
+</section>
+<div class="rule"></div>
+<div class="qr-card">
+  {{ qr }}
+  <p class="code"><span>{{ t.code|caps:lang }}</span><b>{{ code }}</b></p>
+</div>
+<p class="how">{{ t.short_how }}</p>
+<p class="site">cleverphotos.org</p>
+<div class="fold"></div><i class="fold-mark l"></i><i class="fold-mark r"></i>
+{% endblock %}

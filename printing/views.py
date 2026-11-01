@@ -40,14 +40,18 @@ def asset(request, path):
     return response
 
 
-def _sample(kind: str) -> Event:
-    return Event(code="rk238", type="wedding", date=date(2026, 9, 12), **SAMPLES[kind])
+def _sample(kind: str, theme) -> Event:
+    fields = {**SAMPLES[kind], **theme.samples.get(kind, {})}
+    event_type = theme.event_types[0] if theme.event_types else "other"
+    return Event(code="rk238", type=event_type, date=date(2026, 9, 12), **fields)
 
 
-def _event_and_cover(request, which: str):
-    """(event, cover_url, cover_file) for ?event=: a sample name or an event code."""
+def _event_and_cover(request, which: str, theme):
+    """(event, cover_url, cover_file) for ?event=: a sample (the theme's own sample texts and sample cover,
+    if it has them) or an event code. A sample cover is a theme file, so the PDF fetcher finds it by URL."""
     if which in SAMPLES:
-        return _sample(which), None, None
+        cover = f"{R.ASSETS_URL}{theme.id}/{theme.sample_cover}" if theme.sample_cover else None
+        return _sample(which, theme), cover, None
     event = get_object_or_404(Event, code=normalize_code(which))
     file = R.cover_path(event)
     url = reverse("staff:image_file", args=[event.cover_image_id, "d"]) if file else None
@@ -88,7 +92,7 @@ def page(request):
 @staff_required
 def html(request, theme_id, fmt):
     theme = _theme_and_format(theme_id, fmt)
-    event, cover_url, _ = _event_and_cover(request, request.GET.get("event", "short"))
+    event, cover_url, _ = _event_and_cover(request, request.GET.get("event", "short"), theme)
     join_url = request.build_absolute_uri(f"/?event={event.display_code}")
     return HttpResponse(R.render_html(theme, fmt, event, _lang(request), join_url, cover_url))
 
@@ -96,7 +100,7 @@ def html(request, theme_id, fmt):
 @staff_required
 def pdf(request, theme_id, fmt):
     theme = _theme_and_format(theme_id, fmt)
-    event, cover_url, cover_file = _event_and_cover(request, request.GET.get("event", "short"))
+    event, cover_url, cover_file = _event_and_cover(request, request.GET.get("event", "short"), theme)
     join_url = request.build_absolute_uri(f"/?event={event.display_code}")
     page_html = R.render_html(theme, fmt, event, _lang(request), join_url, cover_url)
     try:

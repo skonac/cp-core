@@ -10,6 +10,13 @@
    Screen: the sheet scaled to fit the window; with #raw the bare sheet at full size (thumbnail iframes). */
 @page { size: {{ fmt.width }}mm {{ fmt.height }}mm; margin: 0; }
 html, body { margin: 0; }
+/* Browser "Save as PDF" too: print colours and backgrounds even with "Background graphics" off, and undo the
+   screen fit-to-window scaling (WeasyPrint runs no script; browsers do). */
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+@media print {
+  .stage { width: auto !important; height: auto !important; }
+  .stage .sheet { transform: none !important; box-shadow: none !important; }
+}
 .sheet { position: relative; box-sizing: border-box; width: {{ fmt.width }}mm; height: {{ fmt.height }}mm; overflow: hidden; }
 @media screen {
   html, body { background: #d8d4cb; }

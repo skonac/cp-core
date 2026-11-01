@@ -60,7 +60,8 @@ def cover_path(event) -> Path | None:
 
 def _engine() -> Engine:
     # Not cached: theme edits show up on the next render, no restart (renders are rare).
-    return Engine(dirs=[str(themes.root())], autoescape=True, debug=settings.DEBUG)
+    return Engine(dirs=[str(themes.root())], autoescape=True, debug=settings.DEBUG,
+                  builtins=["printing.textfilters"])   # |caps:lang in every theme
 
 
 def render_html(theme: themes.Theme, fmt: str, event, lang: str, join_url: str, cover_url: str | None) -> str:

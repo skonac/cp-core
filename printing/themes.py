@@ -26,6 +26,8 @@ class Theme:
     texts: dict
     fallback_image: str
     qr_dark: str
+    samples: dict          # staff page only: {"short"|"long": {name, venue, city}} overriding the defaults
+    sample_cover: str      # staff page only: an image standing in for an uploaded cover (e.g. a sample logo)
 
     def text(self, lang: str) -> dict:
         return self.texts.get(lang) or self.texts.get("tr") or {}
@@ -40,7 +42,8 @@ def _load(folder: Path) -> Theme:
     formats = [f for f in meta.get("formats", []) if f in FORMATS and (folder / f"{f}.html").is_file()]
     return Theme(id=folder.name, path=folder, name=meta.get("name", {}), order=int(meta.get("order", 100)),
                  formats=formats, event_types=meta.get("event_types", []), texts=meta.get("texts", {}),
-                 fallback_image=meta.get("fallback_image", ""), qr_dark=meta.get("qr_dark", "#000000"))
+                 fallback_image=meta.get("fallback_image", ""), qr_dark=meta.get("qr_dark", "#000000"),
+                 samples=meta.get("samples", {}), sample_cover=meta.get("sample_cover", ""))
 
 
 def all_themes() -> list[Theme]:

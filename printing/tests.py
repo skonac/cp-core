@@ -32,15 +32,36 @@ class PrintTests(TestCase):
         page = R.render_html(theme, "poster", self.event, "tr", "https://cleverphotos.org/?event=RK238", None)
         self.assertIn('lang="tr"', page)
         self.assertIn("Derya &amp; Can", page)          # escaped
-        self.assertIn("Çırağan Sarayı", page)
+        self.assertIn("ÇIRAĞAN SARAYI", page)             # shown in capitals, Turkish rules
         self.assertIn('class="qr-code"', page)
         self.assertIn("@page { size: 420mm 594mm", page)
         self.assertIn("/api/print/assets/elegant-wedding/images/fallback.jpg", page)
         self.assertIn("/api/print/assets/_fonts/fonts.css", page)
         en = R.render_html(theme, "table", self.event, "en", "https://x/?event=RK238", "/cover.jpg")
-        self.assertIn("Welcome", en)
+        self.assertIn("WELCOME", en)
         self.assertIn('src="/cover.jpg"', en)
         self.assertIn("@page { size: 74mm 210mm", en)
+
+    def test_caps_turkish(self):
+        from .textfilters import caps
+        self.assertEqual(caps("Hoş geldiniz", "tr"), "HOŞ GELDİNİZ")
+        self.assertEqual(caps("Kırıkkale", "tr"), "KIRIKKALE")
+        self.assertEqual(caps("Welcome, Liz", "en"), "WELCOME, LIZ")
+        page = R.render_html(themes.get("elegant-wedding"), "poster", self.event, "tr", "https://x/?event=X", None)
+        self.assertIn("DÜĞÜNÜMÜZE HOŞ GELDİNİZ", page)
+
+    def test_corporate_theme_and_staff_samples(self):
+        theme = themes.get("corporate-modern")
+        self.assertEqual(theme.formats, ["poster", "table"])
+        self.assertEqual([t.id for t in themes.all_themes()][:2], ["elegant-wedding", "corporate-modern"])
+        self.client.force_login(self.staff)
+        r = self.client.get("/dj/staff/print/corporate-modern/table.html?event=short")
+        self.assertContains(r, "Norda 2027 Kick-off")                                   # the theme's own sample
+        self.assertContains(r, "/api/print/assets/corporate-modern/images/sample-logo.jpg")   # sample cover
+        r = self.client.get("/dj/staff/print/corporate-modern/poster.pdf?event=long")
+        self.assertEqual(r["Content-Type"], "application/pdf")
+        page = R.render_html(theme, "poster", self.event, "tr", "https://x/?event=X", None)
+        self.assertIn('class="band no-logo"', page)                                     # no cover: no logo panel
 
     def test_name_size_and_date(self):
         from datetime import date
