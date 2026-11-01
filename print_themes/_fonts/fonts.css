@@ -11,3 +11,9 @@
 @font-face { font-family: 'Archivo'; font-style: normal; font-weight: 600; src: url(archivo-600.woff2) format('woff2'); }
 @font-face { font-family: 'Archivo Expanded'; font-style: normal; font-weight: 500; src: url(archivo-expanded-500.woff2) format('woff2'); }
 @font-face { font-family: 'Archivo Expanded'; font-style: normal; font-weight: 800; src: url(archivo-expanded-800.woff2) format('woff2'); }
+/* Bricolage Grotesque (celebration): text instances opsz 14 at 400/600; 'Bricolage Display' opsz 96 at 800,
+   normal width; 'Bricolage Condensed' opsz 96, wdth 75, 800 */
+@font-face { font-family: 'Bricolage Grotesque'; font-style: normal; font-weight: 400; src: url(bricolage-400.woff2) format('woff2'); }
+@font-face { font-family: 'Bricolage Grotesque'; font-style: normal; font-weight: 600; src: url(bricolage-600.woff2) format('woff2'); }
+@font-face { font-family: 'Bricolage Display'; font-style: normal; font-weight: 800; src: url(bricolage-800.woff2) format('woff2'); }
+@font-face { font-family: 'Bricolage Condensed'; font-style: normal; font-weight: 800; src: url(bricolage-condensed-800.woff2) format('woff2'); }

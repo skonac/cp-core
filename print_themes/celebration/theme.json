@@ -1,0 +1,34 @@
+{
+  "name": {"tr": "Kutlama", "en": "Celebration"},
+  "order": 30,
+  "event_types": ["holiday", "other"],
+  "fallback_image": "",
+  "sample_cover": "images/sample-photo.jpg",
+  "qr_dark": "#2d1846",
+  "formats": ["poster", "table"],
+  "samples": {
+    "short": {"name": "Ece 30 yaşında!", "venue": "Sloth Coffee", "city": "Ankara"},
+    "long": {"name": "Selin ve Arda'nın Mezuniyet Sonrası Yaz Buluşması ve Doğum Günü", "venue": "Moda Sahil Çay Bahçesi",
+             "city": "İstanbul"}
+  },
+  "texts": {
+    "tr": {
+      "welcome": "Hoş geldiniz!",
+      "code": "Kod",
+      "headline": "Bugünün fotoğrafları sizi bulsun",
+      "step1": "Telefonunuzun kamerasıyla QR kodu okutun",
+      "step2": "Telefon numaranızla girin, bir selfie çekin",
+      "step3": "Çekilen karelerden sizin olduklarınız telefonunuza gelsin",
+      "short_how": "Okutun, selfie çekin, fotoğraflarınız size gelsin!"
+    },
+    "en": {
+      "welcome": "Welcome!",
+      "code": "Code",
+      "headline": "Let today's photos find you",
+      "step1": "Scan the QR code with your phone's camera",
+      "step2": "Sign in with your phone number and take a selfie",
+      "step3": "The photos you're in arrive on your phone",
+      "short_how": "Scan, take a selfie, get your photos!"
+    }
+  }
+}

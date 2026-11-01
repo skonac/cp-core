@@ -53,7 +53,7 @@ class PrintTests(TestCase):
     def test_corporate_theme_and_staff_samples(self):
         theme = themes.get("corporate-modern")
         self.assertEqual(theme.formats, ["poster", "table"])
-        self.assertEqual([t.id for t in themes.all_themes()][:2], ["elegant-wedding", "corporate-modern"])
+        self.assertEqual([t.id for t in themes.all_themes()][:3], ["elegant-wedding", "corporate-modern", "celebration"])
         self.client.force_login(self.staff)
         r = self.client.get("/dj/staff/print/corporate-modern/table.html?event=short")
         self.assertContains(r, "Norda 2027 Kick-off")                                   # the theme's own sample
@@ -62,6 +62,15 @@ class PrintTests(TestCase):
         self.assertEqual(r["Content-Type"], "application/pdf")
         page = R.render_html(theme, "poster", self.event, "tr", "https://x/?event=X", None)
         self.assertIn('class="band no-logo"', page)                                     # no cover: no logo panel
+
+    def test_every_theme_renders_both_formats_and_languages(self):
+        for theme in themes.all_themes():
+            for fmt in theme.formats:
+                for lang in themes.LANGS:
+                    with self.subTest(theme=theme.id, fmt=fmt, lang=lang):
+                        page = R.render_html(theme, fmt, self.event, lang, "https://x/?event=X", None)
+                        self.assertIn('class="qr-code"', page)
+                        self.assertNotIn("{{", page)
 
     def test_name_size_and_date(self):
         from datetime import date

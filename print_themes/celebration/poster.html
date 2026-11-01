@@ -1,0 +1,119 @@
+{% extends "_base.html" %}
+{% block style %}
+/* celebration / poster, A2 420 x 594 mm: birthdays, parties, showers, get-togethers. Warm paper, confetti
+   (one inline SVG in mm, behind everything), a pill, the name in a condensed heavy face, date and venue as tilted
+   sticker chips; the cover as a tilted polaroid (no cover: no photo, the title moves down and grows); the QR in
+   a plum ticket beside three steps. Block layout with fixed offsets (WeasyPrint). */
+.sheet-poster {
+  --paper: #fff2e2; --plum: #2d1846; --coral: #ff5d3b; --sun: #ffc23d; --teal: #19b3a6; --pink: #ff9cc8;
+  --blue: #4d7cff;
+  --display: 'Bricolage Condensed', 'Bricolage Grotesque', 'Arial Narrow', sans-serif;
+  --heavy: 'Bricolage Display', 'Bricolage Grotesque', Arial, sans-serif;
+  --body: 'Bricolage Grotesque', Arial, sans-serif;
+  background: var(--paper); color: var(--plum); font-family: var(--body); font-weight: 400;
+}
+.confetti { position: absolute; top: 0; left: 0; width: 420mm; height: 594mm; }
+
+.head { position: absolute; top: 30mm; left: 28mm; right: 28mm; text-align: center; }
+.no-photo .head { top: 222mm; }   /* the middle of the photo area: the confetti there stays at the sides */
+.pill { display: inline-block; margin: 0; padding: 3mm 10mm 3.4mm; border-radius: 20mm; background: var(--coral);
+        color: #fff; font-family: var(--heavy); font-weight: 800; font-size: 30pt; letter-spacing: 0.04em;
+        transform: rotate(-2deg); }
+.name { margin: 9mm 0 0; font-family: var(--display); font-weight: 800; line-height: 0.95; letter-spacing: -0.005em; }
+.name.s { font-size: 150pt; } .name.m { font-size: 118pt; } .name.l { font-size: 90pt; } .name.xl { font-size: 70pt; }
+.no-photo .name.s { font-size: 190pt; } .no-photo .name.m { font-size: 150pt; } .no-photo .name.l { font-size: 112pt; } .no-photo .name.xl { font-size: 86pt; }
+.chips { margin: 10mm 0 0; }
+.chip { display: inline-block; margin: 0 2.5mm; padding: 2.6mm 7mm 3mm; border-radius: 3mm; font-family: var(--heavy);
+        font-weight: 800; font-size: 19pt; letter-spacing: 0.08em; white-space: nowrap; }
+.chip.date { background: var(--sun); color: var(--plum); transform: rotate(-1.5deg); }
+.chip.place { background: var(--teal); color: #fff; transform: rotate(1.2deg); }
+
+.polaroid { position: absolute; top: 182mm; left: 97mm; width: 226mm; height: 196mm; box-sizing: border-box;
+            padding: 9mm 9mm 0; background: #fff; transform: rotate(-3deg); border: 0.3mm solid #ead9c4; }
+.polaroid .img { width: 208mm; height: 156mm; overflow: hidden; background: #f3e6d6; }
+.polaroid img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.polaroid .tag { margin: 6mm 0 0; text-align: center; font-family: var(--display); font-weight: 800; font-size: 30pt;
+                 color: var(--coral); letter-spacing: 0.02em; }
+.tape { position: absolute; top: -7mm; left: 83mm; width: 60mm; height: 15mm; background: var(--sun); opacity: 0.85;
+        transform: rotate(4deg); }
+
+.ticket { position: absolute; top: 394mm; left: 28mm; width: 186mm; height: 178mm; box-sizing: border-box;
+          padding: 9mm 18mm 0; background: var(--plum); border-radius: 6mm; color: #fff; }
+.ticket .qr { width: 150mm; height: 150mm; background: #fff; border-radius: 3mm; }
+.qr-code { display: block; width: 150mm; height: 150mm; }
+.ticket .code { margin: 5mm 0 0; text-align: center; font-family: var(--heavy); font-weight: 800; font-size: 16pt;
+                letter-spacing: 0.22em; }
+.ticket .code b { color: var(--sun); }
+.notch { position: absolute; top: 80mm; width: 16mm; height: 16mm; border-radius: 50%; background: var(--paper); }
+.notch.l { left: -8mm; } .notch.r { right: -8mm; }
+
+.how { position: absolute; top: 402mm; left: 232mm; width: 160mm; }
+.how h2 { margin: 0; font-family: var(--heavy); font-weight: 800; font-size: 36pt; line-height: 1.05; }
+.steps { margin: 12mm 0 0; padding: 0; list-style: none; }
+.steps li { position: relative; margin: 9mm 0 0; padding-left: 20mm; font-size: 20pt; line-height: 1.3; }
+.steps li:first-child { margin-top: 0; }
+.steps .n { position: absolute; left: 0; top: -1mm; width: 14mm; height: 14mm; border-radius: 50%; text-align: center;
+            font-family: var(--heavy); font-weight: 800; font-size: 20pt; line-height: 14mm; color: #fff; }
+.steps li:nth-child(1) .n { background: var(--coral); }
+.steps li:nth-child(2) .n { background: var(--teal); }
+.steps li:nth-child(3) .n { background: var(--blue); }
+.site { position: absolute; right: 28mm; bottom: 24mm; margin: 0; font-family: var(--heavy); font-weight: 800;
+        font-size: 14pt; letter-spacing: 0.24em; color: var(--plum); }
+{% endblock %}
+
+{% block sheet %}
+<div class="{% if not photo %}no-photo{% endif %}">
+<svg class="confetti" xmlns="http://www.w3.org/2000/svg" width="420mm" height="594mm" viewBox="0 0 420 594">
+  <circle cx="34" cy="52" r="9" fill="#ffc23d"/>
+  <circle cx="390" cy="40" r="6" fill="#19b3a6"/>
+  <circle cx="92" cy="22" r="3.2" fill="#2d1846"/>
+  <circle cx="306" cy="20" r="3.6" fill="#ff5d3b"/>
+  <rect x="46" y="118" width="8" height="26" rx="2" fill="#ff9cc8" transform="rotate(25 50 131)"/>
+  <path d="M354 132 A16 16 0 0 1 386 132 Z" fill="#ff5d3b"/>
+  <path d="M14 206 Q22 196 30 206 T46 206 T62 206 T78 206" fill="none" stroke="#19b3a6" stroke-width="3.6" stroke-linecap="round"/>
+  <path d="M378 212 L400 246 L356 246 Z" fill="#4d7cff"/>
+  <circle cx="64" cy="268" r="5.4" fill="#ff5d3b"/>
+  <rect x="346" y="296" width="11" height="11" rx="1.5" fill="#ffc23d" transform="rotate(20 351.5 301.5)"/>
+  <circle cx="40" cy="334" r="12" fill="none" stroke="#ff9cc8" stroke-width="4"/>
+  <path d="M338 362 Q346 352 354 362 T370 362 T386 362" fill="none" stroke="#ff5d3b" stroke-width="3.6" stroke-linecap="round"/>
+  <rect x="392" y="150" width="6" height="22" rx="2" fill="#2d1846" transform="rotate(-30 395 161)"/>
+  <circle cx="16" cy="382" r="5" fill="#ffc23d"/>
+  <circle cx="402" cy="392" r="7" fill="#ff9cc8"/>
+  <path d="M172 18 Q178 11 184 18 T196 18 T208 18" fill="none" stroke="#ffc23d" stroke-width="3" stroke-linecap="round"/>
+  <path d="M20 90 L32 98 L22 108 Z" fill="#19b3a6"/>
+  <circle cx="404" cy="96" r="3.4" fill="#ff5d3b"/>
+  <rect x="70" y="372" width="18" height="6" rx="2" fill="#4d7cff" transform="rotate(-15 79 375)"/>
+  <circle cx="226" cy="578" r="3.4" fill="#19b3a6"/>
+  <circle cx="20" cy="580" r="6" fill="#ff5d3b"/>
+</svg>
+
+<header class="head">
+  <p class="pill">{{ t.welcome }}</p>
+  <h1 class="name {{ name_size }}">{{ event.name }}</h1>
+  <p class="chips"><span class="chip date">{{ date|caps:lang }}</span>{% if event.venue or event.city %}<span class="chip place">{{ event.venue|caps:lang }}{% if event.venue and event.city %} · {% endif %}{{ event.city|caps:lang }}</span>{% endif %}</p>
+</header>
+
+{% if photo %}
+<div class="polaroid">
+  <i class="tape"></i>
+  <div class="img"><img src="{{ photo }}" alt=""></div>
+  <p class="tag">#{{ code }}</p>
+</div>
+{% endif %}
+
+<section class="ticket">
+  <i class="notch l"></i><i class="notch r"></i>
+  <div class="qr">{{ qr }}</div>
+  <p class="code">{{ t.code|caps:lang }} <b>{{ code }}</b></p>
+</section>
+<div class="how">
+  <h2>{{ t.headline }}</h2>
+  <ol class="steps">
+    <li><span class="n">1</span>{{ t.step1 }}</li>
+    <li><span class="n">2</span>{{ t.step2 }}</li>
+    <li><span class="n">3</span>{{ t.step3 }}</li>
+  </ol>
+</div>
+<p class="site">CLEVERPHOTOS.ORG</p>
+</div>
+{% endblock %}
