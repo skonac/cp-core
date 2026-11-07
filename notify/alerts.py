@@ -145,7 +145,7 @@ def alert(topic: str, text: str, key: str | None = None, wait: bool = False) -> 
         else:
             log.error("alert with an unknown topic %r: %s", topic, text)
             targets, text = ["telegram.critical"], f"(unknown topic {topic!r}) {text}"
-        message = f"[{settings.SITE_DOMAIN}] {topic}: {text}"
+        message = f"{topic}: {text}"
         if not targets:
             log.info("alert %s (no route): %s", topic, text)
             return False
@@ -179,7 +179,7 @@ def alert(topic: str, text: str, key: str | None = None, wait: bool = False) -> 
                                      name="admin-alert").start()
             elif kind == "email" and name:
                 try:
-                    _send_email(name, f"[{settings.SITE_DOMAIN}] {topic}", text)
+                    _send_email(name, topic, text)
                 except Exception:
                     log.exception("admin alert email to %s failed", name)
                     continue

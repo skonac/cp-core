@@ -44,7 +44,7 @@ class AlertTests(SimpleTestCase):
     def test_topic_goes_to_its_channel(self):
         with mock.patch("urllib.request.urlopen", return_value=reply()) as urlopen:
             self.assertTrue(alerts.alert("accounts.new", "new account", wait=True))
-        self.assertEqual(posted(urlopen), [{"chat_id": "-100222", "text": "[t.org] accounts.new: new account",
+        self.assertEqual(posted(urlopen), [{"chat_id": "-100222", "text": "accounts.new: new account",
                                             "disable_web_page_preview": True}])
 
     def test_no_route_sends_nothing(self):
@@ -63,7 +63,7 @@ class AlertTests(SimpleTestCase):
                 mock.patch.object(alerts, "_send_email") as send_email:
             self.assertTrue(alerts.alert("shop.fail", "card declined", wait=True))
         self.assertEqual([c.args for c in send_email.call_args_list],
-                         [("a@x.com", "[t.org] shop.fail", "card declined"), ("b@x.com", "[t.org] shop.fail", "card declined")])
+                         [("a@x.com", "shop.fail", "card declined"), ("b@x.com", "shop.fail", "card declined")])
 
     def test_a_failing_email_does_not_stop_the_others(self):
         with mock.patch("urllib.request.urlopen", return_value=reply()) as urlopen, \
