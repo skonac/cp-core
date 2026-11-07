@@ -106,7 +106,7 @@ def public_event(request, code: str):
     """The welcome screen: no photos, no counts. With a session, also adds the event to the user's events.
 
     Errors: 404 event_not_found · 410 event_expired · 423 event_access_closed ·
-    429 rate_limit_exceeded (30 per minute per IP)."""
+    429 rate_limit_exceeded (per IP per minute: CP_EVENT_LOOKUP_PER_MIN, default 30)."""
     ip = request.META.get("REMOTE_ADDR", "")
     if not allow(f"event-lookup:{ip}", settings.EVENT_LOOKUP_PER_MIN, 60):
         raise ApiError(429, "rate_limit_exceeded", "Çok fazla istek. Biraz sonra tekrar dene.")

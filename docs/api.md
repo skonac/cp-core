@@ -338,7 +338,7 @@ the API accepts exactly these `value`s. Today: wedding, sports, graduation, corp
   "allowsGuestAccess": true, "turnstileSiteKey": "1x00000000000000000000AA" }
 ```
 
-Errors: `404 event_not_found`, `410 event_expired`, `423 event_access_closed`, `429 rate_limit_exceeded` (30 lookups/min per IP).
+Errors: `404 event_not_found`, `410 event_expired`, `423 event_access_closed`, `429 rate_limit_exceeded` (lookups per minute per IP: `CP_EVENT_LOOKUP_PER_MIN`, default 30).
 No photos or counts are ever returned here. If a session exists, this call also adds the event to the user's events.
 
 **`GET /api/events/{code}/gallery?view=mine&cursor=0&limit=100`** → `200 gallery_retrieved`
