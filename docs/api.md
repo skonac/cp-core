@@ -193,15 +193,18 @@ or it was a reset, ask for a password: the user is already signed in, the passwo
 
 **`POST /api/auth/email-requests`** `{ "email": "ali@example.com", "purpose": "sign_in", "role": "organizer", "eventCode": "RK238", "locale": "tr" }`
 → `201 email_sent` `{ "challengeId": "em_…", "expiresInSeconds": 900, "resendAfterSeconds": 30 }`.
-- `purpose`: `sign_in` (default) or `reset` ("Şifremi unuttum": different mail text, then `set_password`).
+- `purpose`: `sign_up` (the register screen: an email that already has an account with a password gets
+  `409 email_already_registered` and no mail; offer password sign-in and "forgot password"), `sign_in` (default; an
+  email-code sign-in, also for existing accounts) or `reset` ("Şifremi unuttum": different mail text, then `set_password`).
 - `role` as in the OTP request (default `participant`; organizer sign-up sends `organizer`). `eventCode` optional.
 - `locale`: the mail's language, `tr` (default) or `en`. Link and code are valid 15 minutes and work once.
-- Errors: `404 event_not_found`, `422 invalid_email | invalid_purpose | invalid_role`, `429 rate_limit_exceeded`
-  (3 mails per address per 15 min, 30 s apart).
+- Errors: `404 event_not_found`, `409 email_already_registered`, `422 invalid_email | invalid_purpose | invalid_role`,
+  `429 rate_limit_exceeded` (3 mails per address per 15 min, 30 s apart).
 
 **`POST /api/auth/email-verifications`** `{ "challengeId": "em_…", "code": "4821" }` or `{ "token": "<from the link>" }`
 → `200 email_verified`, same shape as `phone_verified` (`user`, `nextStep`, `isNewUser`, `eventCode`, …), session set.
-- `nextStep: "set_password"`: show the password screen (`PUT /api/me/password`); its answer has the next step.
+- `nextStep: "set_password"`: show the password screen (`PUT /api/me/password`); its answer has the next step
+  (`consent` first whenever the account hasn't given KVKK consent, with or without an event).
 - Errors: `410 email_code_expired`, `422 invalid_email_code`, `429 rate_limit_exceeded` (5 wrong codes per mail,
   10 per address per day; the link keeps working).
 - The link: the mail points to `CP_EMAIL_LINK_PATH` (now the Django page `/dj/auth/email/<token>/`). When cp-web

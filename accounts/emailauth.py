@@ -84,7 +84,12 @@ def request_mail(email: str, purpose: str, role: str, event, locale: str, ip: st
     (request.build_absolute_uri("/")). Raises ApiError."""
     email = clean_email(email)
     if purpose not in EmailChallenge.Purpose.values:
-        raise ApiError(422, "invalid_purpose", "purpose must be sign_in or reset.")
+        raise ApiError(422, "invalid_purpose", "purpose must be sign_up, sign_in or reset.")
+    if purpose == EmailChallenge.Purpose.SIGN_UP:
+        existing = User.objects.filter(email=email).first()
+        if existing is not None and existing.has_usable_password() and existing.email_verified_at:
+            raise ApiError(409, "email_already_registered",
+                           "Bu e-posta ile zaten bir hesap var. Şifrenle giriş yap ya da şifreni sıfırla.")
     if role not in Role.values:
         raise ApiError(422, "invalid_role", f"role must be one of {', '.join(Role.values)}.")
     locale = locale if locale in ("tr", "en") else "tr"
@@ -104,7 +109,7 @@ def request_mail(email: str, purpose: str, role: str, event, locale: str, ip: st
     if settings.EMAIL_DELIVERY == "log":
         challenge.dev_code = code
     link = link_base.rstrip("/") + settings.EMAIL_LINK_PATH.format(token=token)
-    subject, text = TEXTS[(purpose, locale)]
+    subject, text = TEXTS[("sign_in" if purpose == EmailChallenge.Purpose.SIGN_UP else purpose, locale)]
     with transaction.atomic():
         challenge.save()
         dispatch.email(email, subject.format(code=code),

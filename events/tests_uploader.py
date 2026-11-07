@@ -181,7 +181,7 @@ class UploaderTests(TempMedia, TestCase):
     def test_organizer_who_is_also_a_uploader(self):
         UploaderAccess.objects.create(organizer=self.other, phone=ORG, full_name="Seko")
         data = self.c.sign_in(ORG, role="organizer")
-        self.assertEqual((data["nextStep"], len(data["uploaderAccesses"])), ("organizer_home", 1))
+        self.assertEqual((data["nextStep"], len(data["uploaderAccesses"])), ("consent", 1))   # KVKK first
         self.assertCode(self.c.get("/api/uploader/accesses"), 200, "uploader_accesses_retrieved")
 
     def test_participant_sign_in_drops_uploader_rights(self):

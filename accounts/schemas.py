@@ -74,7 +74,7 @@ class SignInOut(Out):
                       "uploader_home"] = Field(
         description="set_password: email sign-in of an account without a password, or a password reset: ask for "
                     "one (PUT /api/me/password), its answer gives the next step; consent/selfie/gallery: signed in "
-                    "from an event link; organizer_home/account_home: no event; "
+                    "from an event link, or without one while KVKK consent is missing; organizer_home/account_home: no event; "
                     "uploader_home: organizer entry by a phone an organizer added as uploader (§3.10).")
     uploaderAccesses: list[UploaderAccessOut] = Field(
         description="Organizers this phone may upload for (empty for most people).", examples=[[]])

@@ -2,9 +2,10 @@
 {% block title %}{% if purpose == "reset" %}Reset password{% else %}Sign in with email{% endif %}{% endblock %}
 {% block content %}
 <div class="card" style="max-width:420px; margin:40px auto">
-  <h1>{% if purpose == "reset" %}Reset password{% elif role == "organizer" %}Organizer sign-up / sign-in{% else %}Sign in with email{% endif %}</h1>
+  <h1>{% if purpose == "reset" %}Reset password{% elif purpose == "sign_up" %}{% if role == "organizer" %}Organizer sign-up{% else %}Sign up{% endif %}{% else %}Sign in with email{% endif %}</h1>
   <p class="muted small">We'll email you a link and a 4-digit code. New email = new account.</p>
-  {% if error %}<ul class="errorlist"><li>{{ error }}</li></ul>{% endif %}
+  {% if error %}<ul class="errorlist"><li>{{ error }}</li></ul>
+  {% if registered %}<p class="small"><a href="{% url 'login' %}">Sign in with your password</a> · <a href="{% url 'email_start' %}?purpose=reset">Forgot password?</a></p>{% endif %}{% endif %}
   <form method="post">{% csrf_token %}
     <p><label for="id_email">Email</label><input type="email" name="email" id="id_email" value="{{ email }}" autocomplete="email" autocapitalize="none" autofocus required></p>
     <p><label for="id_locale">Mail language</label><select name="locale" id="id_locale"><option value="tr">Türkçe</option><option value="en">English</option></select></p>

@@ -154,6 +154,7 @@ class EmailChallenge(models.Model):
     client asks for a new password. design/core.md, "Email sign-up and guest access"."""
 
     class Purpose(models.TextChoices):
+        SIGN_UP = "sign_up"   # refused for an email that already has an account with a password
         SIGN_IN = "sign_in"
         RESET = "reset"
 

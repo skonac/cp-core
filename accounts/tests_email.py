@@ -2,6 +2,7 @@
 import re
 import time
 
+from django.conf import settings
 from django.core.cache import cache
 from django.test import TestCase, override_settings
 
@@ -48,7 +49,7 @@ class EmailSignInTests(TestCase):
 
         self.assertEqual(self.c.put_json("/api/me/password", {"password": "12345"}).json()["code"], "password_too_short")
         r = self.c.put_json("/api/me/password", {"password": "123456"})   # any 6 characters
-        self.assertEqual((r.status_code, r.json()["data"]["nextStep"]), (200, "account_home"), r.content)
+        self.assertEqual((r.status_code, r.json()["data"]["nextStep"]), (200, "consent"), r.content)   # KVKK first
         self.assertEqual(self.c.get("/api/me").status_code, 200)            # still signed in
 
         self.c.delete_("/api/auth/session")
@@ -66,7 +67,7 @@ class EmailSignInTests(TestCase):
         r = self.c.post(f"/dj/auth/email/{token}/", **self.c.csrf_headers())
         self.assertRedirects(r, "/dj/auth/password/", fetch_redirect_response=False)
         r = self.c.post("/dj/auth/password/", {"password": "abcdef"}, **self.c.csrf_headers())
-        self.assertRedirects(r, "/dj/", fetch_redirect_response=False)
+        self.assertRedirects(r, "/dj/consent/", fetch_redirect_response=False)   # KVKK first
         self.assertTrue(User.objects.get(email="ali@example.com").check_password("abcdef"))
         self.assertEqual(self.verify(token=token).json()["code"], "invalid_email_code")   # once
 
@@ -82,7 +83,8 @@ class EmailSignInTests(TestCase):
         self.assertTrue(User.objects.get(email="veli@example.com").is_organizer)
 
     def test_existing_account_sign_in_and_reset(self):
-        u = User.objects.create_user(email="ali@example.com", password="oldpass", is_organizer=True)
+        u = User.objects.create_user(email="ali@example.com", password="oldpass", is_organizer=True,
+                                     kvkk_version=settings.KVKK_VERSION)
         ch, _, _ = self.ask(role="organizer")
         d = self.verify(challengeId=ch.pk, code=ch.dev_code).json()["data"]
         self.assertEqual((d["nextStep"], d["isNewUser"], d["user"]["id"]), ("organizer_home", False, str(u.pk)))
@@ -176,6 +178,12 @@ class EmailSignInTests(TestCase):
         u = User.objects.create_user("+905550000604", "secret1")
         r = self.c.post_json("/api/auth/password-sign-ins", {"identifier": "+905550000604", "password": "secret1",
                                                             "role": "organizer"})
+        self.assertEqual((r.status_code, r.json()["data"]["nextStep"]), (200, "consent"))   # KVKK first
+        u.refresh_from_db()
+        u.kvkk_version = settings.KVKK_VERSION
+        u.save()
+        r = self.c.post_json("/api/auth/password-sign-ins", {"identifier": "+905550000604", "password": "secret1",
+                                                            "role": "organizer"})
         self.assertEqual((r.status_code, r.json()["data"]["nextStep"]), (200, "organizer_home"))
         u.refresh_from_db()
         self.assertTrue(u.is_organizer)
@@ -184,3 +192,26 @@ class EmailSignInTests(TestCase):
             self.assertEqual(r.json()["code"], "invalid_credentials")
         r = self.c.post_json("/api/auth/password-sign-ins", {"identifier": "+905550000604", "password": "secret1"})
         self.assertEqual((r.status_code, r.json()["code"]), (429, "rate_limit_exceeded"))
+
+    def test_sign_up_of_a_registered_email(self):
+        u = User.objects.create_user(email="ali@example.com", password="secret1")
+        u.email_verified_at = u.created_at
+        u.save()
+        r = self.c.post_json("/api/auth/email-requests", {"email": "ALI@example.com", "purpose": "sign_up"})
+        self.assertEqual((r.status_code, r.json()["code"]), (409, "email_already_registered"))
+        self.assertFalse(Notification.objects.exists())                      # no mail
+        self.ask(purpose="sign_in")                                           # an email-code sign-in still works
+        cache.clear()
+        EmailChallenge.objects.all().delete()
+        # registered but no password yet (never finished): the sign-up mail goes out, it's their only way in
+        User.objects.create_user(email="veli@example.com").save()
+        ch, mail, _ = self.ask("veli@example.com", purpose="sign_up")
+        self.assertIn("giriş kodun", mail.title)
+        # a new email signs up as before
+        cache.clear()
+        ch, _, _ = self.ask("new@example.com", purpose="sign_up")
+        self.assertEqual(self.verify(challengeId=ch.pk, code=ch.dev_code).json()["data"]["isNewUser"], True)
+        # the Django page shows the links
+        r = self.c.post("/dj/auth/email/", {"email": "ali@example.com", "purpose": "sign_up", "role": "participant"},
+                        **self.c.csrf_headers())
+        self.assertContains(r, "Forgot password?")

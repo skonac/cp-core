@@ -24,13 +24,15 @@ def _signed_in(request, user, event, purpose):
         return redirect("password")
     if event is not None:
         return redirect("participant:event", code=event.display_code)
+    if not user.is_consent:   # KVKK first
+        return redirect("participant:consent")
     return redirect("home")
 
 
 def email_start(request):
     purpose = request.GET.get("purpose") or request.POST.get("purpose") or "sign_in"
     role = request.GET.get("role") or request.POST.get("role") or "participant"
-    error, email = "", ""
+    error, email, registered = "", "", False
     if request.method == "POST":
         email = request.POST.get("email", "")
         try:
@@ -38,9 +40,9 @@ def email_start(request):
                                                request.META.get("REMOTE_ADDR"), request.build_absolute_uri("/"))
             return redirect("email_code", challenge_id=challenge.pk)
         except ApiError as e:
-            error = e.message
+            error, registered = e.message, e.code == "email_already_registered"
     return render(request, "accounts/email_start.html",
-                  {"purpose": purpose, "role": role, "email": email, "error": error})
+                  {"purpose": purpose, "role": role, "email": email, "error": error, "registered": registered})
 
 
 def email_code(request, challenge_id):
@@ -76,6 +78,8 @@ def password(request):
     if request.method == "POST":
         try:
             emailauth.set_password(request, request.POST.get("password", ""), request.POST.get("current_password"))
+            if not user.is_consent:   # KVKK first
+                return redirect("participant:consent")
             return redirect("home")
         except ApiError as e:
             error = e.message

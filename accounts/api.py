@@ -67,6 +67,8 @@ def user_json(user: User) -> dict:
 
 def next_step(user: User, event) -> str:
     if event is None:
+        if not user.is_consent:   # KVKK first, also when signing in without an event (Nov 7)
+            return "consent"
         return "organizer_home" if user.is_organizer else "account_home"
     if not user.is_consent and (event.is_consent_required or event.is_processing_faces):
         return "consent"
@@ -144,7 +146,7 @@ def otp_verify(request, body: OtpVerifyIn):
 
 class EmailRequestIn(CamelSchema):
     email: str
-    purpose: str = "sign_in"      # sign_in | reset ("forgot password")
+    purpose: str = "sign_in"      # sign_up (refused if registered) | sign_in | reset ("forgot password")
     role: str = "participant"
     event_code: str | None = None
     locale: str = "tr"            # language of the mail: tr | en
@@ -189,13 +191,17 @@ def _signed_in(request, code: str, user: User, event, is_new: bool, first_step: 
     }, message=message)
 
 
-@auth_router.post("/email-requests", auth=None, response={201: S.EmailSentResponse, **errors(404, 422, 429)})
+@auth_router.post("/email-requests", auth=None, response={201: S.EmailSentResponse, **errors(404, 409, 422, 429)})
 def email_request(request, body: EmailRequestIn):
     """Mails a sign-in link and a 4-digit code (dev: to the server log and the admin). One flow for sign-up,
     sign-in and "forgot password" (`purpose: reset`). Either the link or the code signs in
     (POST /api/auth/email-verifications), creating the account for a new email.
 
-    Errors: 404 event_not_found · 422 invalid_email, invalid_purpose, invalid_role, validation_error ·
+    `purpose: sign_up` answers 409 email_already_registered (no mail) when the email already has an account with a
+    password: offer password sign-in and "forgot password".
+
+    Errors: 404 event_not_found · 409 email_already_registered · 422 invalid_email, invalid_purpose, invalid_role,
+    validation_error ·
     429 rate_limit_exceeded (3 mails per address per 15 min; 30 s between mails)."""
     event = _event_or_404(body.event_code)
     challenge = emailauth.request_mail(body.email, body.purpose, body.role, event, body.locale,

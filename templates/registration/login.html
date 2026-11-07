@@ -13,6 +13,7 @@
   </form>
   <p class="small" style="margin-top:14px"><a href="{% url 'email_start' %}">Sign in with an email code</a> ·
     <a href="{% url 'email_start' %}?purpose=reset">Forgot password?</a> ·
-    <a href="{% url 'email_start' %}?role=organizer">Organizer sign-up</a></p>
+    <a href="{% url 'email_start' %}?purpose=sign_up">Sign up</a> ·
+    <a href="{% url 'email_start' %}?purpose=sign_up&amp;role=organizer">Organizer sign-up</a></p>
 </div>
 {% endblock %}
