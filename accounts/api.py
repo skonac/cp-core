@@ -28,7 +28,7 @@ from . import kvkk, uploader
 from .backends import SESSION_BACKEND
 from . import schemas as S
 from .models import ContactMessage, User
-from . import emailauth
+from . import emailauth, guest
 from .otp import mask_phone, request_code, verify_code
 
 log = logging.getLogger("cp.accounts")
@@ -58,7 +58,7 @@ def user_json(user: User) -> dict:
     first = selfies.first()   # "primary" sorts before "secondary"
     return {
         "id": str(user.pk), "phoneNumber": user.phone, "fullName": user.full_name or None, "email": user.email,
-        "profileCompleted": bool(user.full_name), "accountRoles": user.account_roles,
+        "profileCompleted": bool(user.full_name), "accountRoles": user.account_roles, "isGuest": user.is_guest,
         "hasConsent": user.is_consent, "consentVersion": user.kvkk_version or None, "kvkk": kvkk.documents(),
         "selfieState": selfie_state(user),
         "selfieThumbnailUrl": f"/api/me/selfies/{first.pk}/thumb.jpg" if first else None,
@@ -242,6 +242,28 @@ def password_sign_in(request, body: PasswordSignInIn):
     return _signed_in(request, "signed_in", user, event, False, None, "Giriş yapıldı.")
 
 
+class GuestSessionIn(CamelSchema):
+    event_code: str
+
+
+@auth_router.post("/guest-sessions", auth=None, response={200: S.GuestSessionResponse, **errors(403, 404, 410, 423)})
+def guest_session(request, body: GuestSessionIn):
+    """Continue without an account: a guest session for this event only (consent, selfie, my photos,
+    downloads). Deleted after a few hours. Calling it again as the same event's guest keeps the session.
+    A selfie upload by a guest needs a Turnstile token (`turnstileToken`).
+
+    Errors: 403 guest_access_disabled (switched off for this event or everywhere) · 404 event_not_found ·
+    410 event_expired · 423 event_access_closed."""
+    event = _event_or_404(body.event_code)
+    if event.status == Event.Status.EXPIRED:
+        raise ApiError(410, "event_expired", "Bu etkinliğin erişim süresi sona erdi.")
+    if event.status == Event.Status.CLOSED:
+        raise ApiError(423, "event_access_closed", "Bu etkinliğe erişim kapatıldı.")
+    request.session.pop(uploader.SESSION_KEY, None)
+    user = guest.start(request, event)
+    return _signed_in(request, "guest_session_started", user, event, False, None, "Misafir olarak devam ediliyor.")
+
+
 @auth_router.delete("/session", auth=None, response={204: None})
 def sign_out(request):
     """Signs out."""
@@ -294,8 +316,9 @@ def me(request):
 def me_update(request, body: MeUpdateIn):
     """Profile: fullName (required), email (optional, null clears).
 
-    Errors: 403 csrf_failed · 409 email_already_in_use · 422 validation_error, email_is_sign_in (an account
+    Errors: 403 csrf_failed, guest_not_allowed · 409 email_already_in_use · 422 validation_error, email_is_sign_in (an account
     without a phone can't change or clear its email here)."""
+    guest.forbid(request)
     user = request.user
     name = body.full_name.strip()
     if not name or len(name) > 150:
@@ -324,7 +347,8 @@ def put_password(request, body: PasswordIn):
     needed only when the account already has a password and the last sign-in was not by email within
     15 minutes.
 
-    Errors: 403 csrf_failed, current_password_invalid · 422 password_too_short, validation_error."""
+    Errors: 403 csrf_failed, current_password_invalid, guest_not_allowed · 422 password_too_short, validation_error."""
+    guest.forbid(request)
     emailauth.set_password(request, body.password, body.current_password)
     event_id = request.session.get(emailauth.SESSION_EVENT)
     event = Event.objects.filter(pk=event_id).first() if event_id else None
@@ -377,13 +401,16 @@ def selfies(request):
                                                   "selfieState": selfie_state(request.user)})
 
 
-@me_router.post("/selfies", response={201: S.SelfieAcceptedResponse, **errors(401, 403, 422)})
-def upload_selfie(request, file: File[UploadedFile], slot: Form[str] = "primary"):
-    """multipart/form-data: file (JPEG/PNG/WebP/HEIC, ≤ 50 MB), slot. Replaces the slot's selfie.
+@me_router.post("/selfies", response={201: S.SelfieAcceptedResponse, **errors(401, 403, 422, 429)})
+def upload_selfie(request, file: File[UploadedFile], slot: Form[str] = "primary",
+                  turnstileToken: Form[str] = ""):   # noqa: N803  (the multipart field's name)
+    """multipart/form-data: file (JPEG/PNG/WebP/HEIC, ≤ 50 MB), slot, and for guests `turnstileToken` (the
+    Cloudflare Turnstile widget's token; site key: `turnstileSiteKey` in GET /api/public/events/{code}). Replaces the slot's selfie.
     Processing is asynchronous: poll GET /api/me/selfies.
 
-    Errors: 403 consent_required, csrf_failed · 422 unsupported_file_type, unreadable_image,
-    file_too_large, invalid_slot, validation_error."""
+    Errors: 403 consent_required, csrf_failed, turnstile_failed · 422 unsupported_file_type, unreadable_image,
+    file_too_large, invalid_slot, validation_error · 429 rate_limit_exceeded (guests: 2 per 10 min)."""
+    guest.before_selfie(request, turnstileToken)
     try:
         image = ingest_selfie(request.user, file.read(), slot)
     except IngestError as e:

@@ -53,6 +53,10 @@ class User(AbstractBaseUser):
     is_photographer = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)          # may log in to /admin; "admin" in accountRoles
     is_active = models.BooleanField(default=True)          # False = account locked
+    # A guest (accounts/guest.py): no phone, no email, no password; the session is its only key. Reaches only
+    # guest_event; deleted with its selfies after GUEST_TTL_HOURS.
+    is_guest = models.BooleanField(default=False)
+    guest_event = models.ForeignKey("events.Event", null=True, blank=True, on_delete=models.CASCADE, related_name="+")
 
     credit_balance = models.IntegerField(default=0)
     credit_floor = models.IntegerField(null=True, blank=True)   # NULL = settings.CREDIT_FLOOR_DEFAULT
@@ -101,7 +105,7 @@ class User(AbstractBaseUser):
     @property
     def label(self) -> str:
         """How staff pages and logs name the account: phone, else email, else the id."""
-        return self.phone or self.email or f"#{self.pk}"
+        return self.phone or self.email or (f"guest #{self.pk}" if self.is_guest else f"#{self.pk}")
 
     def __str__(self):
         return self.label

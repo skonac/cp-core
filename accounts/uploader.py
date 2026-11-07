@@ -39,4 +39,5 @@ def uploader_user_json(phone: str, accesses) -> dict:
     first = next(iter(accesses), None)
     return {"id": "", "phoneNumber": phone, "fullName": first.full_name if first else None, "email": None,
             "profileCompleted": True, "accountRoles": [], "hasConsent": False, "consentVersion": None,
-            "kvkk": kvkk.documents(), "selfieState": "no_selfie", "selfieThumbnailUrl": None}
+            "kvkk": kvkk.documents(), "selfieState": "no_selfie", "selfieThumbnailUrl": None,
+            "isGuest": False}

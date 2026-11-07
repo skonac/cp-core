@@ -27,6 +27,7 @@ class Event(models.Model):
     is_processing_faces = models.BooleanField(default=True)    # False: photos never go to the worker
     is_browse_all = models.BooleanField(default=False)         # members may browse/download every photo
     is_consent_required = models.BooleanField(default=True)    # False: members without consent get browse-all only
+    is_guest_access = models.BooleanField(default=True)        # QR visitors may use it without an account (CP_GUEST_ACCESS)
 
     cover_image = models.ForeignKey("media.Image", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     frame_landscape_image = models.ForeignKey("media.Image", null=True, blank=True, on_delete=models.SET_NULL,

@@ -60,7 +60,7 @@
   {% endif %}
   <span class="spacer"></span>
   {% if user.is_authenticated %}
-    <span class="muted small">{{ user.label }}</span> <a class="small" href="{% url 'password' %}">password</a>
+    <span class="muted small">{{ user.label }}</span> {% if not user.is_guest %}<a class="small" href="{% url 'password' %}">password</a>{% endif %}
     {% if user.is_staff %}<a class="small" href="{% url 'staff:index' %}">staff</a> <a class="small" href="/admin/">admin</a>{% endif %}
     <form method="post" action="{% url 'logout' %}" style="margin:0">{% csrf_token %}<button class="secondary">Log out</button></form>
   {% endif %}

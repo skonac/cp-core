@@ -28,6 +28,8 @@ class UserOut(Out):
     profileCompleted: bool = Field(description="true when fullName is set.")
     accountRoles: list[Role] = Field(description="UI visibility only; the server checks everything.",
                                      examples=[["participant"]])
+    isGuest: bool = Field(description="A guest session (no account): one event only, no profile or password; "
+                                      "deleted after a few hours.", examples=[False])
     hasConsent: bool = Field(description="Consent given to the CURRENT KVKK version (kvkk.version).")
     consentVersion: str | None = Field(description="Version last consented to; null = never.", examples=[None])
     kvkk: KvkkDocumentsOut
@@ -127,6 +129,7 @@ SignInResponse = envelope("SignInResponse", SignInOut, "phone_verified")
 EmailSentResponse = envelope("EmailSentResponse", EmailChallengeOut, "email_sent")
 EmailSignInResponse = envelope("EmailSignInResponse", SignInOut, "email_verified")
 PasswordSignInResponse = envelope("PasswordSignInResponse", SignInOut, "signed_in")
+GuestSessionResponse = envelope("GuestSessionResponse", SignInOut, "guest_session_started")
 PasswordSetResponse = envelope("PasswordSetResponse", PasswordSetOut, "password_set")
 ProfileResponse = envelope("ProfileResponse", UserOut, "profile_retrieved")
 ProfileUpdatedResponse = envelope("ProfileUpdatedResponse", UserOut, "profile_updated")

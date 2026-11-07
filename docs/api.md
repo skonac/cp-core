@@ -96,6 +96,7 @@ Every response except files and `204` is:
 | 403 | `current_password_invalid` | `PUT /me/password` without the right current password |
 | 410 | `email_code_expired` | Email sign-in code or link older than 15 minutes |
 | 422 | `invalid_email`, `invalid_email_code`, `invalid_credentials`, `password_too_short` | Email sign-in, password sign-in, password |
+| 403 | `guest_access_disabled`, `guest_not_allowed`, `turnstile_failed` | Guest access off for the event (or everywhere); an action guests can't do; Turnstile check failed on a guest's selfie upload |
 | 409 | `email_already_in_use` | `PATCH /me` with another account's email |
 | 422 | `email_is_sign_in` | `PATCH /me` changing or clearing the email of an account without a phone (its only sign-in) |
 | 409 | `consent_version_outdated` | Consent sent for a KVKK version that is no longer current |
@@ -217,6 +218,30 @@ phone/email per 15 min).
 `currentPassword` is needed only if the account already has a password and the last sign-in was not an email
 link/code in the last 15 minutes. Errors: `403 current_password_invalid`, `422 password_too_short`.
 
+#### Guest access (no account)
+
+For participants who scan an event's QR and don't want an account. `GET /api/public/events/{code}` tells whether
+it's offered (`allowsGuestAccess`) and gives `turnstileSiteKey`.
+
+**`POST /api/auth/guest-sessions`** `{ "eventCode": "RK238" }` → `200 guest_session_started`, the sign-in shape
+(`user.isGuest: true`, `nextStep` usually `consent`), session set. Calling it again as that event's guest keeps
+the same guest. Errors: `403 guest_access_disabled`, `404 event_not_found`, `410 event_expired`,
+`423 event_access_closed`.
+
+A guest then works like a participant **in that event only**: consent, selfie, gallery, photos, downloads,
+"not me". Other events answer `404 event_not_found`; `PATCH /me` and `PUT /me/password` answer
+`403 guest_not_allowed`; organizer and shop endpoints `403` as for any participant. The guest and its selfie are
+deleted after a few hours (`CP_GUEST_TTL_HOURS`, default 5); after that the session is gone (`401`), start again.
+If the organizer turns guest access off, the event answers `403 guest_access_disabled` to its guests at once.
+
+**Selfie upload by a guest** (`POST /api/me/selfies`) also needs `turnstileToken`: show the Cloudflare
+Turnstile widget (script `https://challenges.cloudflare.com/turnstile/v0/api.js`, site key `turnstileSiteKey`)
+on the selfie screen and send its token as a multipart field. A token works once; reset the widget after each
+upload. Errors: `403 turnstile_failed`, `429 rate_limit_exceeded` (2 uploads per 10 minutes per guest).
+Accounts don't need the token.
+
+To keep a guest's work, the user signs up by email (the guest's selfie is not carried over, for now).
+
 ### 3.2 The signed-in user
 
 **`GET /api/me`** → `200 profile_retrieved`, the `user` object above. `401` when signed out (use this on app start to know whether a session exists).
@@ -309,7 +334,8 @@ the API accepts exactly these `value`s. Today: wedding, sports, graduation, corp
 
 ```json
 { "code": "RK238", "name": "Derya & Can", "type": "wedding", "date": "2026-06-12", "locationLabel": "İstanbul",
-  "status": "active", "hasFaceSearch": true, "allowsBrowseAll": false, "requiresConsent": true }
+  "status": "active", "hasFaceSearch": true, "allowsBrowseAll": false, "requiresConsent": true,
+  "allowsGuestAccess": true, "turnstileSiteKey": "1x00000000000000000000AA" }
 ```
 
 Errors: `404 event_not_found`, `410 event_expired`, `423 event_access_closed`, `429 rate_limit_exceeded` (30 lookups/min per IP).
@@ -422,7 +448,7 @@ allows an overdraft down to a floor, so a balance of −12 is shown as −12.
 ```json
 { "id": "RK238", "code": "RK238", "name": "Derya & Can", "type": "wedding", "date": "2026-06-12",
   "city": "İstanbul", "venue": "Çırağan Sarayı", "status": "active",
-  "hasFaceSearch": true, "allowsBrowseAll": false, "requiresConsent": true,
+  "hasFaceSearch": true, "allowsBrowseAll": false, "requiresConsent": true, "allowsGuestAccess": true,
   "photoCount": 684, "processedPhotoCount": 680, "pendingPhotoCount": 4, "failedPhotoCount": 0,
   "participantCount": 213,
   "coverThumbnailUrl": "/api/organizer/events/RK238/cover/thumb.jpg", "coverIsUploaded": true,
@@ -436,6 +462,7 @@ allows an overdraft down to a floor, so a balance of −12 is shown as −12.
 | `hasFaceSearch` | Photos go to face matching ("photos of me"). Off: participants only browse all |
 | `allowsBrowseAll` | Participants may browse all photos. Must be `true` when `hasFaceSearch` is `false` |
 | `requiresConsent` | Participants need KVKK consent to enter (default `true`) |
+| `allowsGuestAccess` | QR visitors may use the event without an account (default `true`; the server-wide switch can still turn it off). Turning it off locks current guests out at once |
 | `processedPhotoCount` / `pendingPhotoCount` / `failedPhotoCount` | Face processing: finished / waiting or running / failed |
 | `participantCount` | People who opened the event (the organizer not counted) |
 | `coverThumbnailUrl` | The uploaded cover; without one, the first photo; `null` when neither exists. `coverIsUploaded` tells which |
@@ -450,7 +477,7 @@ allows an overdraft down to a floor, so a balance of −12 is shown as −12.
 
 **`POST /api/organizer/events`** — `multipart/form-data`: `name` (required), `date` (required, `YYYY-MM-DD`),
 `type` (default `wedding`), `city`, `venue`, `hasFaceSearch` (default `true`), `allowsBrowseAll` (default `false`),
-`requiresConsent` (default `true`), `cover` (optional image file).
+`requiresConsent` (default `true`), `allowsGuestAccess` (default `true`), `cover` (optional image file).
 → `201 organizer_event_created` `{ event }`. The event is active at once and its code is generated.
 Errors: `422 validation_error`, `invalid_event_settings` (face search off without browse-all), and for the cover
 `unsupported_file_type`, `unreadable_image`, `file_too_large`.
@@ -458,7 +485,7 @@ Errors: `422 validation_error`, `invalid_event_settings` (face search off withou
 **`GET /api/organizer/events/{code}`** → `200 organizer_event_retrieved` `{ event }`.
 
 **`PATCH /api/organizer/events/{code}`** — JSON, any subset of `name`, `type`, `date`, `city`, `venue`,
-`hasFaceSearch`, `allowsBrowseAll`, `requiresConsent`, `status` (`active` | `access_closed`: open/close access).
+`hasFaceSearch`, `allowsBrowseAll`, `requiresConsent`, `allowsGuestAccess`, `status` (`active` | `access_closed`: open/close access).
 → `200 organizer_event_updated` `{ event }`. Errors: `410 event_expired`, `422 validation_error`, `invalid_event_settings`.
 
 **QR code.** `GET /api/organizer/events/{code}/qr?width=<px>` → `200 image/svg+xml`: a QR code encoding
@@ -569,10 +596,10 @@ Unknown ids are skipped.
 ```json
 { "participants": [ { "membershipId": "123", "displayName": "Ece Yılmaz", "maskedPhone": "•••••••••4218",
                       "joinedAt": "2026-10-18T15:42:00+00:00", "lastActiveAt": "2026-10-18T20:12:00+00:00",
-                      "hasConsent": true, "matchStatus": "completed", "matchedPhotoCount": 18 } ],
+                      "hasConsent": true, "matchStatus": "completed", "matchedPhotoCount": 18, "isGuest": false } ],
   "total": 1, "counts": { "completed": 1, "pending": 0, "failed": 0 } }
 ```
-`maskedPhone` is `null` when the participant's account has no phone.
+`maskedPhone` is `null` when the participant's account has no phone (guests, email accounts). `isGuest`: a guest (no account; deleted after a few hours).
 
 Most recently active first. `matchStatus`: `consent_pending` (no KVKK consent yet) → `selfie_pending` (no selfie)
 → `processing` (selfie being checked) → `completed` (matching runs; `matchedPhotoCount` = photos they are in), or
@@ -884,4 +911,4 @@ message). Pass the interface language as `lang`. Sort themes whose `eventTypes` 
 
 Live iyzico payments (sandbox now), real OTP delivery (WhatsApp; SMS parked), push notifications (new photos of you, end of event), a WhatsApp message to a newly added uploader, emailing the documents after payment,
 organizer activity feed, participant access revoke, choosing the cover from the event's photos,
-covers for participants (`coverThumbnailUrl` in `/api/me/events`), guest access (in progress). Ask before building screens that need them.
+covers for participants (`coverThumbnailUrl` in `/api/me/events`), Ask before building screens that need them.

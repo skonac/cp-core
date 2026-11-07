@@ -8,6 +8,18 @@ class AccountsConfig(AppConfig):
     def ready(self):
         checks.register(check_kvkk_files)
         checks.register(check_master_pass)
+        checks.register(check_turnstile)
+
+
+def check_turnstile(app_configs=None, **kwargs):
+    """Guest access in production with Cloudflare's always-pass test key: works, but protects nothing."""
+    from django.conf import settings
+    if settings.GUEST_ACCESS and not settings.IS_DEV and settings.TURNSTILE_SECRET == settings.TURNSTILE_TEST_SECRET:
+        return [checks.Warning("CP_GUEST_ACCESS is on with Cloudflare's test Turnstile key; set CP_TURNSTILE_SITE_KEY "
+                               "and CP_TURNSTILE_SECRET", id="cp.W020")]
+    if (settings.TURNSTILE_SECRET == settings.TURNSTILE_TEST_SECRET) != (settings.TURNSTILE_SITE_KEY == settings.TURNSTILE_TEST_SITE_KEY):
+        return [checks.Error("Set both CP_TURNSTILE_SITE_KEY and CP_TURNSTILE_SECRET (or neither)", id="cp.E021")]
+    return []
 
 
 def check_master_pass(app_configs=None, **kwargs):

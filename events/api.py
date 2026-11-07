@@ -23,6 +23,8 @@ from .models import Event
 from .participant import Access, access_for, may_see_photo, public_status, touch_membership
 from .types import event_types_json
 
+from accounts import guest   # noqa: E402  (accounts.api imports events, not events.api)
+
 public_router = Router(tags=["events"])
 events_router = Router(tags=["events"], auth=django_auth)
 
@@ -30,6 +32,8 @@ BLOCKED = {
     "closed": (423, "event_access_closed", "Bu etkinliğe erişim kapatıldı."),
     "expired": (410, "event_expired", "Bu etkinliğin erişim süresi sona erdi."),
     "consent_required": (403, "consent_required", "Bu etkinlik için açık rıza gerekli."),
+    "not_found": (404, "event_not_found", "Etkinlik bulunamadı."),                       # a guest, another event
+    "guest_access_off": (403, "guest_access_disabled", "Bu etkinlikte misafir girişi kapalı. Giriş yapman gerekiyor."),
 }
 
 
@@ -117,7 +121,8 @@ def public_event(request, code: str):
         "code": event.display_code, "name": event.name, "type": event.type, "date": event.date.isoformat(),
         "locationLabel": event.location_label or None, "status": public_status(event),
         "hasFaceSearch": event.is_processing_faces, "allowsBrowseAll": event.is_browse_all,
-        "requiresConsent": event.is_consent_required,
+        "requiresConsent": event.is_consent_required, "allowsGuestAccess": guest.allowed(event),
+        "turnstileSiteKey": settings.TURNSTILE_SITE_KEY,
     })
 
 

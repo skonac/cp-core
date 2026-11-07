@@ -11,7 +11,10 @@ from .models import Event, EventMember
 
 def touch_membership(user, event) -> None:
     """Any event visit by a signed-in user: membership (once), participant role, activity time
-    (written at most once an hour, so browsing doesn't write on every request)."""
+    (written at most once an hour, so browsing doesn't write on every request). A guest joins only its own
+    event (accounts/guest.py)."""
+    if user.is_guest and user.guest_event_id != event.pk:
+        return
     member, created = EventMember.objects.get_or_create(user=user, event=event)
     if not created and member.last_activity_at < timezone.now() - timedelta(hours=1):
         EventMember.objects.filter(pk=member.pk).update(last_activity_at=timezone.now())
@@ -22,13 +25,19 @@ def touch_membership(user, event) -> None:
 
 @dataclass
 class Access:
-    blocked: str = ""          # "", "closed", "expired", "consent_required"
+    blocked: str = ""          # "", "closed", "expired", "consent_required"; guests also "not_found", "guest_access_off"
     can_match: bool = False    # may see "my photos"
     can_browse: bool = False   # may see all photos
     matching: str = ""         # consent_required | matching_off | no_selfie | selfie_processing | selfie_rejected | ready
 
 
 def access_for(user, event) -> Access:
+    if user.is_guest:   # only its own event, and only while guests are let in (accounts/guest.py)
+        from accounts import guest
+        if user.guest_event_id != event.pk:
+            return Access(blocked="not_found")
+        if event.status == Event.Status.OPEN and not guest.allowed(event):
+            return Access(blocked="guest_access_off")
     is_host = user.is_staff or event.owner_id == user.pk
     if event.status == Event.Status.EXPIRED:
         return Access(blocked="expired")

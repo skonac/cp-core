@@ -5,6 +5,7 @@ from . import participant_views as v
 app_name = "participant"
 
 urlpatterns = [
+    path("g/<str:code>/", v.guest_start, name="guest_start"),
     path("e/<str:code>/", v.event_page, name="event"),
     path("e/<str:code>/all/", v.event_page, {"view": "all"}, name="event_all"),
     path("e/<str:code>/photos/<int:seq>/", v.photo_page, name="photo"),

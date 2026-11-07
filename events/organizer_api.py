@@ -118,7 +118,7 @@ def event_json(request, event: Event, stats: dict, base: str = "/api/organizer/e
         "id": code, "code": code, "name": event.name, "type": event.type, "date": event.date.isoformat(),
         "city": event.city or None, "venue": event.venue or None, "status": public_status(event),
         "hasFaceSearch": event.is_processing_faces, "allowsBrowseAll": event.is_browse_all,
-        "requiresConsent": event.is_consent_required,
+        "requiresConsent": event.is_consent_required, "allowsGuestAccess": event.is_guest_access,
         "photoCount": stats["total"], "processedPhotoCount": stats["done"],
         "pendingPhotoCount": stats["pending"] + stats["processing"], "failedPhotoCount": stats["failed"],
         "participantCount": stats["participants"],
@@ -205,6 +205,7 @@ class EventCreateIn(CamelSchema):
     has_face_search: bool = True
     allows_browse_all: bool = False
     requires_consent: bool = True
+    allows_guest_access: bool = True
 
 
 def _check_rule(faces: bool, browse: bool):
@@ -216,7 +217,7 @@ def _check_rule(faces: bool, browse: bool):
 @organizer_router.post("/events", response={201: S.EventCreatedResponse, **errors(401, 403, 422)})
 def create_event(request, data: Form[EventCreateIn], cover: File[UploadedFile] = None):
     """multipart/form-data: name, type, date (YYYY-MM-DD), city, venue (optional), hasFaceSearch,
-    allowsBrowseAll, requiresConsent (optional, defaults true/false/true), cover (optional image).
+    allowsBrowseAll, requiresConsent, allowsGuestAccess (optional, defaults true/false/true/true), cover (optional image).
     The event is open at once; the code is generated. Creating costs nothing.
 
     Errors: 403 organizer_access_required · 422 validation_error, invalid_event_settings,
@@ -230,7 +231,7 @@ def create_event(request, data: Form[EventCreateIn], cover: File[UploadedFile] =
         event = Event.objects.create(
             name=name, type=data.type, date=data.date, city=data.city.strip(), venue=data.venue.strip(),
             owner=user, is_processing_faces=data.has_face_search, is_browse_all=data.allows_browse_all,
-            is_consent_required=data.requires_consent)
+            is_consent_required=data.requires_consent, is_guest_access=data.allows_guest_access)
         if cover is not None:
             try:
                 ingest_cover(event, user, cover.read())
@@ -258,6 +259,7 @@ class EventPatchIn(CamelSchema):
     has_face_search: bool | None = None
     allows_browse_all: bool | None = None
     requires_consent: bool | None = None
+    allows_guest_access: bool | None = None
 
 
 @organizer_router.patch("/events/{code}", response={200: S.EventUpdatedResponse, **errors(401, 403, 404, 410, 422)})
@@ -272,7 +274,7 @@ def update_event(request, code: str, data: EventPatchIn):
     fields = data.model_dump(exclude_unset=True)
     mapping = {"name": "name", "type": "type", "date": "date", "city": "city", "venue": "venue",
                "has_face_search": "is_processing_faces", "allows_browse_all": "is_browse_all",
-               "requires_consent": "is_consent_required"}
+               "requires_consent": "is_consent_required", "allows_guest_access": "is_guest_access"}
     for key, attr in mapping.items():
         if key in fields and fields[key] is not None:
             value = fields[key].strip() if isinstance(fields[key], str) else fields[key]
@@ -639,7 +641,7 @@ def participants(request, code: str):
         rows.append({"membershipId": str(m.pk), "displayName": m.user.full_name or None,
                      "maskedPhone": mask_phone(m.user.phone), "joinedAt": m.joined_at.isoformat(),
                      "lastActiveAt": m.last_activity_at.isoformat(), "hasConsent": m.user.is_consent,
-                     "matchStatus": status, "matchedPhotoCount": matched})
+                     "matchStatus": status, "matchedPhotoCount": matched, "isGuest": m.user.is_guest})
     return respond(request, "organizer_participants_retrieved",
                    {"participants": rows, "total": len(rows), "counts": counts})
 

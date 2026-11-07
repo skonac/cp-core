@@ -4,7 +4,9 @@
 <h1>{{ event.name }}</h1>
 <p class="muted">{{ event.date|date:"j F Y" }}{% if event.location_label %} · {{ event.location_label }}{% endif %}</p>
 
-{% if access.blocked == "closed" %}
+{% if access.blocked == "guest_access_off" %}
+  <div class="notice warn">Guest access to this event has been switched off. <a href="{% url 'login' %}">Sign in</a> to continue.</div>
+{% elif access.blocked == "closed" %}
   <div class="notice warn">Sorry, this event is no longer accessible.</div>
 {% elif access.blocked == "expired" %}
   <div class="notice warn">Sorry, this event has ended and its photos are no longer available.</div>

@@ -21,7 +21,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from accounts import kvkk
+from accounts import guest, kvkk
+from common.api import ApiError
 from media.framing import served_relpath
 from media.ingest import IngestError, ingest_selfie
 from media.matching import my_photos
@@ -63,6 +64,8 @@ def event_page(request, code, view="mine"):
     event = _event_or_404(code)
     touch_membership(request.user, event)
     access = access_for(request.user, event)
+    if access.blocked == "not_found":
+        raise Http404   # a guest of another event
     if access.blocked == "consent_required":
         return redirect(f"{reverse('participant:consent')}?next={reverse('participant:event', args=[event.code])}")
     if view == "all" and not access.can_browse:
@@ -148,14 +151,29 @@ def my_face(request):
             messages.error(request, "Choose a photo first.")
         else:
             try:
+                guest.before_selfie(request, request.POST.get("cf-turnstile-response", ""))
                 ingest_selfie(request.user, upload.read(), slot)
                 messages.success(request, "Selfie received. Checking it takes a few seconds.")
             except IngestError as e:
                 messages.error(request, INGEST_MESSAGES.get(e.code, e.code))
+            except ApiError as e:   # guests: Turnstile, rate limit
+                messages.error(request, e.message)
         return redirect("participant:my_face")
     selfies = {s.slot: s for s in Image.objects.filter(owner=request.user, kind=Image.Kind.SELFIE, deleted_at__isnull=True)}
     slots = [(slot, label, selfies.get(slot)) for slot, label in Image.Slot.choices]
-    return render(request, "participant/my_face.html", {"slots": slots})
+    return render(request, "participant/my_face.html", {"slots": slots, "turnstile_site_key": settings.TURNSTILE_SITE_KEY})
+
+
+def guest_start(request, code):
+    """/dj/g/<code>/: continue without an account (the QR visitor's path in the Django pages)."""
+    event = _event_or_404(code)
+    if request.method == "POST":
+        try:
+            guest.start(request, event)
+            return redirect("participant:event", code=event.code)
+        except ApiError as e:
+            messages.error(request, e.message)
+    return render(request, "participant/guest_start.html", {"event": event, "allowed": guest.allowed(event)})
 
 
 @login_required

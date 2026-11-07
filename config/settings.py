@@ -74,6 +74,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "accounts.middleware.GuestExpiryMiddleware",   # expired guests are signed out
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -188,6 +189,17 @@ EMAIL_LINK_PATH = env("CP_EMAIL_LINK_PATH", "/dj/auth/email/{token}/")
 PASSWORD_MIN_LENGTH = 6           # characters; no other rules
 PASSWORD_SET_WINDOW = 15 * 60     # seconds after an email sign-in in which a password may be set without the old one
 PASSWORD_SIGN_IN_MAX_FAILS = 10   # wrong passwords per phone/email per 15 min
+
+# Guest access (accounts/guest.py): participants without an account, through an event's QR.
+GUEST_ACCESS = env_bool("CP_GUEST_ACCESS", True)              # false: no guest access anywhere (events' own switch aside)
+GUEST_TTL_HOURS = float(env("CP_GUEST_TTL_HOURS", "5"))      # a guest and its selfies are deleted after this
+GUEST_SELFIE_MAX = int(env("CP_GUEST_SELFIE_MAX", "2"))      # selfie uploads per guest ...
+GUEST_SELFIE_WINDOW = int(env("CP_GUEST_SELFIE_WINDOW", "600"))   # ... per this many seconds
+# Cloudflare Turnstile on guest selfie uploads. Default: Cloudflare's test keys (always pass, no network call).
+TURNSTILE_TEST_SITE_KEY = "1x00000000000000000000AA"
+TURNSTILE_TEST_SECRET = "1x0000000000000000000000000000000AA"
+TURNSTILE_SITE_KEY = env("CP_TURNSTILE_SITE_KEY", TURNSTILE_TEST_SITE_KEY)
+TURNSTILE_SECRET = env("CP_TURNSTILE_SECRET", TURNSTILE_TEST_SECRET)
 # --- Notifications (notify/, design/notifications.md)
 # "log": no SMS leaves the server (OTP codes: log + OtpChallenge.dev_code); "live": real providers (routing in
 # notify/providers). CP_OTP_DELIVERY is the old name of the same switch.

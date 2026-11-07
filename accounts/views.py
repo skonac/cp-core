@@ -69,6 +69,8 @@ def email_link(request, token):
 @login_required
 def password(request):
     user = request.user
+    if user.is_guest:
+        return redirect("home")
     error = ""
     needs_current = user.has_usable_password() and not emailauth.in_password_window(request)
     if request.method == "POST":

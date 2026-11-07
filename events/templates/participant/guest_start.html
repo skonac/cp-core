@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ event.name }}{% endblock %}
+{% block content %}
+<div class="card" style="max-width:420px; margin:40px auto">
+  <h1>{{ event.name }}</h1>
+  <p class="muted">{{ event.date }}{% if event.location_label %} · {{ event.location_label }}{% endif %}</p>
+  {% if messages %}<ul class="errorlist">{% for m in messages %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+  {% if allowed %}
+  <p>Find the photos you're in: give consent, take a selfie, see and download your photos. No account needed;
+     your guest session and selfie are deleted after a few hours.</p>
+  <form method="post">{% csrf_token %}<button>Continue without an account</button></form>
+  {% else %}
+  <p>This event needs an account.</p>
+  {% endif %}
+  <p class="small" style="margin-top:14px"><a href="{% url 'login' %}?next={% url 'participant:event' event.code %}">Sign in</a> ·
+    <a href="{% url 'email_start' %}">Sign up with email</a></p>
+</div>
+{% endblock %}

@@ -13,11 +13,12 @@ class EventForm(forms.ModelForm):
     class Meta:
         model = Event
         fields = ["name", "type", "date", "city", "venue",
-                  "is_processing_faces", "is_browse_all", "is_consent_required"]
+                  "is_processing_faces", "is_browse_all", "is_consent_required", "is_guest_access"]
         widgets = {"date": forms.DateInput(attrs={"type": "date"})}
         labels = {
             "venue": "Venue (place name, no street address)",
             "is_processing_faces": "Find faces (participants get “my photos”)",
             "is_browse_all": "Participants may browse all photos",
             "is_consent_required": "Require KVKK consent to enter",
+            "is_guest_access": "Guests may use it without an account (QR visitors)",
         }

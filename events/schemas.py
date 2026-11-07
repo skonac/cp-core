@@ -31,6 +31,10 @@ class PublicEventOut(Out):
     hasFaceSearch: bool
     allowsBrowseAll: bool
     requiresConsent: bool
+    allowsGuestAccess: bool = Field(description="Offer \"continue without an account\" "
+                                                "(POST /api/auth/guest-sessions).")
+    turnstileSiteKey: str = Field(description="Cloudflare Turnstile site key for the widget on a guest's selfie upload.",
+                                  examples=["1x00000000000000000000AA"])
 
 
 class MatchedFaceOut(Out):

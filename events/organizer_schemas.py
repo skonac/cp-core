@@ -23,6 +23,8 @@ class OrganizerEventOut(Out):
     hasFaceSearch: bool = Field(description="Photos go to face matching ('photos of me').")
     allowsBrowseAll: bool = Field(description="Participants may browse all photos.")
     requiresConsent: bool = Field(description="Participants need KVKK consent to enter.")
+    allowsGuestAccess: bool = Field(description="QR visitors may use the event without an account (also needs the "
+                                                "server-wide switch).")
     photoCount: int = Field(examples=[684])
     processedPhotoCount: int = Field(description="Face processing finished (done).", examples=[680])
     pendingPhotoCount: int = Field(description="Waiting for or in face processing.", examples=[4])
@@ -168,6 +170,7 @@ class ParticipantOut(Out):
     hasConsent: bool
     matchStatus: Literal["consent_pending", "selfie_pending", "processing", "completed", "failed"]
     matchedPhotoCount: int | None = Field(description="null unless matchStatus is completed.", examples=[18])
+    isGuest: bool = Field(description="A guest (no account; deleted after a few hours).")
 
 
 class ParticipantCountsOut(Out):
