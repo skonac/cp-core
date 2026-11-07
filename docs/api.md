@@ -787,11 +787,19 @@ changes the assignment at any time.
 
 - **`GET /api/organizer/uploaders`** (optional `?event=RK238`: only those assigned to that event) →
   `200 organizer_uploaders_retrieved` `{ uploaders: [uploader…], total }`, newest first, revoked ones too. Uploader:
-  `{ id, fullName, phoneNumber, status: "active"|"revoked", events: [{ code, name, status }], createdAt, lastLoginAt }`.
-- **`POST /api/organizer/uploaders`** `{ "fullName": "Mert Yılmaz", "phoneNumber": "+905550000001", "eventCodes": ["RK238"] }` →
-  `201 organizer_uploader_created` `{ uploader }`. `eventCodes`: this organizer's events, not expired (may be empty).
-  One uploader per phone per organizer: to give an existing one more events, PATCH it. Errors: `409 uploader_already_exists`,
-  `422 invalid_phone_number`, `422 validation_error` (an unknown, foreign or expired code: `errors.eventCodes`).
+  `{ id, fullName, phoneNumber, email, status: "active"|"revoked", events: [{ code, name, status }], createdAt, lastLoginAt }`
+  (`phoneNumber` or `email` is `null`, whichever wasn't given).
+- **`POST /api/organizer/uploaders`** `{ "fullName": "Mert Yılmaz", "email": "mert@example.com", "eventCodes": ["RK238"], "locale": "tr" }` →
+  `201 organizer_uploader_created` `{ uploader }`. **Use `email`** (Nov 7; `phoneNumber` still works but needs SMS/WhatsApp, which we
+  can't send yet). The uploader gets an **invitation mail** (link + 4-digit code, `locale` = its language) that signs in to an
+  account for that email, created if new: `nextStep: "set_password"`, then `uploader_home`. An email that already has an account
+  signs in to it (no organizer role is added). `eventCodes`: this organizer's events, not expired (may be empty).
+  One uploader per email/phone per organizer: to give an existing one more events, PATCH it. Errors: `409 uploader_already_exists`,
+  `422 invalid_email | invalid_phone_number`, `422 validation_error` (neither given; or an unknown, foreign or expired code:
+  `errors.eventCodes`), `429 rate_limit_exceeded` (mails to that address).
+- **`POST /api/organizer/uploaders/{id}/invitation`** (`?locale=en` optional) → `200 organizer_uploader_invited` `{ uploader }`:
+  the invitation mail again (a "Resend" button). Errors: `404 uploader_not_found`, `410 uploader_revoked`,
+  `422 validation_error` (a phone uploader: no email), `429 rate_limit_exceeded` (3 mails per address per 15 min, 30 s apart).
 - **`PATCH /api/organizer/uploaders/{id}`** `{ "eventCodes": ["RK238", "TQ7MZ"], "fullName": "…" }` (either or both) →
   `200 organizer_uploader_updated` `{ uploader }`. `eventCodes` replaces the whole set (`[]` = none); effective at once, also
   in an open session. Errors: `404 uploader_not_found`, `410 uploader_revoked` (add it again instead), `422 validation_error`.
@@ -800,7 +808,12 @@ changes the assignment at any time.
   takes effect at once, also in an open session). `404 uploader_not_found`.
 - Organizer photo objects (§3.6) have **`uploadedBy`**: the uploader's name, or `null` for the organizer's own uploads.
 
-**Sign-in.** The uploader uses the organizer entry (`role: "organizer"`). The OTP verification answers
+**Sign-in by email** (uploaders added by email): the invitation link/code, later email + password
+(`POST /api/auth/password-sign-ins` with `role: "organizer"`) or an email code (`email-requests` with `role: "organizer"`).
+These answer `nextStep: "uploader_home"` (after `set_password` for a new account) and `uploaderAccesses`; no organizer
+role is added. The uploader is a normal account: `user.id` set, its verified email carries the upload rights.
+
+**Sign-in by phone.** The uploader uses the organizer entry (`role: "organizer"`). The OTP verification answers
 `nextStep: "uploader_home"` with `uploaderAccesses: [{ id, organizerName, uploaderName }]`. Without an account
 the `user` object has `"id": ""`, `fullName` = the name the organizer gave, no roles, no consent, no selfie; `GET /api/me`
 returns the same while the session lasts. A phone that already has an account (say a former wedding guest) is simply
@@ -817,10 +830,10 @@ someone's uploader gets `organizer_home`, and `uploaderAccesses` lists the other
 | `GET …/accesses/{accessId}/events/{code}` | `uploader_event_retrieved` | `{ event }`; cover at `…/events/{code}/cover/thumb.jpg` |
 | `POST …/events/{code}/photo-upload-check` | `photo_upload_eligibility_checked` | as §3.6, the organizer's balance |
 | `POST …/events/{code}/photos` | `uploader_photos_uploaded` | as §3.6 (`200`, ≤ 20 files, ≤ 60 MB, per-file results) |
-| `GET …/events/{code}/photos` | `uploader_photos_retrieved` | **only the photos this phone uploaded**; `counts` too; files `…/photos/{photoId}/thumb.jpg`, `display.jpg` |
+| `GET …/events/{code}/photos` | `uploader_photos_retrieved` | **only the photos this uploader (email/phone) uploaded**; `counts` too; files `…/photos/{photoId}/thumb.jpg`, `display.jpg` |
 | `DELETE …/events/{code}/photos` | `uploader_photos_deleted` | `{ photoIds }`; only its own photos, others skipped |
 
-`…` = `/api/uploader`. Errors: `404 uploader_access_not_found` (not this phone's, or revoked: go back to the
+`…` = `/api/uploader`. Errors: `404 uploader_access_not_found` (not this uploader's, or revoked: go back to the
 organizer list), `404 event_not_found` (also an event not assigned, or no longer), `410 event_expired`, `422` as in §3.6, `403 csrf_failed`.
 
 ## 4. Flows

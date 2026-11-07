@@ -17,9 +17,9 @@ from .backends import SESSION_BACKEND
 from .models import EmailChallenge
 
 
-def _signed_in(request, user, event, purpose):
+def _signed_in(request, user, event, purpose, uploader_entry=False):
     login(request, user, backend=SESSION_BACKEND)
-    emailauth.after_sign_in(request, event, may_set_password=True)
+    emailauth.after_sign_in(request, event, may_set_password=True, uploader_entry=uploader_entry)
     if emailauth.needs_password(user, purpose):
         return redirect("password")
     if event is not None:
@@ -50,8 +50,8 @@ def email_code(request, challenge_id):
     error = ""
     if request.method == "POST":
         try:
-            user, _, event, purpose = emailauth.verify(challenge_id=challenge_id, code=request.POST.get("code", ""))
-            return _signed_in(request, user, event, purpose)
+            user, _, event, purpose, up = emailauth.verify(challenge_id=challenge_id, code=request.POST.get("code", ""))
+            return _signed_in(request, user, event, purpose, up)
         except ApiError as e:
             error = e.message
     return render(request, "accounts/email_code.html", {"challenge": challenge, "error": error})
@@ -61,8 +61,8 @@ def email_link(request, token):
     error = ""
     if request.method == "POST":
         try:
-            user, _, event, purpose = emailauth.verify(token=token)
-            return _signed_in(request, user, event, purpose)
+            user, _, event, purpose, up = emailauth.verify(token=token)
+            return _signed_in(request, user, event, purpose, up)
         except ApiError as e:
             error = e.message
     return render(request, "accounts/email_link.html", {"error": error})

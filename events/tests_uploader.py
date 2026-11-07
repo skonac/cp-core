@@ -7,9 +7,12 @@ import re
 
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.conf import settings
+from django.test import TestCase, override_settings
 
-from accounts.models import OtpChallenge, UploaderAccess, User
+from accounts.models import EmailChallenge, OtpChallenge, UploaderAccess, User
+from media.models import Image
+from notify.models import Notification
 from common.testing import ApiClient, TempMedia, add_photo, jpeg, make_event
 from config.api import api
 from events.models import Event
@@ -148,6 +151,8 @@ class UploaderTests(TempMedia, TestCase):
 
         # --- and revokes
         self.as_organizer()
+        self.assertCode(c.post_json(f"/api/organizer/uploaders/{ph['id']}/invitation", {}), 422,
+                        "validation_error")                           # a phone uploader has no email to mail
         r = c.delete_(f"/api/organizer/uploaders/{ph['id']}")
         self.assertCode(r, 200, "organizer_uploader_revoked")
         self.assertEqual(r.json()["data"]["uploader"]["status"], "revoked")
@@ -189,3 +194,105 @@ class UploaderTests(TempMedia, TestCase):
         self.c.sign_in(PH, role="organizer")
         self.c.sign_in("+905550000299")                              # someone else, same browser
         self.assertEqual(self.c.get("/api/uploader/accesses").json()["data"]["accesses"], [])
+
+
+@override_settings(NOTIFY_SENDER="inline", EMAIL_DELIVERY="log")
+class EmailUploaderTests(TempMedia, TestCase):
+    """Uploaders by email (Nov 7): an invitation mail signs in to an account for that email; the account's
+    verified email carries the upload rights; later sign-ins by email + password through the organizer entry."""
+
+    def setUp(self):
+        cache.clear()
+        self.org = User.objects.create_user(ORG, is_organizer=True, credit_balance=10, full_name="Futuruniq",
+                                            kvkk_version=settings.KVKK_VERSION)
+        self.event = make_event(self.org, name="Derya & Can")
+        self.c = ApiClient()
+        self.c.force_login(self.org)
+        self.c.get("/api/auth/csrf")
+
+    def invitation(self):
+        mail = Notification.objects.filter(channel="email").latest("id")
+        return mail, EmailChallenge.objects.latest("created_at")
+
+    def test_invite_sign_in_upload_and_password(self):
+        c = self.c
+        r = c.post_json("/api/organizer/uploaders", {"fullName": "Mert", "email": " Mert@Example.com",
+                                                     "eventCodes": [self.event.display_code]})
+        self.assertEqual(r.status_code, 201, r.content)
+        up = r.json()["data"]["uploader"]
+        self.assertEqual((up["email"], up["phoneNumber"]), ("mert@example.com", None))
+        mail, ch = self.invitation()
+        self.assertIn("Futuruniq", mail.title)
+        self.assertEqual((mail.to, ch.purpose, ch.role), ("mert@example.com", "invite", "organizer"))
+        r = c.post_json("/api/organizer/uploaders", {"fullName": "Mert 2", "email": "mert@example.com"})
+        self.assertEqual((r.status_code, r.json()["code"]), (409, "uploader_already_exists"))
+        r = c.post_json("/api/organizer/uploaders", {"fullName": "Nobody"})
+        self.assertEqual((r.status_code, r.json()["code"]), (422, "validation_error"))
+        r = c.post_json("/api/organizer/uploaders", {"fullName": "X", "email": "not-an-email"})
+        self.assertEqual((r.status_code, r.json()["code"]), (422, "invalid_email"))
+
+        # the uploader opens the mail (another browser)
+        u = ApiClient()
+        u.get("/api/auth/csrf")
+        d = u.post_json("/api/auth/email-verifications", {"challengeId": ch.pk, "code": ch.dev_code}).json()["data"]
+        self.assertEqual((d["nextStep"], d["isNewUser"], [a["organizerName"] for a in d["uploaderAccesses"]]),
+                         ("set_password", True, ["Futuruniq"]))
+        acct = User.objects.get(email="mert@example.com")
+        self.assertFalse(acct.is_organizer)                          # an uploader is no organizer
+        r = u.put_json("/api/me/password", {"password": "foto12"})
+        self.assertEqual(r.json()["data"]["nextStep"], "uploader_home")
+        access_id = u.get("/api/uploader/accesses").json()["data"]["accesses"][0]["id"]
+        root = f"/api/uploader/accesses/{access_id}/events"
+        self.assertEqual([e["code"] for e in u.get(root).json()["data"]["events"]], [self.event.display_code])
+        r = u.post(f"{root}/{self.event.display_code}/photos", {"files": [_file(5)]}, **u.csrf_headers())
+        self.assertEqual((r.status_code, r.json()["data"]["acceptedCount"]), (200, 1), r.content)
+        self.assertEqual(Image.objects.get(event=self.event, kind="photo", uploaded_by__email="mert@example.com").owner,
+                         self.org)                                    # on the organizer's credits
+        self.assertEqual(u.get(f"{root}/{self.event.display_code}/photos").json()["data"]["total"], 1)
+        self.assertEqual(u.get("/api/organizer/events").status_code, 403)
+
+        # later: email + password through the organizer entry
+        u.delete_("/api/auth/session")
+        u.get("/api/auth/csrf")
+        r = u.post_json("/api/auth/password-sign-ins", {"identifier": "mert@example.com", "password": "foto12",
+                                                       "role": "organizer"})
+        self.assertEqual(r.json()["data"]["nextStep"], "uploader_home")
+        acct.refresh_from_db()
+        self.assertFalse(acct.is_organizer)
+        self.assertEqual(u.get("/api/uploader/accesses").status_code, 200)
+        self.assertIsNotNone(UploaderAccess.objects.get(email="mert@example.com").last_login_at)
+
+        # resend, revoke: rights gone at once
+        EmailChallenge.objects.all().delete()                         # (the mail limits are per 15 min, 30 s apart)
+        r = c.post_json(f"/api/organizer/uploaders/{up['id']}/invitation", {})
+        self.assertEqual((r.status_code, r.json()["code"]), (200, "organizer_uploader_invited"))
+        r = c.post_json(f"/api/organizer/uploaders/{up['id']}/invitation", {})
+        self.assertEqual((r.status_code, r.json()["code"]), (429, "rate_limit_exceeded"))   # 30 s apart
+        c.delete_(f"/api/organizer/uploaders/{up['id']}")
+        self.assertEqual(u.get(root).status_code, 404)
+        self.assertEqual(c.post_json(f"/api/organizer/uploaders/{up['id']}/invitation", {}).status_code, 410)
+
+    def test_existing_account_invited(self):
+        """An email that already has an account: the invitation signs in to it; no new account."""
+        old = User.objects.create_user(email="ece@example.com", password="secret1", is_participant=True)
+        old.email_verified_at = old.created_at
+        old.save()
+        self.c.post_json("/api/organizer/uploaders", {"fullName": "Ece", "email": "ece@example.com",
+                                                      "eventCodes": [self.event.display_code]})
+        _, ch = self.invitation()
+        u = ApiClient()
+        u.get("/api/auth/csrf")
+        d = u.post_json("/api/auth/email-verifications", {"token": "x" * 4, "challengeId": ch.pk,
+                                                          "code": ch.dev_code}).json()
+        self.assertEqual(d["code"], "invalid_email_code")            # a wrong token is wrong
+        d = u.post_json("/api/auth/email-verifications", {"challengeId": ch.pk, "code": ch.dev_code}).json()["data"]
+        self.assertEqual((d["user"]["id"], d["isNewUser"], d["nextStep"]), (str(old.pk), False, "uploader_home"))
+
+    def test_unverified_email_gives_no_rights(self):
+        """An account whose email was only typed in (never verified) gets no upload rights from it."""
+        User.objects.create_user("+905550000299", "secret1", email="mert@example.com")
+        UploaderAccess.objects.create(organizer=self.org, email="mert@example.com", full_name="Mert")
+        u = ApiClient()
+        u.get("/api/auth/csrf")
+        u.post_json("/api/auth/password-sign-ins", {"identifier": "+905550000299", "password": "secret1"})
+        self.assertEqual(u.get("/api/uploader/accesses").json()["data"]["accesses"], [])

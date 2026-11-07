@@ -140,7 +140,8 @@ class UploaderEventOut(Out):
 class UploaderOut(Out):
     id: str = Field(examples=["12"])
     fullName: str = Field(examples=["Mert Yılmaz"])
-    phoneNumber: str = Field(examples=["+905550000001"])
+    phoneNumber: str | None = Field(description="null for an uploader added by email.", examples=["+905550000001"])
+    email: str | None = Field(description="null for an uploader added by phone.", examples=["mert@example.com"])
     status: Literal["active", "revoked"]
     events: list[UploaderEventOut] = Field(description="The events it may upload to (by date).")
     createdAt: str = Field(examples=["2026-10-20T09:00:00+00:00"])
@@ -226,6 +227,7 @@ ParticipantListResponse = envelope("ParticipantListResponse", ParticipantListOut
 UploaderListResponse = envelope("UploaderListResponse", UploaderListOut, "organizer_uploaders_retrieved")
 UploaderResponse = envelope("UploaderResponse", UploaderDataOut, "organizer_uploader_created")
 UploaderUpdatedResponse = envelope("UploaderUpdatedResponse", UploaderDataOut, "organizer_uploader_updated")
+UploaderInvitedResponse = envelope("UploaderInvitedResponse", UploaderDataOut, "organizer_uploader_invited")
 UploaderRevokedResponse = envelope("UploaderRevokedResponse", UploaderDataOut, "organizer_uploader_revoked")
 
 # The uploader API (events/uploader_api.py): same shapes, own codes.

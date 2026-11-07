@@ -128,7 +128,8 @@ def otp_verify(request, body: OtpVerifyIn):
         request.session.cycle_key()
         rotate_token(request)
     request.session.pop(uploader.SESSION_KEY, None)   # never inherit another phone's uploader rights
-    accesses = list(uploader.active_accesses(uploader_phone or user.phone or ""))
+    accesses = list(uploader.active_accesses(uploader.Identity(uploader_phone) if uploader_phone
+                                             else uploader.user_identity(user)))
     if uploader_phone:
         request.session[uploader.SESSION_KEY] = uploader_phone
         return respond(request, "phone_verified", {
@@ -182,7 +183,7 @@ def _event_or_404(code: str | None):
 def _signed_in(request, code: str, user: User, event, is_new: bool, first_step: str | None = None,
                message: str = ""):
     """The SignInOut answer for an account sign-in (email or password)."""
-    accesses = list(uploader.active_accesses(user.phone or ""))
+    accesses = list(uploader.active_accesses(uploader.user_identity(user)))
     return respond(request, code, {
         "user": user_json(user), "nextStep": first_step or next_step(user, event), "isNewUser": is_new,
         "eventCode": event.display_code if event else None,
@@ -203,6 +204,8 @@ def email_request(request, body: EmailRequestIn):
     Errors: 404 event_not_found · 409 email_already_registered · 422 invalid_email, invalid_purpose, invalid_role,
     validation_error ·
     429 rate_limit_exceeded (3 mails per address per 15 min; 30 s between mails)."""
+    if body.purpose == "invite":
+        raise ApiError(422, "invalid_purpose", "purpose must be sign_up, sign_in or reset.")
     event = _event_or_404(body.event_code)
     challenge = emailauth.request_mail(body.email, body.purpose, body.role, event, body.locale,
                                        request.META.get("REMOTE_ADDR"), request.build_absolute_uri("/"))
@@ -222,11 +225,12 @@ def email_verify(request, body: EmailVerifyIn):
     429 rate_limit_exceeded (5 wrong codes per mail, 10 per address per day; the link still works)."""
     if not body.token and not (body.challenge_id and body.code):
         raise ApiError(422, "validation_error", "challengeId + code, or token.")
-    user, is_new, event, purpose = emailauth.verify(body.challenge_id, body.code, body.token)
+    user, is_new, event, purpose, uploader_entry = emailauth.verify(body.challenge_id, body.code, body.token)
     login(request, user, backend=SESSION_BACKEND)
     request.session.pop(uploader.SESSION_KEY, None)
-    emailauth.after_sign_in(request, event, may_set_password=True)
-    first = "set_password" if emailauth.needs_password(user, purpose) else None
+    emailauth.after_sign_in(request, event, may_set_password=True, uploader_entry=uploader_entry)
+    first = ("set_password" if emailauth.needs_password(user, purpose)
+             else "uploader_home" if uploader_entry else None)
     return _signed_in(request, "email_verified", user, event, is_new, first, "E-posta doğrulandı.")
 
 
@@ -238,14 +242,15 @@ def password_sign_in(request, body: PasswordSignInIn):
     Errors: 404 event_not_found · 422 invalid_credentials, invalid_role, validation_error ·
     429 rate_limit_exceeded (10 wrong passwords per phone/email per 15 min)."""
     event = _event_or_404(body.event_code)
-    user = emailauth.password_sign_in(body.identifier, body.password, body.role)
+    user, uploader_entry = emailauth.password_sign_in(body.identifier, body.password, body.role)
     login(request, user, backend=SESSION_BACKEND)
     request.session.pop(uploader.SESSION_KEY, None)
-    emailauth.after_sign_in(request, event, may_set_password=False)
+    emailauth.after_sign_in(request, event, may_set_password=False, uploader_entry=uploader_entry)
     if event is not None:
         from events.participant import touch_membership
         touch_membership(user, event)
-    return _signed_in(request, "signed_in", user, event, False, None, "Giriş yapıldı.")
+    return _signed_in(request, "signed_in", user, event, False, "uploader_home" if uploader_entry else None,
+                      "Giriş yapıldı.")
 
 
 class GuestSessionIn(CamelSchema):
@@ -358,8 +363,8 @@ def put_password(request, body: PasswordIn):
     emailauth.set_password(request, body.password, body.current_password)
     event_id = request.session.get(emailauth.SESSION_EVENT)
     event = Event.objects.filter(pk=event_id).first() if event_id else None
-    return respond(request, "password_set", {"user": user_json(request.user),
-                                            "nextStep": next_step(request.user, event)},
+    step = "uploader_home" if request.session.get(emailauth.SESSION_UPLOADER) else next_step(request.user, event)
+    return respond(request, "password_set", {"user": user_json(request.user), "nextStep": step},
                    message="Şifre kaydedildi.")
 
 

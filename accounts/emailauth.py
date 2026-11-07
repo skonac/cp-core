@@ -26,6 +26,7 @@ from common.api import ApiError
 from common.ratelimit import allow
 from notify import dispatch
 
+from . import uploader
 from .models import EmailChallenge, Role, User, normalize_email
 from .otp import is_master_pass
 
@@ -33,6 +34,7 @@ log = logging.getLogger("cp.emailauth")
 
 SESSION_PASSWORD_UNTIL = "password_set_until"   # session: an email sign-in allows a password without the old one
 SESSION_EVENT = "sign_in_event"                  # session: the event of the last sign-in (nextStep after the password)
+SESSION_UPLOADER = "uploader_entry"              # session: the last sign-in was an uploader entry (nextStep after the password)
 
 ROLE_FLAGS = {"participant": "is_participant", "organizer": "is_organizer", "photographer": "is_photographer"}
 
@@ -47,6 +49,18 @@ TEXTS = {
                         "or enter this code: {code}\n\n"
                         "The link and the code are valid for {minutes} minutes and work once. "
                         "If you didn't ask for this, you can ignore this email.\n\nCleverphotos"),
+    ("invite", "tr"): ("{organizer} seni Cleverphotos'a fotoğraf yüklemek için ekledi",
+                       "Merhaba,\n\n{organizer} seni Cleverphotos'ta etkinlik fotoğraflarını yüklemen için ekledi.\n\n"
+                       "Girmek için bu bağlantıya tıkla:\n{link}\n\nya da şu kodu gir: {code}\n\n"
+                       "Ardından bir şifre seçeceksin; sonraki girişlerde e-postan ve şifrenle, organizatör "
+                       "girişinden girebilirsin. Bağlantı ve kod {minutes} dakika geçerli ve bir kez kullanılabilir; "
+                       "süresi geçerse organizatör girişinden e-posta ile giriş yapabilirsin.\n\nCleverphotos"),
+    ("invite", "en"): ("{organizer} added you to Cleverphotos to upload photos",
+                       "Hello,\n\n{organizer} added you on Cleverphotos to upload their event photos.\n\n"
+                       "Click this link to sign in:\n{link}\n\nor enter this code: {code}\n\n"
+                       "Then you'll choose a password; next time sign in with your email and password through the "
+                       "organizer entry. The link and the code are valid for {minutes} minutes and work once; after "
+                       "that, sign in by email through the organizer entry.\n\nCleverphotos"),
     ("reset", "tr"): ("Cleverphotos şifre sıfırlama kodun: {code}",
                       "Merhaba,\n\nCleverphotos şifreni yenilemek için bu bağlantıya tıkla:\n{link}\n\n"
                       "ya da şu kodu gir: {code}\n\nArdından yeni şifreni seçeceksin. "
@@ -79,7 +93,7 @@ def _fails_today(email: str, now) -> int:
 
 
 def request_mail(email: str, purpose: str, role: str, event, locale: str, ip: str | None,
-                 link_base: str) -> EmailChallenge:
+                 link_base: str, organizer_name: str = "") -> EmailChallenge:
     """Create a challenge and mail its link and code. `link_base` = scheme + host for the link
     (request.build_absolute_uri("/")). Raises ApiError."""
     email = clean_email(email)
@@ -110,6 +124,7 @@ def request_mail(email: str, purpose: str, role: str, event, locale: str, ip: st
         challenge.dev_code = code
     link = link_base.rstrip("/") + settings.EMAIL_LINK_PATH.format(token=token)
     subject, text = TEXTS[("sign_in" if purpose == EmailChallenge.Purpose.SIGN_UP else purpose, locale)]
+    subject, text = subject.replace("{organizer}", organizer_name), text.replace("{organizer}", organizer_name)
     with transaction.atomic():
         challenge.save()
         dispatch.email(email, subject.format(code=code),
@@ -121,10 +136,12 @@ def request_mail(email: str, purpose: str, role: str, event, locale: str, ip: st
 
 def verify(challenge_id: str = "", code: str = "", token: str = ""):
     """By the code (challenge_id + code) or by the link (token).
-    -> (user, is_new_user, event or None, purpose). Raises ApiError on any failure."""
+    -> (user, is_new_user, event or None, purpose, uploader entry). Raises ApiError on any failure.
+    An uploader entry (organizer entry by some organizer's uploader, accounts.uploader.is_uploader_entry)
+    adds no organizer role."""
     now = timezone.now()
     failure = None
-    is_new, event, user = False, None, None
+    is_new, event, user, uploader_entry = False, None, None, False
     with transaction.atomic():
         if token:
             challenge = EmailChallenge.objects.select_for_update().filter(
@@ -157,11 +174,14 @@ def verify(challenge_id: str = "", code: str = "", token: str = ""):
             is_new = user is None
             if is_new:
                 user = User.objects.create_user(email=challenge.email)
-            flag = ROLE_FLAGS[challenge.role]
-            setattr(user, flag, True)
             user.email_verified_at = user.email_verified_at or now
-            user.save(update_fields=[flag, "email_verified_at"])
             event = challenge.event
+            uploader_entry = uploader.is_uploader_entry(user, challenge.role, event)
+            if uploader_entry:
+                uploader.touch_last_login(uploader.user_identity(user))
+            flag = ROLE_FLAGS["participant" if uploader_entry else challenge.role]   # an uploader is no organizer
+            setattr(user, flag, True)
+            user.save(update_fields=[flag, "email_verified_at"])
     if failure:
         raise failure
     if event is not None:
@@ -169,17 +189,18 @@ def verify(challenge_id: str = "", code: str = "", token: str = ""):
         touch_membership(user, event)
     EmailChallenge.objects.filter(created_at__lt=now - timedelta(hours=24)).delete()   # housekeeping
     log.info("email sign-in: %s (%s, %s)", user.email, challenge.purpose, "new" if is_new else "existing")
-    return user, is_new, event, challenge.purpose
+    return user, is_new, event, challenge.purpose, uploader_entry
 
 
 def needs_password(user: User, purpose: str) -> bool:
     return purpose == EmailChallenge.Purpose.RESET or not user.has_usable_password()
 
 
-def after_sign_in(request, event, may_set_password: bool) -> None:
-    """Session bookkeeping after login(): which event the sign-in was for, and the window for choosing a
-    password without the old one."""
+def after_sign_in(request, event, may_set_password: bool, uploader_entry: bool = False) -> None:
+    """Session bookkeeping after login(): which event the sign-in was for, whether it was an uploader entry,
+    and the window for choosing a password without the old one."""
     request.session[SESSION_EVENT] = event.pk if event else None
+    request.session[SESSION_UPLOADER] = uploader_entry
     if may_set_password:
         request.session[SESSION_PASSWORD_UNTIL] = time.time() + settings.PASSWORD_SET_WINDOW
     else:
@@ -210,8 +231,9 @@ def set_password(request, password: str, current_password: str | None = None) ->
     log.info("password set: %s", user.label)
 
 
-def password_sign_in(identifier: str, password: str, role: str) -> User:
-    """Phone or email + password. Adds `role` like a code sign-in does. Raises ApiError."""
+def password_sign_in(identifier: str, password: str, role: str):
+    """Phone or email + password. Adds `role` like a code sign-in does (not organizer for an uploader entry).
+    -> (user, uploader entry). Raises ApiError."""
     from django.contrib.auth import authenticate
     if role not in Role.values:
         raise ApiError(422, "invalid_role", f"role must be one of {', '.join(Role.values)}.")
@@ -226,8 +248,11 @@ def password_sign_in(identifier: str, password: str, role: str) -> User:
     if user is None:
         allow(f"pwfail:{key}", settings.PASSWORD_SIGN_IN_MAX_FAILS, 900)   # counts the failure
         raise ApiError(422, "invalid_credentials", "Telefon/e-posta veya şifre hatalı.")
-    flag = ROLE_FLAGS[role]
+    uploader_entry = uploader.is_uploader_entry(user, role, None)
+    if uploader_entry:
+        uploader.touch_last_login(uploader.user_identity(user))
+    flag = ROLE_FLAGS["participant" if uploader_entry else role]
     if not getattr(user, flag):
         setattr(user, flag, True)
         user.save(update_fields=[flag])
-    return user
+    return user, uploader_entry

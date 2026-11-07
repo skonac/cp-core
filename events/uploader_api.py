@@ -1,10 +1,10 @@
-"""Uploader API (/api/uploader/…): a phone an organizer added as uploader
+"""Uploader API (/api/uploader/…): a phone or email an organizer added as uploader
 (accounts.UploaderAccess) lists the organizer's events it is assigned to and uploads photos to them
 on the organizer's credits. Nothing else: no event settings, participants, credits, shop or uploader management.
 Shapes are the organizer API's (docs/api.md §3.10); an uploader sees and deletes only the photos
-uploaded with their phone. Every request re-checks the access, so a revoke takes effect at once.
+uploaded with their phone/email. Every request re-checks the access, so a revoke takes effect at once.
 
-Auth: the session's verified phone (accounts.uploader.session_phone), with the CSRF check like
+Auth: the session's verified phone or email (accounts.uploader.session_identity), with the CSRF check like
 every other signed-in endpoint (403 csrf_failed).
 """
 from django.conf import settings
@@ -15,7 +15,7 @@ from ninja.files import UploadedFile
 from ninja.security import APIKeyCookie
 
 from accounts.models import UploaderAccess, User
-from accounts.uploader import access_json, active_accesses, session_phone
+from accounts.uploader import access_json, active_accesses, session_identity
 from common.api import ApiError, errors, file_doc, respond
 from media.framing import served_relpath
 from media.ingest import IngestError, event_cover, ingest_photo
@@ -30,11 +30,11 @@ from .organizer_api import (MAX_FILES_PER_UPLOAD, STATUS_IN, STATUS_OUT, PhotoId
 
 
 class UploaderSession(APIKeyCookie):
-    """The session cookie, CSRF-checked on unsafe methods; request.auth = the verified phone."""
+    """The session cookie, CSRF-checked on unsafe methods; request.auth = the verified phone/email (Identity)."""
     param_name = settings.SESSION_COOKIE_NAME
 
     def authenticate(self, request, key):
-        return session_phone(request) or None
+        return session_identity(request) or None
 
 
 uploader_router = Router(tags=["uploader"], auth=UploaderSession())
@@ -44,7 +44,7 @@ uploader_router = Router(tags=["uploader"], auth=UploaderSession())
 
 def _access(request, access_id: str) -> UploaderAccess:
     access = (UploaderAccess.objects.select_related("organizer")
-              .filter(pk=int(access_id), phone=request.auth, status=UploaderAccess.Status.ACTIVE).first()
+              .filter(request.auth.q(), pk=int(access_id), status=UploaderAccess.Status.ACTIVE).first()
               if access_id.isdigit() else None)
     if access is None:
         raise ApiError(404, "uploader_access_not_found", "Bu organizatör için yetkin yok.")
@@ -70,9 +70,12 @@ def _event(request, access_id: str, code: str) -> tuple[UploaderAccess, Event]:
 
 
 def _my_photos(access: UploaderAccess, event: Event):
-    """Photos of this event uploaded with this phone for this organizer (also through an earlier access row)."""
-    return Image.objects.filter(event=event, kind=Image.Kind.PHOTO, deleted_at__isnull=True,
-                                uploaded_by__phone=access.phone, uploaded_by__organizer_id=access.organizer_id)
+    """Photos of this event uploaded with this access's phone/email for this organizer (also through an earlier
+    access row)."""
+    from accounts.uploader import Identity
+    return Image.objects.filter(Identity(access.phone, access.email).q("uploaded_by__"), event=event,
+                                kind=Image.Kind.PHOTO, deleted_at__isnull=True,
+                                uploaded_by__organizer_id=access.organizer_id)
 
 
 def _event_json(request, access, event, stats) -> dict:

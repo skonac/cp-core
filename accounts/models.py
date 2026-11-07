@@ -157,6 +157,7 @@ class EmailChallenge(models.Model):
         SIGN_UP = "sign_up"   # refused for an email that already has an account with a password
         SIGN_IN = "sign_in"
         RESET = "reset"
+        INVITE = "invite"     # an organizer added this email as uploader (organizer API only)
 
     id = models.CharField(primary_key=True, max_length=32, default=new_email_challenge_id, editable=False)
     email = models.EmailField()                                # lowercase
@@ -198,7 +199,10 @@ class UploaderAccess(models.Model):
 
     organizer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
                                   related_name="uploader_accesses")
-    phone = models.CharField(max_length=16, validators=[phone_validator])
+    # Who: a phone (signs in by OTP, no account needed) and/or an email (Nov 7: invited by mail, gets an
+    # account; its verified email carries the rights). At least one.
+    phone = models.CharField(max_length=16, blank=True, validators=[phone_validator])
+    email = models.EmailField(blank=True)                     # lowercase
     full_name = models.CharField(max_length=150)              # as the organizer typed it
     events = models.ManyToManyField("events.Event", blank=True, related_name="uploader_accesses")   # where it may upload
     status = models.CharField(max_length=8, choices=Status.choices, default=Status.ACTIVE)
@@ -207,12 +211,26 @@ class UploaderAccess(models.Model):
     last_login_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["organizer", "phone"], condition=models.Q(status="active"),
-                                               name="uploader_once_per_organizer")]
-        indexes = [models.Index(fields=["phone"], condition=models.Q(status="active"), name="uploader_phone")]
+        constraints = [
+            models.UniqueConstraint(fields=["organizer", "phone"], condition=models.Q(status="active") & ~models.Q(phone=""),
+                                    name="uploader_once_per_organizer"),
+            models.UniqueConstraint(fields=["organizer", "email"], condition=models.Q(status="active") & ~models.Q(email=""),
+                                    name="uploader_email_once_per_organizer"),
+            models.CheckConstraint(condition=~models.Q(phone="") | ~models.Q(email=""), name="uploader_phone_or_email"),
+        ]
+        indexes = [models.Index(fields=["phone"], condition=models.Q(status="active"), name="uploader_phone"),
+                   models.Index(fields=["email"], condition=models.Q(status="active"), name="uploader_email")]
+
+    def save(self, *args, **kwargs):
+        self.email = normalize_email(self.email)
+        super().save(*args, **kwargs)
+
+    @property
+    def contact(self) -> str:
+        return self.email or self.phone
 
     def __str__(self):
-        return f"{self.full_name} ({self.phone}) for {self.organizer_id}"
+        return f"{self.full_name} ({self.contact}) for {self.organizer_id}"
 
 
 class ConsentLog(models.Model):

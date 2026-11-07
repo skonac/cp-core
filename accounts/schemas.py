@@ -52,8 +52,9 @@ class EmailChallengeOut(Out):
 
 class PasswordSetOut(Out):
     user: "UserOut"
-    nextStep: Literal["consent", "selfie", "gallery", "organizer_home", "account_home"] = Field(
-        description="Where to go now (the event of the sign-in, if any).")
+    nextStep: Literal["consent", "selfie", "gallery", "organizer_home", "account_home", "uploader_home"] = Field(
+        description="Where to go now (the event of the sign-in, if any; uploader_home after an uploader's "
+                    "organizer-entry sign-in).")
 
 
 class MembershipOut(Out):
@@ -75,7 +76,7 @@ class SignInOut(Out):
         description="set_password: email sign-in of an account without a password, or a password reset: ask for "
                     "one (PUT /api/me/password), its answer gives the next step; consent/selfie/gallery: signed in "
                     "from an event link, or without one while KVKK consent is missing; organizer_home/account_home: no event; "
-                    "uploader_home: organizer entry by a phone an organizer added as uploader (§3.10).")
+                    "uploader_home: organizer entry (role organizer) by a phone or email an organizer added as uploader (§3.10).")
     uploaderAccesses: list[UploaderAccessOut] = Field(
         description="Organizers this phone may upload for (empty for most people).", examples=[[]])
     isNewUser: bool

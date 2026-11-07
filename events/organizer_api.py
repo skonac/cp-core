@@ -19,6 +19,7 @@ from pydantic import Field
 
 from accounts.models import UploaderAccess, User
 from accounts.otp import E164, mask_phone, normalize_phone
+from accounts.uploader import organizer_name as uploader_organizer_name
 from common import ratelimit
 from common.api import ApiError, CamelSchema, errors, file_doc, respond
 from media.framing import preview_relpath, served_relpath
@@ -650,7 +651,8 @@ def participants(request, code: str):
 
 def uploader_json(a: UploaderAccess) -> dict:
     events = sorted(a.events.all(), key=lambda e: (e.date, e.code))
-    return {"id": str(a.pk), "fullName": a.full_name, "phoneNumber": a.phone, "status": a.status,
+    return {"id": str(a.pk), "fullName": a.full_name, "phoneNumber": a.phone or None, "email": a.email or None,
+            "status": a.status,
             "events": [{"code": e.display_code, "name": e.name, "status": public_status(e)} for e in events],
             "createdAt": a.created_at.isoformat(),
             "lastLoginAt": a.last_login_at.isoformat() if a.last_login_at else None}
@@ -692,32 +694,70 @@ def list_uploaders(request, event: str = ""):
 
 class UploaderIn(CamelSchema):
     full_name: str = Field(min_length=1, max_length=150)
-    phone_number: str
+    email: str | None = None           # one of the two (email: invited by mail, gets an account)
+    phone_number: str | None = None    # (phone: signs in by OTP, no account)
     event_codes: list[str] = Field(default_factory=list, max_length=500)
+    locale: str = "tr"                 # the invitation mail's language: tr | en
 
 
-@organizer_router.post("/uploaders", response={201: S.UploaderResponse, **errors(401, 403, 409, 422)})
+def _invite(request, access: UploaderAccess, locale: str = "tr") -> None:
+    """Mail the uploader a sign-in link + code (organizer entry: no organizer role, uploader home)."""
+    from accounts import emailauth
+    emailauth.request_mail(access.email, "invite", "organizer", None, locale, request.META.get("REMOTE_ADDR"),
+                           request.build_absolute_uri("/"), organizer_name=uploader_organizer_name(access.organizer))
+
+
+@organizer_router.post("/uploaders", response={201: S.UploaderResponse, **errors(401, 403, 409, 422, 429)})
 def add_uploader(request, data: UploaderIn):
-    """Let a phone number upload to the chosen events (`eventCodes`, this organizer's, not expired), on this
-    organizer's credits. No account is created for it; the uploader signs in with the organizer entry.
-    One uploader per phone: to give it more events, PATCH it.
+    """Let an email and/or a phone upload to the chosen events (`eventCodes`, this organizer's, not expired),
+    on this organizer's credits. One uploader per email/phone: to give it more events, PATCH it.
+    - `email` (works now): the uploader gets an invitation mail (link + 4-digit code) that signs in to an
+      account for that email (created if new; they choose a password), straight to the uploader home.
+      Later: email + password (or an email code) through the organizer entry.
+    - `phoneNumber`: no account; the uploader signs in with the organizer entry by OTP (needs WhatsApp/SMS).
 
-    Errors: 403 organizer_access_required · 409 uploader_already_exists (this phone is already an
-    active uploader of this organizer) · 422 invalid_phone_number, validation_error (also an unknown or
-    expired event code, in errors.eventCodes)."""
+    Errors: 403 organizer_access_required · 409 uploader_already_exists (this email/phone is already an
+    active uploader of this organizer) · 422 invalid_email, invalid_phone_number, validation_error (neither
+    given; also an unknown or expired event code, in errors.eventCodes) · 429 rate_limit_exceeded (mails to
+    this address)."""
+    from accounts.emailauth import clean_email
     user = _organizer(request)
-    phone, name = normalize_phone(data.phone_number), data.full_name.strip()
-    if not E164.match(phone):
+    name = data.full_name.strip()
+    email = clean_email(data.email) if (data.email or "").strip() else ""
+    phone = normalize_phone(data.phone_number or "")
+    if phone and not E164.match(phone):
         raise ApiError(422, "invalid_phone_number", "Geçerli bir cep telefonu numarası gir (+90…).")
+    if not (email or phone):
+        raise ApiError(422, "validation_error", "E-posta gerekli.", errors={"email": ["required"]})
     if not name:
         raise ApiError(422, "validation_error", "Ad gerekli.", errors={"fullName": ["required"]})
     events = _assignable_events(user, data.event_codes)
-    if UploaderAccess.objects.filter(organizer=user, phone=phone, status=UploaderAccess.Status.ACTIVE).exists():
-        raise ApiError(409, "uploader_already_exists", "Bu telefon numarası zaten ekli.")
+    active = UploaderAccess.objects.filter(organizer=user, status=UploaderAccess.Status.ACTIVE)
+    if (email and active.filter(email=email).exists()) or (phone and active.filter(phone=phone).exists()):
+        raise ApiError(409, "uploader_already_exists", "Bu kişi zaten ekli.")
     with transaction.atomic():
-        access = UploaderAccess.objects.create(organizer=user, phone=phone, full_name=name)
+        access = UploaderAccess.objects.create(organizer=user, phone=phone, email=email, full_name=name)
         access.events.set(events)
+        if email:
+            _invite(request, access, data.locale)
     return respond(request, "organizer_uploader_created", {"uploader": uploader_json(access)}, status=201)
+
+
+@organizer_router.post("/uploaders/{uploader_id}/invitation",
+                       response={200: S.UploaderInvitedResponse, **errors(401, 403, 404, 410, 422, 429)})
+def resend_invitation(request, uploader_id: str, locale: str = "tr"):
+    """Mail the invitation (sign-in link + code) again. Errors: 403 organizer_access_required ·
+    404 uploader_not_found · 410 uploader_revoked · 422 validation_error (no email on this uploader) ·
+    429 rate_limit_exceeded (3 mails per address per 15 min, 30 s apart)."""
+    _organizer(request)
+    access = _own_uploader(request, uploader_id)
+    if access.status != UploaderAccess.Status.ACTIVE:
+        raise ApiError(410, "uploader_revoked", "Bu kayıt kaldırılmış.")
+    if not access.email:
+        raise ApiError(422, "validation_error", "Bu kişinin e-postası yok.", errors={"email": ["required"]})
+    _invite(request, access, locale)
+    return respond(request, "organizer_uploader_invited", {"uploader": uploader_json(access)},
+                   message="Davet e-postası gönderildi.")
 
 
 class UploaderPatchIn(CamelSchema):
@@ -750,7 +790,7 @@ def update_uploader(request, uploader_id: str, data: UploaderPatchIn):
 
 @organizer_router.delete("/uploaders/{uploader_id}", response={200: S.UploaderRevokedResponse, **errors(401, 403, 404)})
 def revoke_uploader(request, uploader_id: str):
-    """Revoke: the phone can no longer upload for this organizer, at once (also in an open session).
+    """Revoke: the email/phone can no longer upload for this organizer, at once (also in an open session).
     The row stays (status `revoked`, its events kept for the record), with the photos it uploaded. Idempotent.
 
     Errors: 403 organizer_access_required · 404 uploader_not_found."""
