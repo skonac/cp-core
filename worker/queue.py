@@ -14,9 +14,23 @@ from django.utils import timezone
 
 from events.models import Event
 from media.models import Face, Image
+from notify.alerts import alert
 
 log = logging.getLogger("cp.queue")
 S = Image.Status
+
+
+def _alert_failed(image) -> None:
+    """Tell the admin group that an image ended up failed - after the transaction commits, so a rolled-back
+    failure is not announced. Not for unreadable_image: that is the uploader's bad file, not our problem.
+    One alert per error kind per 5 minutes (alerts.py, topic images.fail), so a broken worker does not flood the group."""
+    if image.error == "unreadable_image":
+        return
+    where = f"event {image.event.code}" if image.event_id else "selfie"
+    text = f"Image {image.pk} failed ({where}): {image.error} after {image.attempts} attempts"
+    if image.error_detail:
+        text += f"\n{image.error_detail[:300]}"
+    transaction.on_commit(lambda: alert("images.fail", text, key=image.error))
 
 
 def candidates():
@@ -60,6 +74,7 @@ def claim(worker_id: str):
                 image.error = image.error or "max_attempts"
                 image.save(update_fields=["status", "processing_until", "error"])
                 log.warning("image %s failed after %s attempts", image.pk, image.attempts)
+                _alert_failed(image)
                 continue
             image.status = S.PROCESSING
             image.processing_until = timezone.now() + timedelta(seconds=settings.WORKER_LEASE)
@@ -130,6 +145,8 @@ def store_result(image_id: int, body: dict) -> tuple[int, str]:
             image.processing_until = None
             image.save(update_fields=["error", "error_detail", "status", "processing_until"])
             log.warning("image %s: worker error %s -> %s", image.pk, image.error, image.status)
+            if final:
+                _alert_failed(image)
             return 200, image.status
 
         problem = check_result(body, image.is_selfie)
