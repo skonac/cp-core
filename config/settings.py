@@ -227,6 +227,11 @@ ZOHOMAIL_CLIENT_SECRET = env("CP_ZOHOMAIL_CLIENT_SECRET", "")
 ZOHOMAIL_REFRESH_TOKEN = env("CP_ZOHOMAIL_REFRESH_TOKEN", "")
 ZOHOMAIL_ACCOUNT_ID = env("CP_ZOHOMAIL_ACCOUNT_ID", "")
 ZOHOMAIL_FROM = env("CP_ZOHOMAIL_FROM", "")
+# Admin alerts to our Telegram group (notify/alerts.py): "log" (log only) or "live" (needs the bot token and the
+# group's chat id; a supergroup's id looks like -100...). Basic groups change id when upgraded.
+TELEGRAM_DELIVERY = env("CP_TELEGRAM_DELIVERY", "log")
+TELEGRAM_BOT_TOKEN = env("CP_TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_ADMIN_CHAT_ID = env("CP_TELEGRAM_ADMIN_CHAT_ID", "")
 PRINT_THEMES_DIR = BASE_DIR / "print_themes"   # printed materials: one folder per theme (README there)
 PRINT_RENDERS_AT_ONCE = 2   # WeasyPrint PDFs at the same time per process (each 100-200 MB for ~2 s)
 EVENT_LOOKUP_PER_MIN = int(env("CP_EVENT_LOOKUP_PER_MIN", "30"))   # public event lookups per IP per minute (a venue shares one IP)
