@@ -55,7 +55,7 @@ class Event(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.code:
-            # 28.6 M codes: a collision is rare; retry a few times, the unique index is the final guard.
+            # 887 M codes (6 of 31 symbols): a collision is rare; retry a few times, the unique index is the final guard.
             for _ in range(10):
                 code = new_event_code()
                 if not Event.objects.filter(code=code).exists():

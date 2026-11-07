@@ -43,7 +43,7 @@ Last updated: 2026-10-31 (printed materials) · API version 0.7
 | CSRF | Every `POST`, `PATCH`, `PUT`, `DELETE` to a signed-in endpoint must send header `X-CSRFToken: <value of the csrftoken cookie>`. Read the cookie at request time; signing in rotates it. |
 | JSON | camelCase field names, UTF-8. Timestamps ISO 8601 with offset (`2026-10-19T08:30:00+00:00`); dates `YYYY-MM-DD`. |
 | IDs | Always strings. Photo ids are the photo's number in its event, zero-padded: `"00017"`. Unique only within an event. |
-| Event codes | 5 characters, case-insensitive, digits 2–9 and letters without i/l/o. The API returns them uppercase (`"RK238"`); send them in any case. |
+| Event codes | 6 characters for events created since Nov 7, 2026 (older ones keep 5; accept both), case-insensitive, digits 2–9 and letters without i/l/o. The API returns them uppercase (`"RK238X"`); send them in any case. |
 | Locale | Messages (`message`) are Turkish. The KVKK document exists in `tr` and `en`. |
 
 ### Recommended fetch helper

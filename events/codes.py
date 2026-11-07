@@ -1,4 +1,4 @@
-"""Event codes: random, 5 characters from an alphabet without look-alikes (design/core.md).
+"""Event codes: random, EVENT_CODE_LENGTH characters (6 since Nov 7; older events keep their 5) from an alphabet without look-alikes (design/core.md).
 Stored lowercase, shown uppercase, compared case-insensitively."""
 import secrets
 

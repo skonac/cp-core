@@ -169,7 +169,7 @@ DOWNLOAD_NAME = "cleverphotos_{code}_{seq:05d}.jpg"
 ZIP_MAX_FILES = int(env("CP_ZIP_MAX_FILES", "50"))   # photos per ZIP download request
 ZIP_NAME = "cleverphotos_{code}_{view}.zip"
 
-EVENT_CODE_LENGTH = 5
+EVENT_CODE_LENGTH = int(env("CP_EVENT_CODE_LENGTH", "6"))   # new events (Nov 7: 5 -> 6); older codes keep working; max 8 (column)
 EVENT_CODE_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz"   # 31 symbols: no 0/1, no i/l/o
 
 OTP_TTL = 120               # seconds
