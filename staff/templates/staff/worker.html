@@ -25,7 +25,7 @@
 <h2>Failed ({{ failed|length }})</h2>
 {% if failed %}<div class="scroll"><table class="t"><tr><th>Image</th><th>Owner</th><th class="n">Attempts</th><th>Error</th><th>Detail</th><th>Uploaded</th></tr>
 {% for i in failed %}<tr><td><a href="{% url 'staff:image' i.id %}">{% if i.is_selfie %}selfie {{ i.id }}{% else %}{{ i.event.display_code }} {{ i.seq_str }}{% endif %}</a></td>
-  <td><a href="{% url 'staff:user' i.owner_id %}">{{ i.owner.phone }}</a></td><td class="n">{{ i.attempts }}</td>
+  <td><a href="{% url 'staff:user' i.owner_id %}">{{ i.owner.label }}</a></td><td class="n">{{ i.attempts }}</td>
   <td style="color:var(--bad)">{{ i.error }}</td><td class="wrap small">{{ i.error_detail|truncatechars:200 }}</td><td>{{ i.created_at|date:"Y-m-d H:i" }}</td></tr>{% endfor %}
 </table></div>{% else %}<p class="muted">None.</p>{% endif %}
 

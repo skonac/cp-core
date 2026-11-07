@@ -25,6 +25,7 @@ from media.models import Image
 from media.storage import file_response, soft_delete
 
 from . import kvkk, uploader
+from .backends import SESSION_BACKEND
 from . import schemas as S
 from .models import ContactMessage, User
 from .otp import mask_phone, request_code, verify_code
@@ -119,12 +120,12 @@ def otp_verify(request, body: OtpVerifyIn):
     Errors: 410 otp_expired · 422 invalid_otp, validation_error · 429 rate_limit_exceeded (5 wrong codes)."""
     user, is_new, event, uploader_phone = verify_code(body.challenge_id, body.code)
     if user is not None:
-        login(request, user, backend="django.contrib.auth.backends.ModelBackend")   # sets sessionid, rotates csrftoken
+        login(request, user, backend=SESSION_BACKEND)   # sets sessionid, rotates csrftoken
     else:   # uploader without an account: a session holding only the verified phone
         request.session.cycle_key()
         rotate_token(request)
     request.session.pop(uploader.SESSION_KEY, None)   # never inherit another phone's uploader rights
-    accesses = list(uploader.active_accesses(uploader_phone or user.phone))
+    accesses = list(uploader.active_accesses(uploader_phone or user.phone or ""))
     if uploader_phone:
         request.session[uploader.SESSION_KEY] = uploader_phone
         return respond(request, "phone_verified", {
@@ -192,7 +193,8 @@ def me(request):
 def me_update(request, body: MeUpdateIn):
     """Profile: fullName (required), email (optional, null clears).
 
-    Errors: 403 csrf_failed · 409 email_already_in_use · 422 validation_error."""
+    Errors: 403 csrf_failed · 409 email_already_in_use · 422 validation_error, email_is_sign_in (an account
+    without a phone can't change or clear its email here)."""
     user = request.user
     name = body.full_name.strip()
     if not name or len(name) > 150:
@@ -205,6 +207,9 @@ def me_update(request, body: MeUpdateIn):
             raise ApiError(422, "validation_error", "Geçerli bir e-posta adresi gir.") from None
         if User.objects.filter(email=email).exclude(pk=user.pk).exists():
             raise ApiError(409, "email_already_in_use", "Bu e-posta başka bir hesapta kayıtlı.")
+    if email != user.email and not user.phone:
+        # the email is this account's only sign-in: changing it needs a verified address (email sign-in step)
+        raise ApiError(422, "email_is_sign_in", "Bu hesap e-posta ile giriş yapıyor; e-posta buradan değiştirilemez.")
     if email != user.email:
         user.email_verified_at = None
     user.full_name, user.email = name, email

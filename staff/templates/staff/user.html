@@ -1,8 +1,8 @@
 {% extends "staff/_base.html" %}
-{% block title %}{{ u.phone }} · staff{% endblock %}
+{% block title %}{{ u.label }} · staff{% endblock %}
 {% block staff %}
 <p class="small"><a href="{% url 'staff:users' %}">← Users</a></p>
-<h1>{{ u.phone }}{% if u.full_name %} <span class="muted">{{ u.full_name }}</span>{% endif %}
+<h1>{{ u.label }}{% if u.full_name %} <span class="muted">{{ u.full_name }}</span>{% endif %}
   {% for r in u.account_roles %}<span class="pill">{{ r }}</span> {% endfor %}{% if not u.is_active %}<span class="pill failed">locked</span>{% endif %}</h1>
 <p class="small"><a href="/admin/accounts/user/{{ u.id }}/change/">edit in admin</a>{% if u.is_organizer %} · <a href="/admin/credits/credittransaction/add/?user={{ u.id }}">adjust credits</a>{% endif %}</p>
 
@@ -76,7 +76,7 @@
 
 {% if credits %}<h2>Credit transactions</h2>
 <div class="scroll"><table class="t"><tr><th>When</th><th class="n">Delta</th><th>Kind</th><th>Ref</th><th>By</th><th>Note</th></tr>
-{% for t in credits %}<tr><td>{{ t.created_at|date:"Y-m-d H:i" }}</td><td class="n">{{ t.delta|stringformat:"+d" }}</td><td>{{ t.kind }}</td><td>{{ t.ref }}</td><td>{{ t.actor.phone|default:"" }}</td><td class="wrap">{{ t.note }}</td></tr>{% endfor %}
+{% for t in credits %}<tr><td>{{ t.created_at|date:"Y-m-d H:i" }}</td><td class="n">{{ t.delta|stringformat:"+d" }}</td><td>{{ t.kind }}</td><td>{{ t.ref }}</td><td>{{ t.actor.label|default:"" }}</td><td class="wrap">{{ t.note }}</td></tr>{% endfor %}
 </table></div>{% endif %}
 
 <h2>Consent log</h2>

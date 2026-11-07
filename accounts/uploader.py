@@ -15,7 +15,7 @@ def session_phone(request) -> str:
     """The verified phone of this session for uploader purposes, or ""."""
     phone = request.session.get(SESSION_KEY, "")
     if not phone and request.user.is_authenticated:
-        phone = request.user.phone
+        phone = request.user.phone or ""
     return phone
 
 

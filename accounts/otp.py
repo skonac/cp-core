@@ -29,7 +29,9 @@ def normalize_phone(text: str) -> str:
     return re.sub(r"[\s\-()]", "", text or "")
 
 
-def mask_phone(phone: str) -> str:
+def mask_phone(phone: str | None) -> str | None:
+    if not phone:
+        return None
     return "•" * (len(phone) - 4) + phone[-4:]
 
 

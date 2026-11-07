@@ -9,10 +9,10 @@
   <div class="row" style="justify-content:space-between">
     <div><b>{{ m.subject }}</b><br>
       <span class="small">{{ m.name }} · <a href="mailto:{{ m.email }}?subject=Re: {{ m.subject|urlencode }}">{{ m.email }}</a>{% if m.phone %} · {{ m.phone }}{% endif %}
-      {% if m.user %} · account <a href="{% url 'staff:user' m.user_id %}">{{ m.user.phone }}</a>{% endif %}</span><br>
+      {% if m.user %} · account <a href="{% url 'staff:user' m.user_id %}">{{ m.user.label }}</a>{% endif %}</span><br>
       <span class="muted small">{{ m.created_at|date:"Y-m-d H:i" }} · {{ m.locale }} · {{ m.ip|default:"" }}</span></div>
     <form method="post" style="margin:0">{% csrf_token %}<input type="hidden" name="id" value="{{ m.id }}">
-      {% if m.handled_at %}<span class="small muted">handled {{ m.handled_at|date:"Y-m-d H:i" }}{% if m.handled_by %} by {{ m.handled_by.phone }}{% endif %}</span>
+      {% if m.handled_at %}<span class="small muted">handled {{ m.handled_at|date:"Y-m-d H:i" }}{% if m.handled_by %} by {{ m.handled_by.label }}{% endif %}</span>
         <button class="secondary" name="action" value="unhandle">Mark new</button>
       {% else %}<button name="action" value="handle">Mark handled</button>{% endif %}</form>
   </div>

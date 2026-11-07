@@ -10,7 +10,7 @@ from .models import ConsentLog, ContactMessage, OtpChallenge, UploaderAccess, Us
 class UserCreateForm(AdminUserCreationForm):
     class Meta:
         model = User
-        fields = ("phone",)
+        fields = ("phone", "email")
 
 
 class UserEditForm(UserChangeForm):
@@ -42,7 +42,7 @@ class UserAdmin(DjangoUserAdmin):
         ("Dates", {"fields": ("created_at", "last_login")}),
     )
     add_fieldsets = (
-        (None, {"classes": ("wide",), "fields": ("phone", "usable_password", "password1", "password2")}),
+        (None, {"classes": ("wide",), "fields": ("phone", "email", "usable_password", "password1", "password2")}),
     )
 
 
@@ -67,9 +67,9 @@ class UploaderAccessAdmin(admin.ModelAdmin):
 @admin.register(ConsentLog)
 class ConsentLogAdmin(admin.ModelAdmin):
     """The legal record: read-only, no adding or deleting from the admin."""
-    list_display = ("id", "created_at", "phone", "full_name", "version", "locale", "ip")
+    list_display = ("id", "created_at", "phone", "email", "full_name", "version", "locale", "ip")
     list_filter = ("version", "locale")
-    search_fields = ("phone", "full_name")
+    search_fields = ("phone", "email", "full_name")
     readonly_fields = [f.name for f in ConsentLog._meta.fields]
 
     def has_add_permission(self, request):

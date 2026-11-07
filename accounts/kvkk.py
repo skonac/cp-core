@@ -44,7 +44,7 @@ def record_consent(user: User, locale: str, ip: str | None, user_agent: str) -> 
     with transaction.atomic():
         user.kvkk_version = version
         user.save(update_fields=["kvkk_version"])
-        ConsentLog.objects.create(user=user, phone=user.phone, full_name=user.full_name, version=version,
+        ConsentLog.objects.create(user=user, phone=user.phone or "", email=user.email or "", full_name=user.full_name, version=version,
                                   locale=locale, sha256=sha256(filename(locale, version)),
                                   ip=ip or None, user_agent=(user_agent or "")[:500])
     return True

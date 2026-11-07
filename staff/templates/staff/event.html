@@ -4,7 +4,7 @@
 <p class="small"><a href="{% url 'staff:events' %}">← Events</a></p>
 <h1><span class="code">{{ event.display_code }}</span> {{ event.name }} <span class="pill {{ event.status }}">{{ event.status }}</span></h1>
 <p class="muted small">{{ event.type }} · {{ event.date|date:"Y-m-d" }}{% if event.location_label %} · {{ event.location_label }}{% endif %}
- · owner <a href="{% url 'staff:user' event.owner_id %}">{{ event.owner.phone }}</a>{% if event.owner.full_name %} {{ event.owner.full_name }}{% endif %}
+ · owner <a href="{% url 'staff:user' event.owner_id %}">{{ event.owner.label }}</a>{% if event.owner.full_name %} {{ event.owner.full_name }}{% endif %}
  · <a href="{% url 'organizer:event' event.code %}">organizer page</a> · <a href="{% url 'participant:event' event.code %}">participant page</a> · <a href="/admin/events/event/{{ event.id }}/change/">admin</a></p>
 
 <div class="row" style="margin-top:12px">
@@ -29,7 +29,7 @@
 {% if members %}<div class="scroll"><table class="t">
 <tr><th>Phone</th><th>Name</th><th>Consent</th><th>Selfie</th><th class="n">Matched</th><th>Joined</th><th>Last activity</th><th></th></tr>
 {% for m in members %}<tr>
-  <td><a href="{% url 'staff:user' m.user_id %}">{{ m.user.phone }}</a></td><td>{{ m.user.full_name }}</td>
+  <td><a href="{% url 'staff:user' m.user_id %}">{{ m.user.label }}</a></td><td>{{ m.user.full_name }}</td>
   <td>{{ m.user.is_consent|yesno:"yes,—" }}</td><td><span class="pill {% if m.selfie_state == 'ready' %}ready{% elif m.selfie_state == 'selfie_rejected' %}rejected{% endif %}">{{ m.selfie_state }}</span></td>
   <td class="n">{% if m.matched is not None %}<a href="?as={{ m.user_id }}">{{ m.matched }}</a>{% else %}—{% endif %}</td>
   <td>{{ m.joined_at|date:"Y-m-d H:i" }}</td><td>{{ m.last_activity_at|date:"Y-m-d H:i" }}</td>
@@ -37,7 +37,7 @@
 </tr>{% endfor %}
 </table></div>{% else %}<p class="muted">Nobody has opened this event yet.</p>{% endif %}
 
-<h2 id="photos">{% if as_user %}Photos of <a href="{% url 'staff:user' as_user.id %}">{{ as_user.phone }}</a>{% if as_user.full_name %} {{ as_user.full_name }}{% endif %} ({{ page.paginator.count }}){% else %}Photos ({{ page.paginator.count }}){% endif %}</h2>
+<h2 id="photos">{% if as_user %}Photos of <a href="{% url 'staff:user' as_user.id %}">{{ as_user.label }}</a>{% if as_user.full_name %} {{ as_user.full_name }}{% endif %} ({{ page.paginator.count }}){% else %}Photos ({{ page.paginator.count }}){% endif %}</h2>
 <div class="filters">
   {% if as_user %}<a href="?">× show all photos</a> ·{% endif %}
   Status: <a href="?{% if as_user %}as={{ as_user.id }}&{% endif %}{% if show_deleted %}deleted=1{% endif %}#photos" class="{% if not status_filter %}on{% endif %}">all</a>

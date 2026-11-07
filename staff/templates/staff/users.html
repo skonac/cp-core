@@ -7,7 +7,7 @@
 <div class="scroll"><table class="t">
 <tr><th>Phone</th><th>Name</th><th>Email</th><th>Roles</th><th>Consent</th><th>Selfie</th><th class="n">Joined</th><th class="n">Owns</th><th class="n">Credits</th><th>Last login</th><th>Created</th></tr>
 {% for u in page %}<tr class="{% if not u.is_active %}dim{% endif %}">
-  <td><a href="{% url 'staff:user' u.id %}">{{ u.phone }}</a></td><td>{{ u.full_name }}</td><td>{{ u.email|default:"" }}</td>
+  <td><a href="{% url 'staff:user' u.id %}">{{ u.label }}</a></td><td>{{ u.full_name }}</td><td>{{ u.email|default:"" }}</td>
   <td>{{ u.account_roles|join:", " }}{% if not u.is_active %} <span class="pill failed">locked</span>{% endif %}</td>
   <td>{% if u.kvkk_version == kvkk_version %}{{ u.kvkk_version }}{% elif u.kvkk_version %}<span style="color:var(--warn)">{{ u.kvkk_version }} (old)</span>{% else %}—{% endif %}</td>
   <td><span class="pill {% if u.selfie_state == 'ready' %}ready{% elif u.selfie_state == 'selfie_rejected' %}rejected{% endif %}">{{ u.selfie_state }}</span></td>

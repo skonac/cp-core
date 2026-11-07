@@ -161,7 +161,8 @@ class UploaderAccessesOut(Out):
 class ParticipantOut(Out):
     membershipId: str = Field(examples=["123"])
     displayName: str | None = Field(examples=["Ece Yılmaz"])
-    maskedPhone: str = Field(examples=["•••••••••4218"])
+    maskedPhone: str | None = Field(description="null when the participant's account has no phone.",
+                                    examples=["•••••••••4218"])
     joinedAt: str
     lastActiveAt: str
     hasConsent: bool

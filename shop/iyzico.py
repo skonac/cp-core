@@ -99,7 +99,7 @@ def build_initialize_request(purchase, user, profile, callback_url: str) -> dict
         "enabledInstallments": [1],
         "buyer": {
             "id": str(user.pk), "name": profile.first_name, "surname": profile.last_name,
-            "gsmNumber": user.phone, "email": profile.email,
+            "gsmNumber": user.phone or None, "email": profile.email,
             "identityNumber": profile.identity_number or NO_TCKN,
             "registrationAddress": address, "city": city, "country": country,
             "zipCode": profile.postal_code or None, "ip": purchase.ip or "127.0.0.1",

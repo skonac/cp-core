@@ -197,3 +197,79 @@ class ContactApiTests(TestCase):
         documented = {(m.upper(), norm(path)) for path, ops in api.get_openapi_schema()["paths"].items() for m in ops
                       if path.startswith("/api/contact/")}
         self.assertEqual(documented - called, set())
+
+
+class PhonelessAccountTests(TestCase):
+    """Accounts without a phone (email sign-up, guests later): identity is the id; password sign-in
+    takes a phone or an email (accounts.backends.IdentifierBackend)."""
+
+    def test_accounts_without_phone_or_email(self):
+        a, b = User.objects.create_user(), User.objects.create_user()   # NULLs don't collide
+        self.assertIsNone(a.phone)
+        self.assertEqual(str(b), f"#{b.pk}")
+        c = User.objects.create_user(email=" Ali@Example.COM ")
+        c.refresh_from_db()
+        self.assertEqual(c.email, "ali@example.com")
+        self.assertEqual(c.label, "ali@example.com")
+        from django.db import IntegrityError, transaction
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            User.objects.create_user(email="ALI@example.com")   # case-insensitive by storing lowercase
+        u = User.objects.create_user("")   # "" from a form counts as no phone
+        self.assertIsNone(u.phone)
+
+    def test_password_sign_in_with_email_or_phone(self):
+        from django.contrib.auth import authenticate
+        e = User.objects.create_user(email="ali@example.com", password="secret1")
+        p = User.objects.create_user("+905550000071", "secret2", email="veli@example.com")
+        self.assertEqual(authenticate(username="ali@example.com", password="secret1"), e)
+        self.assertEqual(authenticate(username=" ALI@example.com", password="secret1"), e)
+        self.assertEqual(authenticate(username="+905550000071", password="secret2"), p)
+        self.assertEqual(authenticate(username="veli@example.com", password="secret2"), p)
+        self.assertIsNone(authenticate(username="ali@example.com", password="wrong"))
+        self.assertIsNone(authenticate(username="nobody@example.com", password="secret1"))
+        self.assertIsNone(authenticate(username="", password="secret1"))
+        e.is_active = False
+        e.save()
+        self.assertIsNone(authenticate(username="ali@example.com", password="secret1"))
+
+    def test_django_login_page_with_email(self):
+        User.objects.create_user(email="ali@example.com", password="secret1", is_organizer=True)
+        r = self.client.post("/dj/login/", {"username": "Ali@Example.com", "password": "secret1"})
+        self.assertEqual(r.status_code, 302, r.content)
+        self.assertTrue(self.client.get("/api/me").json()["data"]["id"])
+        self.assertIsNone(self.client.get("/api/me").json()["data"]["phoneNumber"])
+
+    @override_settings(MASTER_PASS="12345")
+    def test_master_pass_with_email(self):
+        from django.contrib.auth import authenticate
+        u = User.objects.create_user(email="ali@example.com")
+        self.assertEqual(authenticate(username="ali@example.com", password="12345"), u)
+
+    def test_consent_log_copies_email(self):
+        from . import kvkk
+        u = User.objects.create_user(email="ali@example.com", full_name="Ali")
+        self.assertTrue(kvkk.record_consent(u, "tr", "127.0.0.1", "UA"))
+        log = ConsentLog.objects.get()
+        self.assertEqual((log.phone, log.email, log.full_name), ("", "ali@example.com", "Ali"))
+
+    def test_email_only_account_keeps_its_email(self):
+        u = User.objects.create_user(email="ali@example.com", password="secret1")
+        c = Client(enforce_csrf_checks=True)
+        c.force_login(u)
+        c.get("/api/auth/csrf")
+        h = {"HTTP_X_CSRFTOKEN": c.cookies["csrftoken"].value}
+        for email in (None, "other@example.com"):
+            r = c.patch("/api/me", {"fullName": "Ali", "email": email}, content_type="application/json", **h)
+            self.assertEqual((r.status_code, r.json()["code"]), (422, "email_is_sign_in"), r.content)
+        r = c.patch("/api/me", {"fullName": "Ali", "email": "ALI@example.com"}, content_type="application/json", **h)
+        self.assertEqual(r.status_code, 200, r.content)   # same address: only the name changes
+
+    def test_staff_pages_and_masking_without_phone(self):
+        from .otp import mask_phone
+        self.assertIsNone(mask_phone(None))
+        staff = User.objects.create_user("+905550000070", "pw", is_staff=True)
+        u = User.objects.create_user(email="ali@example.com")
+        self.client.force_login(staff)
+        r = self.client.get("/dj/staff/users/")
+        self.assertContains(r, "ali@example.com")
+        self.assertContains(self.client.get(f"/dj/staff/users/{u.pk}/"), "ali@example.com")

@@ -2,7 +2,7 @@
 {% block title %}{% if image.is_selfie %}Selfie {{ image.id }}{% elif image.is_cover %}Cover {{ image.id }}{% else %}{{ image.event.display_code }} {{ image.seq_str }}{% endif %} · staff{% endblock %}
 {% block staff %}
 <p class="small">
-{% if image.is_selfie %}<a href="{% url 'staff:user' image.owner_id %}">← {{ image.owner.phone }}</a>
+{% if image.is_selfie %}<a href="{% url 'staff:user' image.owner_id %}">← {{ image.owner.label }}</a>
 {% else %}<a href="{% url 'staff:event' image.event.code %}">← {{ image.event.display_code }} {{ image.event.name }}</a>
   {% if prev %} · <a href="{% url 'staff:image' prev %}">previous</a>{% endif %}{% if next %} · <a href="{% url 'staff:image' next %}">next</a>{% endif %}{% endif %}
 </p>
@@ -12,7 +12,7 @@
 <div class="row" style="margin-top:12px">
   <div class="card"><table class="kv t">
     <tr><td>Image id</td><td>{{ image.id }} · <a href="/admin/media/image/{{ image.id }}/change/">admin</a></td></tr>
-    <tr><td>Owner</td><td><a href="{% url 'staff:user' image.owner_id %}">{{ image.owner.phone }}</a> {{ image.owner.full_name }}</td></tr>
+    <tr><td>Owner</td><td><a href="{% url 'staff:user' image.owner_id %}">{{ image.owner.label }}</a> {{ image.owner.full_name }}</td></tr>
     <tr><td>Master (stored)</td><td>{{ image.width }}×{{ image.height }} · {{ image.bytes|filesizeformat }}</td></tr>
     <tr><td>sha256</td><td class="small"><code>{{ image.sha256 }}</code></td></tr>
     <tr><td>Taken</td><td>{{ image.taken_at|date:"Y-m-d H:i:s"|default:"—" }}</td></tr>
@@ -44,8 +44,8 @@
   <img src="{% url 'staff:image_file' image.id 'd' %}" alt="" style="display:block; max-width:100%; max-height:80vh; height:auto">
   {% for f in faces %}
   {% with c=f.match|yesno:"#1f9d55,#39f" %}
-  <div title="face {{ forloop.counter }} · score {{ f.score|floatformat:3 }}{% if f.match %} · {{ f.match.user.full_name|default:f.match.user.phone }} {{ f.match.sim|floatformat:3 }}{% endif %}" style="position:absolute; left:{{ f.box.left|stringformat:'.3f' }}%; top:{{ f.box.top|stringformat:'.3f' }}%; width:{{ f.box.width|stringformat:'.3f' }}%; height:{{ f.box.height|stringformat:'.3f' }}%; border:2px solid {{ c }}; border-radius:3px; box-shadow:0 0 0 1px rgba(0,0,0,.4)">
-    <span style="position:absolute; top:-18px; left:-2px; background:{{ c }}; color:#fff; font-size:11px; padding:0 4px; border-radius:3px; white-space:nowrap">{{ forloop.counter }}{% if f.match %} {{ f.match.user.full_name|default:f.match.user.phone|truncatechars:18 }}{% endif %}</span>
+  <div title="face {{ forloop.counter }} · score {{ f.score|floatformat:3 }}{% if f.match %} · {{ f.match.user.full_name|default:f.match.user.label }} {{ f.match.sim|floatformat:3 }}{% endif %}" style="position:absolute; left:{{ f.box.left|stringformat:'.3f' }}%; top:{{ f.box.top|stringformat:'.3f' }}%; width:{{ f.box.width|stringformat:'.3f' }}%; height:{{ f.box.height|stringformat:'.3f' }}%; border:2px solid {{ c }}; border-radius:3px; box-shadow:0 0 0 1px rgba(0,0,0,.4)">
+    <span style="position:absolute; top:-18px; left:-2px; background:{{ c }}; color:#fff; font-size:11px; padding:0 4px; border-radius:3px; white-space:nowrap">{{ forloop.counter }}{% if f.match %} {{ f.match.user.full_name|default:f.match.user.label|truncatechars:18 }}{% endif %}</span>
   </div>
   {% endwith %}
   {% endfor %}
@@ -71,7 +71,7 @@
 {% for f in faces %}<tr>
   <td>{{ forloop.counter }}</td><td>{{ f.id }}</td><td class="n">{{ f.score|floatformat:3 }}</td><td class="n">{{ f.size_pct }}</td>
   {% if image.kind == "photo" %}
-  <td>{% if f.match %}<a href="{% url 'staff:user' f.match.user.pk %}" style="color:var(--ok); font-weight:700">{{ f.match.user.full_name|default:f.match.user.phone }}</a> {{ f.match.sim|floatformat:3 }}{% if f.also %} <span class="pill" title="also at or above the threshold: {% for m in f.also %}{{ m.user.full_name|default:m.user.phone }} {{ m.sim|floatformat:3 }}{% if not forloop.last %}, {% endif %}{% endfor %}">+{{ f.also|length }}</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
+  <td>{% if f.match %}<a href="{% url 'staff:user' f.match.user.pk %}" style="color:var(--ok); font-weight:700">{{ f.match.user.full_name|default:f.match.user.label }}</a> {{ f.match.sim|floatformat:3 }}{% if f.also %} <span class="pill" title="also at or above the threshold: {% for m in f.also %}{{ m.user.full_name|default:m.user.label }} {{ m.sim|floatformat:3 }}{% if not forloop.last %}, {% endif %}{% endfor %}">+{{ f.also|length }}</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
   {% endif %}
   <td><code class="small">{% for v in f.bbox %}{{ v|floatformat:4 }}{% if not forloop.last %}, {% endif %}{% endfor %}</code></td>
   <td class="wrap"><code class="small">{% for v in f.landmarks %}{{ v|floatformat:3 }}{% if not forloop.last %}, {% endif %}{% endfor %}</code></td>
@@ -81,7 +81,7 @@
 
 {% if downloads %}<h2>Downloads (last 20)</h2>
 <div class="scroll"><table class="t"><tr><th>When</th><th>User</th><th>IP</th></tr>
-{% for d in downloads %}<tr><td>{{ d.downloaded_at|date:"Y-m-d H:i:s" }}</td><td><a href="{% url 'staff:user' d.user_id %}">{{ d.user.phone }}</a></td><td>{{ d.ip }}</td></tr>{% endfor %}
+{% for d in downloads %}<tr><td>{{ d.downloaded_at|date:"Y-m-d H:i:s" }}</td><td><a href="{% url 'staff:user' d.user_id %}">{{ d.user.label }}</a></td><td>{{ d.ip }}</td></tr>{% endfor %}
 </table></div>{% endif %}
 
 <h2>EXIF</h2>

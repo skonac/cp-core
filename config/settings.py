@@ -127,8 +127,8 @@ STATICFILES_DIRS = [BASE_DIR / "static"]   # public files for outside parties (i
 
 # Django pages: where login sends people (URL names from config/urls.py)
 AUTHENTICATION_BACKENDS = [
-    "django.contrib.auth.backends.ModelBackend",   # phone + the account's own password
-    "accounts.backends.MasterPassBackend",         # phone + CP_MASTER_PASS (non-production)
+    "accounts.backends.IdentifierBackend",         # phone or email + the account's own password
+    "accounts.backends.MasterPassBackend",         # phone or email + CP_MASTER_PASS (non-production)
 ]
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "home"          # "/" sends organizers and participants to their own pages

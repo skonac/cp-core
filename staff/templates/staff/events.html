@@ -12,7 +12,7 @@
   <td class="wrap">{{ e.name }}</td>
   <td><span class="pill {{ e.status }}">{{ e.status }}</span></td>
   <td>{{ e.type }}</td><td>{{ e.date|date:"Y-m-d" }}</td>
-  <td><a href="{% url 'staff:user' e.owner_id %}">{{ e.owner.phone }}</a>{% if e.owner.full_name %} <span class="muted">{{ e.owner.full_name }}</span>{% endif %}</td>
+  <td><a href="{% url 'staff:user' e.owner_id %}">{{ e.owner.label }}</a>{% if e.owner.full_name %} <span class="muted">{{ e.owner.full_name }}</span>{% endif %}</td>
   <td class="n"><a href="{% url 'staff:event' e.code %}">{{ e.photos.total }}</a></td>
   <td class="n">{{ e.photos.pending|default:"" }}</td><td class="n">{{ e.photos.processing|default:"" }}</td>
   <td class="n">{{ e.photos.done }}</td>

@@ -94,6 +94,7 @@ Every response except files and `204` is:
 | 403 | `organizer_access_required` | Organizer or shop endpoint, account without the organizer role |
 | 404 | `event_not_found`, `photo_not_found`, `selfie_not_found`, `face_not_found`, `not_found` | Missing, or not visible to this user (never revealed which) |
 | 409 | `email_already_in_use` | `PATCH /me` with another account's email |
+| 422 | `email_is_sign_in` | `PATCH /me` changing or clearing the email of an account without a phone (its only sign-in) |
 | 409 | `consent_version_outdated` | Consent sent for a KVKK version that is no longer current |
 | 409 | `pricing_changed` | Purchase with an old `pricingVersion` |
 | 410 | `event_expired`, `otp_expired` | |
@@ -186,6 +187,7 @@ Errors: `422 invalid_otp` (wrong code, unknown or already used challenge), `410 
 
 | Field | Notes |
 | --- | --- |
+| `phoneNumber` | `null` for accounts without a phone (email sign-up, coming). Don't use it as the account's identity; that is `id`. |
 | `accountRoles` | Any of `participant`, `organizer`, `photographer`, `admin`. UI visibility only; the server checks everything. `participant` = has joined at least one event. |
 | `hasConsent` | KVKK explicit consent given **to the current document version**. A new version makes it `false` for everyone until they consent again. |
 | `consentVersion` | The version the user last consented to (`null` = never). Differs from `kvkk.version` when the text was updated since. |
@@ -195,7 +197,7 @@ Errors: `422 invalid_otp` (wrong code, unknown or already used challenge), `410 
 | `selfieThumbnailUrl` | The primary selfie's thumbnail, or `null` |
 
 **`PATCH /api/me`** `{ "fullName": "Seko Konac", "email": "seko@example.com" }` → `200 profile_updated`, user object.
-`fullName` required (max 150); `email` optional (`null` clears it). Errors: `422 validation_error`, `409 email_already_in_use`.
+`fullName` required (max 150); `email` optional (`null` clears it; stored lowercase). Errors: `422 validation_error`, `409 email_already_in_use`, `422 email_is_sign_in` (an account without a phone signs in with its email: it can't be changed or cleared here).
 
 **`GET /api/me/events`** → `200 user_events_retrieved`: events the user has opened (newest activity first).
 
@@ -534,6 +536,7 @@ Unknown ids are skipped.
                       "hasConsent": true, "matchStatus": "completed", "matchedPhotoCount": 18 } ],
   "total": 1, "counts": { "completed": 1, "pending": 0, "failed": 0 } }
 ```
+`maskedPhone` is `null` when the participant's account has no phone.
 
 Most recently active first. `matchStatus`: `consent_pending` (no KVKK consent yet) → `selfie_pending` (no selfie)
 → `processing` (selfie being checked) → `completed` (matching runs; `matchedPhotoCount` = photos they are in), or
@@ -845,4 +848,4 @@ message). Pass the interface language as `lang`. Sort themes whose `eventTypes` 
 
 Live iyzico payments (sandbox now), real OTP delivery (WhatsApp; SMS parked), push notifications (new photos of you, end of event), a WhatsApp message to a newly added uploader, emailing the documents after payment,
 organizer activity feed, participant access revoke, choosing the cover from the event's photos,
-covers for participants (`coverThumbnailUrl` in `/api/me/events`), email login. Ask before building screens that need them.
+covers for participants (`coverThumbnailUrl` in `/api/me/events`), email sign-up and sign-in (in progress), guest access (in progress). Ask before building screens that need them.

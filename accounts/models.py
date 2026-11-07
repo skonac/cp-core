@@ -20,10 +20,9 @@ class Role(models.TextChoices):
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
-    def create_user(self, phone, password=None, **extra):
-        if not phone:
-            raise ValueError("phone is required")
-        user = self.model(phone=phone, **extra)
+    def create_user(self, phone=None, password=None, **extra):
+        # An account may have a phone, an email, both, or neither (a guest, later). Identity is the id.
+        user = self.model(phone=phone or None, **extra)
         if password:
             user.set_password(password)
         else:
@@ -40,9 +39,11 @@ class UserManager(BaseUserManager):
 class User(AbstractBaseUser):
     # From AbstractBaseUser: password, last_login. No Django groups or per-model permissions:
     # staff (is_staff) may do everything in the admin; see has_perm below.
-    phone = models.CharField(max_length=16, unique=True, validators=[phone_validator])
+    # Sign-in identifiers, both optional: phone (OTP, password) and email (link/code, password). NULLs don't
+    # collide in a unique column. The account's identity is its integer id, never the phone or the email.
+    phone = models.CharField(max_length=16, unique=True, null=True, blank=True, validators=[phone_validator])
     phone_verified_at = models.DateTimeField(null=True, blank=True)
-    email = models.EmailField(unique=True, null=True, blank=True)   # NULLs don't collide in a unique column
+    email = models.EmailField(unique=True, null=True, blank=True)   # stored lowercase (save)
     email_verified_at = models.DateTimeField(null=True, blank=True)
     full_name = models.CharField(max_length=150, blank=True)
 
@@ -63,11 +64,13 @@ class User(AbstractBaseUser):
 
     objects = UserManager()
 
-    USERNAME_FIELD = "phone"    # the login identifier
+    USERNAME_FIELD = "phone"    # what createsuperuser asks for; password sign-in takes phone or email (backends.py)
     REQUIRED_FIELDS = []        # createsuperuser asks only for phone + password
 
     def save(self, *args, **kwargs):
-        self.email = self.email or None   # "" from forms would collide in the unique column
+        # "" from forms would collide in the unique columns; emails compare case-insensitively
+        self.phone = self.phone or None
+        self.email = normalize_email(self.email) or None
         super().save(*args, **kwargs)
 
     # The admin asks these. One rule: an active staff account has every permission.
@@ -95,8 +98,17 @@ class User(AbstractBaseUser):
                  ("photographer", self.is_photographer), ("admin", self.is_staff)]
         return [name for name, held in roles if held]
 
+    @property
+    def label(self) -> str:
+        """How staff pages and logs name the account: phone, else email, else the id."""
+        return self.phone or self.email or f"#{self.pk}"
+
     def __str__(self):
-        return self.phone
+        return self.label
+
+
+def normalize_email(email: str | None) -> str:
+    return (email or "").strip().lower()
 
 
 def new_challenge_id() -> str:
@@ -162,9 +174,10 @@ class UploaderAccess(models.Model):
 
 class ConsentLog(models.Model):
     """One row per consent given: the legal record. Append-only (read-only in the admin).
-    Kept when the account is deleted (user becomes NULL; phone and name are copies)."""
+    Kept when the account is deleted (user becomes NULL; phone, email and name are copies)."""
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
-    phone = models.CharField(max_length=16)
+    phone = models.CharField(max_length=16, blank=True)
+    email = models.EmailField(blank=True)
     full_name = models.CharField(max_length=150, blank=True)
     version = models.CharField(max_length=8)                  # e.g. "002" = kvkk_tr_002.html + kvkk_en_002.html
     locale = models.CharField(max_length=2)                   # the language shown: tr | en
@@ -177,7 +190,7 @@ class ConsentLog(models.Model):
         indexes = [models.Index(fields=["user", "created_at"], name="consentlog_user")]
 
     def __str__(self):
-        return f"{self.phone} {self.version}/{self.locale} {self.created_at:%Y-%m-%d %H:%M}"
+        return f"{self.phone or self.email or self.user_id} {self.version}/{self.locale} {self.created_at:%Y-%m-%d %H:%M}"
 
 
 class ContactMessage(models.Model):

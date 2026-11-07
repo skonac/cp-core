@@ -21,7 +21,8 @@ class KvkkDocumentsOut(Out):
 
 class UserOut(Out):
     id: str = Field(examples=["69"])
-    phoneNumber: str = Field(examples=["+905551234567"])
+    phoneNumber: str | None = Field(description="null for accounts without a phone (email sign-up).",
+                                    examples=["+905551234567"])
     fullName: str | None = Field(examples=["Seko Konac"])
     email: str | None = Field(examples=[None])
     profileCompleted: bool = Field(description="true when fullName is set.")
