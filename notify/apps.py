@@ -7,6 +7,9 @@ class NotifyConfig(AppConfig):
 
     def ready(self):
         checks.register(check_delivery)
+        from django.core.signals import got_request_exception
+        from .alerts import on_request_exception
+        got_request_exception.connect(on_request_exception, dispatch_uid="cp-admin-alert-system-error")
 
 
 def check_delivery(app_configs=None, **kwargs):

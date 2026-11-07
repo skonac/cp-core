@@ -11,7 +11,7 @@ from .providers import SendError
 
 BASE = dict(TELEGRAM_DELIVERY="live", TELEGRAM_BOT_TOKEN="123:abc", SITE_DOMAIN="t.org",
             TELEGRAM_CHANNELS={"critical": "-100111", "info": "-100222"},
-            NOTIFY_ROUTES={"images_fail": "telegram.critical", "accounts_new": "telegram.info",
+            NOTIFY_ROUTES={"system_error": "telegram.critical", "images_fail": "telegram.critical", "accounts_new": "telegram.info",
                            "shop_fail": "telegram.critical, email.a@x.com, email.b@x.com", "shop_success": "none"})
 
 
@@ -116,3 +116,24 @@ class AlertTests(SimpleTestCase):
     def test_missing_token(self):
         with self.assertRaises(SendError):
             alerts.send_telegram("-100111", "x")
+
+    def test_unhandled_request_error_goes_to_system_error(self):
+        request = mock.Mock(method="POST", path="/api/shop/purchases", request_id="req_abc")
+        with mock.patch.object(alerts, "alert") as alert:
+            try:
+                raise KeyError("boom")
+            except KeyError:
+                alerts.on_request_exception(request=request)
+        alert.assert_called_once_with("system.error", "POST /api/shop/purchases -> KeyError: 'boom'\nrequest req_abc",
+                                      key="KeyError:/api/shop/purchases")
+
+    def test_request_error_alert_reaches_the_channel(self):
+        request = mock.Mock(method="GET", path="/x", request_id="req_1")
+        with mock.patch("urllib.request.urlopen", return_value=reply()) as urlopen, \
+                mock.patch.object(alerts.threading, "Thread", side_effect=lambda target, args, **kw: mock.Mock(start=lambda: target(*args))):
+            try:
+                raise ValueError("bad")
+            except ValueError:
+                alerts.on_request_exception(request=request)
+        self.assertEqual(posted(urlopen)[0]["chat_id"], "-100111")
+        self.assertIn("system.error: GET /x -> ValueError: bad", posted(urlopen)[0]["text"])

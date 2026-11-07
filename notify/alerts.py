@@ -25,6 +25,7 @@ was upgraded" and the error below names the new one.
 import json
 import logging
 import socket
+import sys
 import threading
 import time
 import urllib.error
@@ -190,3 +191,20 @@ def alert(topic: str, text: str, key: str | None = None, wait: bool = False) -> 
     except Exception:
         log.exception("admin alert failed")
         return False
+
+
+def on_request_exception(sender=None, request=None, **kwargs) -> None:
+    """Django's got_request_exception signal (connected in apps.py): an unhandled error in a view -> system.error.
+    Method, path (no query string, no body: they can hold codes and personal data), the exception and the request
+    id the client got in X-Request-ID. One alert per exception type + path per 5 minutes."""
+    try:
+        kind, exc, _ = sys.exc_info()
+        if kind is None:
+            return
+        path = getattr(request, "path", "?")
+        text = (f"{getattr(request, 'method', '?')} {path} -> {kind.__name__}: {str(exc)[:300]}"
+                f"\nrequest {getattr(request, 'request_id', '?')}")
+        alert("system.error", text, key=f"{kind.__name__}:{path}")
+    except Exception:
+        log.exception("system.error alert failed")
+
