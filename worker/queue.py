@@ -5,6 +5,7 @@ store_result(id, body)    -> (http status, message)
 """
 import logging
 import math
+import time
 from datetime import timedelta
 
 from django.conf import settings
@@ -15,6 +16,8 @@ from django.utils import timezone
 from events.models import Event
 from media.models import Face, Image
 from notify.alerts import alert
+
+from .models import Worker
 
 log = logging.getLogger("cp.queue")
 S = Image.Status
@@ -31,6 +34,36 @@ def _alert_failed(image) -> None:
     if image.error_detail:
         text += f"\n{image.error_detail[:300]}"
     transaction.on_commit(lambda: alert("images.fail", text, key=image.error))
+
+
+SILENT_CHECK_EVERY = 300                    # seconds between checks, per process (kept in RAM)
+SILENT_WAITING_FOR = timedelta(minutes=5)   # an image waiting this long ...
+SILENT_WORKER_FOR = timedelta(minutes=2)    # ... while no worker has polled for this long
+_last_silent_check: float | None = None
+
+
+def check_silent() -> None:
+    """worker.silent: images are waiting and no worker is polling. Called by worker.middleware on every request,
+    so it runs when somebody is using the site (a waiting image means someone is) and costs one clock read
+    otherwise; the database is asked at most once per SILENT_CHECK_EVERY per process. Never raises."""
+    global _last_silent_check
+    now = time.monotonic()
+    if _last_silent_check is not None and now - _last_silent_check < SILENT_CHECK_EVERY:
+        return
+    _last_silent_check = now
+    try:
+        t = timezone.now()
+        waiting = candidates().filter(created_at__lt=t - SILENT_WAITING_FOR)
+        oldest = waiting.order_by("created_at").values_list("created_at", flat=True).first()
+        if oldest is None or Worker.objects.filter(last_seen_at__gte=t - SILENT_WORKER_FOR).exists():
+            return
+        seen = Worker.objects.order_by("-last_seen_at").values_list("last_seen_at", flat=True).first()
+        alert("worker.silent",
+              f"{waiting.count()} image(s) waiting, the oldest for {int((t - oldest).total_seconds() // 60)} min; "
+              + (f"no worker polled for {int((t - seen).total_seconds() // 60)} min" if seen else "no worker has ever polled"),
+              key="silent")
+    except Exception:
+        log.exception("worker.silent check failed")
 
 
 def candidates():

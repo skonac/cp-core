@@ -75,6 +75,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "accounts.middleware.GuestExpiryMiddleware",   # expired guests are signed out
+    "worker.middleware.SilentWorkerMiddleware",    # alerts when images wait and no worker polls (admin alert worker.silent)
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

@@ -244,6 +244,14 @@ class PurchaseTests(TestCase):
             purchase = finish_iyzico(purchase.provider_token)
         self.assertEqual((purchase.status, purchase.error_code), ("pending", "payment_provider_unreachable"))
 
+    def test_iyzico_unreachable_alerts_shop_stuck(self):
+        fake = FakeIyzico(unreachable=True)
+        purchase = self._start(fake)
+        with mock.patch("shop.iyzico._send", fake), mock.patch("shop.payments.alert") as alert:
+            finish_iyzico(purchase.provider_token)
+        self.assertEqual(alert.call_args.args[0], "shop.stuck")
+        self.assertIn(purchase.number, alert.call_args.args[1])
+
     def _hook(self, body, **headers):
         return self.client.post("/api/shop/iyzico/webhook", json.dumps(body) if isinstance(body, dict) else body,
                                 content_type="application/json", **headers)

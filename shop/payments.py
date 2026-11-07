@@ -126,6 +126,9 @@ def finish_iyzico(token: str) -> Purchase | None:
         Purchase.objects.filter(pk=purchase.pk).update(error_code=e.code, error_message=e.message[:500],
                                                        provider_response=e.response)
         purchase.refresh_from_db()
+        # Pending, and the money may have moved: iyzico's webhook comes back about every 15 min (alert once per 5).
+        alert("shop.stuck", f"Purchase {purchase.number} is pending, iyzico could not be asked: {e.code} {e.message[:200]} "
+                            f"({purchase.amount} {purchase.currency}, user {purchase.user_id})", key=f"stuck:{purchase.pk}")
         return purchase
     ok = (answer.get("paymentStatus") == "SUCCESS"
           and answer.get("conversationId") == purchase.conversation_id
