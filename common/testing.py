@@ -159,6 +159,9 @@ class ApiClient(Client):
     def post_json(self, path, body=None):
         return self.post(path, body or {}, content_type="application/json", **self.csrf_headers())
 
+    def put_json(self, path, body):
+        return self.put(path, body, content_type="application/json", **self.csrf_headers())
+
     def patch_json(self, path, body):
         return self.patch(path, body, content_type="application/json", **self.csrf_headers())
 

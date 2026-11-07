@@ -42,6 +42,18 @@ class OtpChallengeOut(Out):
     resendAfterSeconds: int = Field(examples=[30])
 
 
+class EmailChallengeOut(Out):
+    challengeId: str = Field(examples=["em_WcM7QQ-RIA9d2osCR_Mx6A"])
+    expiresInSeconds: int = Field(examples=[900])
+    resendAfterSeconds: int = Field(examples=[30])
+
+
+class PasswordSetOut(Out):
+    user: "UserOut"
+    nextStep: Literal["consent", "selfie", "gallery", "organizer_home", "account_home"] = Field(
+        description="Where to go now (the event of the sign-in, if any).")
+
+
 class MembershipOut(Out):
     eventCode: str = Field(examples=["RK238"])
     role: Literal["participant"]
@@ -56,8 +68,11 @@ class UploaderAccessOut(Out):
 
 class SignInOut(Out):
     user: UserOut = Field(description="For an uploader without an account: id is empty, no roles.")
-    nextStep: Literal["consent", "selfie", "gallery", "organizer_home", "account_home", "uploader_home"] = Field(
-        description="consent/selfie/gallery: signed in from an event link; organizer_home/account_home: no event; "
+    nextStep: Literal["set_password", "consent", "selfie", "gallery", "organizer_home", "account_home",
+                      "uploader_home"] = Field(
+        description="set_password: email sign-in of an account without a password, or a password reset: ask for "
+                    "one (PUT /api/me/password), its answer gives the next step; consent/selfie/gallery: signed in "
+                    "from an event link; organizer_home/account_home: no event; "
                     "uploader_home: organizer entry by a phone an organizer added as uploader (§3.10).")
     uploaderAccesses: list[UploaderAccessOut] = Field(
         description="Organizers this phone may upload for (empty for most people).", examples=[[]])
@@ -109,6 +124,10 @@ class SelfiesOut(Out):
 CsrfResponse = envelope("CsrfResponse", None, "csrf_set")
 OtpSentResponse = envelope("OtpSentResponse", OtpChallengeOut, "otp_sent")
 SignInResponse = envelope("SignInResponse", SignInOut, "phone_verified")
+EmailSentResponse = envelope("EmailSentResponse", EmailChallengeOut, "email_sent")
+EmailSignInResponse = envelope("EmailSignInResponse", SignInOut, "email_verified")
+PasswordSignInResponse = envelope("PasswordSignInResponse", SignInOut, "signed_in")
+PasswordSetResponse = envelope("PasswordSetResponse", PasswordSetOut, "password_set")
 ProfileResponse = envelope("ProfileResponse", UserOut, "profile_retrieved")
 ProfileUpdatedResponse = envelope("ProfileUpdatedResponse", UserOut, "profile_updated")
 ConsentResponse = envelope("ConsentResponse", ConsentOut, "consent_recorded")

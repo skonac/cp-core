@@ -98,4 +98,8 @@
 <div class="scroll"><table class="t"><tr><th>Sent</th><th>Role</th><th>Event</th><th>Dev code</th><th class="n">Wrong</th><th>Used</th><th>IP</th></tr>
 {% for o in otps %}<tr><td>{{ o.created_at|date:"Y-m-d H:i:s" }}</td><td>{{ o.role }}</td><td>{{ o.event.display_code|default:"" }}</td><td><code>{{ o.dev_code }}</code></td><td class="n">{{ o.attempts }}</td><td>{{ o.consumed_at|date:"H:i:s"|default:"" }}</td><td>{{ o.ip }}</td></tr>{% endfor %}
 </table></div>{% endif %}
+{% if email_codes %}<h2>Recent email sign-in mails</h2>
+<div class="scroll"><table class="t"><tr><th>Sent</th><th>Purpose</th><th>Role</th><th>Event</th><th>Dev code</th><th class="n">Wrong</th><th>Used</th><th>IP</th></tr>
+{% for o in email_codes %}<tr><td>{{ o.created_at|date:"Y-m-d H:i:s" }}</td><td>{{ o.purpose }}</td><td>{{ o.role }}</td><td>{{ o.event.display_code|default:"" }}</td><td><code>{{ o.dev_code }}</code></td><td class="n">{{ o.attempts }}</td><td>{{ o.consumed_at|date:"H:i:s"|default:"" }}</td><td>{{ o.ip }}</td></tr>{% endfor %}
+</table></div>{% endif %}
 {% endblock %}

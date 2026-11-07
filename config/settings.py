@@ -175,6 +175,19 @@ OTP_TTL = 120               # seconds
 OTP_MAX_PER_15MIN = 3       # codes per phone
 OTP_MAX_ATTEMPTS = 5        # wrong codes per challenge
 OTP_RESEND_AFTER = 30       # seconds before another code may be requested
+
+# Email sign-in (accounts/emailauth.py): a mail with a link and a 4-digit code.
+EMAIL_CODE_TTL = 15 * 60          # seconds; link and code
+EMAIL_CODE_MAX_PER_15MIN = 3      # mails per address
+EMAIL_CODE_RESEND_AFTER = 30      # seconds before another mail may be requested
+EMAIL_CODE_MAX_ATTEMPTS = 5       # wrong codes per mail
+EMAIL_CODE_MAX_FAILS_PER_DAY = 10 # wrong codes per address per 24 h, all mails together (the link still works)
+# Where the mail's link points; {token} is replaced. cp-web can take this over with its own page that
+# posts the token to /api/auth/email-verifications.
+EMAIL_LINK_PATH = env("CP_EMAIL_LINK_PATH", "/dj/auth/email/{token}/")
+PASSWORD_MIN_LENGTH = 6           # characters; no other rules
+PASSWORD_SET_WINDOW = 15 * 60     # seconds after an email sign-in in which a password may be set without the old one
+PASSWORD_SIGN_IN_MAX_FAILS = 10   # wrong passwords per phone/email per 15 min
 # --- Notifications (notify/, design/notifications.md)
 # "log": no SMS leaves the server (OTP codes: log + OtpChallenge.dev_code); "live": real providers (routing in
 # notify/providers). CP_OTP_DELIVERY is the old name of the same switch.

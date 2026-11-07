@@ -28,6 +28,7 @@ from . import kvkk, uploader
 from .backends import SESSION_BACKEND
 from . import schemas as S
 from .models import ContactMessage, User
+from . import emailauth
 from .otp import mask_phone, request_code, verify_code
 
 log = logging.getLogger("cp.accounts")
@@ -141,6 +142,106 @@ def otp_verify(request, body: OtpVerifyIn):
     }, message="Telefon numarası doğrulandı.")
 
 
+class EmailRequestIn(CamelSchema):
+    email: str
+    purpose: str = "sign_in"      # sign_in | reset ("forgot password")
+    role: str = "participant"
+    event_code: str | None = None
+    locale: str = "tr"            # language of the mail: tr | en
+
+
+class EmailVerifyIn(CamelSchema):
+    challenge_id: str = ""        # with code
+    code: str = ""
+    token: str = ""               # or the link's token alone
+
+
+class PasswordSignInIn(CamelSchema):
+    identifier: str               # phone (E.164) or email
+    password: str
+    role: str = "participant"
+    event_code: str | None = None
+
+
+class PasswordIn(CamelSchema):
+    password: str
+    current_password: str | None = None
+
+
+def _event_or_404(code: str | None):
+    if not code:
+        return None
+    event = Event.objects.filter(code=normalize_code(code)).first()
+    if event is None:
+        raise ApiError(404, "event_not_found", "Etkinlik bulunamadı.")
+    return event
+
+
+def _signed_in(request, code: str, user: User, event, is_new: bool, first_step: str | None = None,
+               message: str = ""):
+    """The SignInOut answer for an account sign-in (email or password)."""
+    accesses = list(uploader.active_accesses(user.phone or ""))
+    return respond(request, code, {
+        "user": user_json(user), "nextStep": first_step or next_step(user, event), "isNewUser": is_new,
+        "eventCode": event.display_code if event else None,
+        "eventMembership": {"eventCode": event.display_code, "role": "participant"} if event else None,
+        "uploaderAccesses": [uploader.access_json(a) for a in accesses],
+    }, message=message)
+
+
+@auth_router.post("/email-requests", auth=None, response={201: S.EmailSentResponse, **errors(404, 422, 429)})
+def email_request(request, body: EmailRequestIn):
+    """Mails a sign-in link and a 4-digit code (dev: to the server log and the admin). One flow for sign-up,
+    sign-in and "forgot password" (`purpose: reset`). Either the link or the code signs in
+    (POST /api/auth/email-verifications), creating the account for a new email.
+
+    Errors: 404 event_not_found · 422 invalid_email, invalid_purpose, invalid_role, validation_error ·
+    429 rate_limit_exceeded (3 mails per address per 15 min; 30 s between mails)."""
+    event = _event_or_404(body.event_code)
+    challenge = emailauth.request_mail(body.email, body.purpose, body.role, event, body.locale,
+                                       request.META.get("REMOTE_ADDR"), request.build_absolute_uri("/"))
+    return respond(request, "email_sent", {
+        "challengeId": challenge.pk, "expiresInSeconds": settings.EMAIL_CODE_TTL,
+        "resendAfterSeconds": settings.EMAIL_CODE_RESEND_AFTER,
+    }, status=201, message="E-posta gönderildi.")
+
+
+@auth_router.post("/email-verifications", auth=None, response={200: S.EmailSignInResponse, **errors(410, 422, 429)})
+def email_verify(request, body: EmailVerifyIn):
+    """Signs in with the mail's code (`challengeId` + `code`) or its link (`token`), creating the account for a
+    new email. Sets the session cookie. `nextStep: set_password` = ask for a password now (new account, an
+    account without one, or a reset); the user is already signed in either way.
+
+    Errors: 410 email_code_expired · 422 invalid_email_code, validation_error ·
+    429 rate_limit_exceeded (5 wrong codes per mail, 10 per address per day; the link still works)."""
+    if not body.token and not (body.challenge_id and body.code):
+        raise ApiError(422, "validation_error", "challengeId + code, or token.")
+    user, is_new, event, purpose = emailauth.verify(body.challenge_id, body.code, body.token)
+    login(request, user, backend=SESSION_BACKEND)
+    request.session.pop(uploader.SESSION_KEY, None)
+    emailauth.after_sign_in(request, event, may_set_password=True)
+    first = "set_password" if emailauth.needs_password(user, purpose) else None
+    return _signed_in(request, "email_verified", user, event, is_new, first, "E-posta doğrulandı.")
+
+
+@auth_router.post("/password-sign-ins", auth=None,
+                  response={200: S.PasswordSignInResponse, **errors(404, 422, 429)})
+def password_sign_in(request, body: PasswordSignInIn):
+    """Phone or email + password. `role` is added to the account like a code sign-in does.
+
+    Errors: 404 event_not_found · 422 invalid_credentials, invalid_role, validation_error ·
+    429 rate_limit_exceeded (10 wrong passwords per phone/email per 15 min)."""
+    event = _event_or_404(body.event_code)
+    user = emailauth.password_sign_in(body.identifier, body.password, body.role)
+    login(request, user, backend=SESSION_BACKEND)
+    request.session.pop(uploader.SESSION_KEY, None)
+    emailauth.after_sign_in(request, event, may_set_password=False)
+    if event is not None:
+        from events.participant import touch_membership
+        touch_membership(user, event)
+    return _signed_in(request, "signed_in", user, event, False, None, "Giriş yapıldı.")
+
+
 @auth_router.delete("/session", auth=None, response={204: None})
 def sign_out(request):
     """Signs out."""
@@ -215,6 +316,21 @@ def me_update(request, body: MeUpdateIn):
     user.full_name, user.email = name, email
     user.save(update_fields=["full_name", "email", "email_verified_at"])
     return respond(request, "profile_updated", user_json(user), message="Profil güncellendi.")
+
+
+@me_router.put("/password", response={200: S.PasswordSetResponse, **errors(401, 403, 422)})
+def put_password(request, body: PasswordIn):
+    """Sets the password (at least 6 characters, no other rules) and stays signed in. `currentPassword` is
+    needed only when the account already has a password and the last sign-in was not by email within
+    15 minutes.
+
+    Errors: 403 csrf_failed, current_password_invalid · 422 password_too_short, validation_error."""
+    emailauth.set_password(request, body.password, body.current_password)
+    event_id = request.session.get(emailauth.SESSION_EVENT)
+    event = Event.objects.filter(pk=event_id).first() if event_id else None
+    return respond(request, "password_set", {"user": user_json(request.user),
+                                            "nextStep": next_step(request.user, event)},
+                   message="Şifre kaydedildi.")
 
 
 @me_router.post("/consent", response={201: S.ConsentResponse, **errors(401, 403, 409, 422)})

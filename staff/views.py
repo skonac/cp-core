@@ -29,7 +29,7 @@ from django.utils import timezone
 from PIL import Image as PILImage
 from pgvector.django import CosineDistance
 
-from accounts.models import ConsentLog, ContactMessage, OtpChallenge, User
+from accounts.models import ConsentLog, ContactMessage, EmailChallenge, OtpChallenge, User
 from credits.models import CreditTransaction
 from shop.models import BillingProfile, Purchase
 from events.codes import normalize_code
@@ -259,7 +259,10 @@ def user(request, user_id):
         "download_total": DownloadLog.objects.filter(user=u).count(),
         "rejections": FaceRejection.objects.filter(user=u).select_related("face__image", "event")
                                            .order_by("-created_at")[:50],
-        "otps": OtpChallenge.objects.filter(phone=u.phone).select_related("event").order_by("-created_at")[:10],
+        "otps": OtpChallenge.objects.filter(phone=u.phone).select_related("event").order_by("-created_at")[:10]
+                if u.phone else [],
+        "email_codes": EmailChallenge.objects.filter(email=u.email).select_related("event").order_by("-created_at")[:10]
+                       if u.email else [],
         "kvkk_version": settings.KVKK_VERSION})
 
 

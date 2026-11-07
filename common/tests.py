@@ -223,7 +223,9 @@ class ApiContractTests(TempMedia, TestCase):
         # --- every API endpoint was called (add new endpoints to this test)
         called = {(m, _norm(route)) for m, route, _ in c.checked}
         documented = {(m.upper(), _norm(path)) for path, ops in api.get_openapi_schema()["paths"].items() for m in ops
-                      if not path.startswith(("/api/organizer/", "/api/shop/", "/api/me/billing", "/api/contact/", "/api/uploader/"))}   # events/tests_organizer.py, shop/tests.py
+                      if not path.startswith(("/api/organizer/", "/api/shop/", "/api/me/billing", "/api/contact/", "/api/uploader/",
+                                              "/api/auth/email-", "/api/auth/password-", "/api/me/password"))}
+        # excluded: events/tests_organizer.py, shop/tests.py, accounts/tests*.py (contract-checked there too)
         self.assertEqual(documented - called, set(), "endpoints never called by this test")
 
 

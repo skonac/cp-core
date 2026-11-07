@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div class="card" style="max-width:420px; margin:40px auto">
+  <h1>Sign in to Cleverphotos</h1>
+  {% if error %}<ul class="errorlist"><li>{{ error }}</li></ul><p class="small"><a href="{% url 'email_start' %}">Send a new mail</a></p>
+  {% else %}
+  <form method="post" id="go">{% csrf_token %}<button>Continue</button></form>
+  {% endif %}
+</div>
+{% endblock %}

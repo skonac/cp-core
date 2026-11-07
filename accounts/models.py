@@ -140,6 +140,44 @@ class OtpChallenge(models.Model):
         return f"{self.phone} {self.created_at:%Y-%m-%d %H:%M}"
 
 
+def new_email_challenge_id() -> str:
+    return "em_" + secrets.token_urlsafe(16)
+
+
+class EmailChallenge(models.Model):
+    """One sign-in mail: a link (long random token) and a 4-digit code, either one signs in (or creates
+    the account for a new email). purpose `reset` = "forgot password": the same mail, after which the
+    client asks for a new password. design/core.md, "Email sign-up and guest access"."""
+
+    class Purpose(models.TextChoices):
+        SIGN_IN = "sign_in"
+        RESET = "reset"
+
+    id = models.CharField(primary_key=True, max_length=32, default=new_email_challenge_id, editable=False)
+    email = models.EmailField()                                # lowercase
+    code_hash = models.CharField(max_length=128)
+    link_hash = models.CharField(max_length=64, unique=True)   # sha256 of the link token
+    dev_code = models.CharField(max_length=4, blank=True)      # readable copy while EMAIL_DELIVERY = "log"
+    purpose = models.CharField(max_length=8, choices=Purpose.choices, default=Purpose.SIGN_IN)
+    role = models.CharField(max_length=16, choices=Role.choices, default=Role.PARTICIPANT)
+    event = models.ForeignKey("events.Event", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    locale = models.CharField(max_length=2, default="tr")
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)     # wrong codes entered
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["email", "created_at"], name="emailch_email_recent"),   # rate limits
+            models.Index(fields=["created_at"], name="emailch_created"),                 # purge
+        ]
+
+    def __str__(self):
+        return f"{self.email} {self.purpose} {self.created_at:%Y-%m-%d %H:%M}"
+
+
 class UploaderAccess(models.Model):
     """An organizer lets a phone number upload to some of their events: an uploader (cp-web's draft
     called it "photographer"; that word is the future account role, is_photographer). One row per

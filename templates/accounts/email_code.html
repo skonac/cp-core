@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Enter the code{% endblock %}
+{% block content %}
+<div class="card" style="max-width:420px; margin:40px auto">
+  <h1>Enter the code</h1>
+  {% if challenge %}<p class="muted small">Sent to {{ challenge.email }}. Or click the link in the mail.</p>{% endif %}
+  {% if error %}<ul class="errorlist"><li>{{ error }}</li></ul>{% endif %}
+  <form method="post">{% csrf_token %}
+    <p><label for="id_code">4-digit code</label><input type="text" name="code" id="id_code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" autofocus required></p>
+    <button>Continue</button>
+  </form>
+  <p class="small" style="margin-top:14px"><a href="{% url 'email_start' %}">Send a new mail</a></p>
+</div>
+{% endblock %}

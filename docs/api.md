@@ -93,6 +93,9 @@ Every response except files and `204` is:
 | 403 | `browse_all_not_allowed` | `view=all` on an event that doesn't allow it |
 | 403 | `organizer_access_required` | Organizer or shop endpoint, account without the organizer role |
 | 404 | `event_not_found`, `photo_not_found`, `selfie_not_found`, `face_not_found`, `not_found` | Missing, or not visible to this user (never revealed which) |
+| 403 | `current_password_invalid` | `PUT /me/password` without the right current password |
+| 410 | `email_code_expired` | Email sign-in code or link older than 15 minutes |
+| 422 | `invalid_email`, `invalid_email_code`, `invalid_credentials`, `password_too_short` | Email sign-in, password sign-in, password |
 | 409 | `email_already_in_use` | `PATCH /me` with another account's email |
 | 422 | `email_is_sign_in` | `PATCH /me` changing or clearing the email of an account without a phone (its only sign-in) |
 | 409 | `consent_version_outdated` | Consent sent for a KVKK version that is no longer current |
@@ -181,13 +184,46 @@ Errors: `422 invalid_otp` (wrong code, unknown or already used challenge), `410 
 
 **`DELETE /api/auth/session`** → `204`. Signs out.
 
+#### Email sign-up, sign-in, forgot password
+
+One flow for all three: the user types an email, we mail a **link and a 4-digit code**; either one signs in,
+creating the account when the email is new. Then, if the account has no password (new, or signed up by phone)
+or it was a reset, ask for a password: the user is already signed in, the password is for next time.
+
+**`POST /api/auth/email-requests`** `{ "email": "ali@example.com", "purpose": "sign_in", "role": "organizer", "eventCode": "RK238", "locale": "tr" }`
+→ `201 email_sent` `{ "challengeId": "em_…", "expiresInSeconds": 900, "resendAfterSeconds": 30 }`.
+- `purpose`: `sign_in` (default) or `reset` ("Şifremi unuttum": different mail text, then `set_password`).
+- `role` as in the OTP request (default `participant`; organizer sign-up sends `organizer`). `eventCode` optional.
+- `locale`: the mail's language, `tr` (default) or `en`. Link and code are valid 15 minutes and work once.
+- Errors: `404 event_not_found`, `422 invalid_email | invalid_purpose | invalid_role`, `429 rate_limit_exceeded`
+  (3 mails per address per 15 min, 30 s apart).
+
+**`POST /api/auth/email-verifications`** `{ "challengeId": "em_…", "code": "4821" }` or `{ "token": "<from the link>" }`
+→ `200 email_verified`, same shape as `phone_verified` (`user`, `nextStep`, `isNewUser`, `eventCode`, …), session set.
+- `nextStep: "set_password"`: show the password screen (`PUT /api/me/password`); its answer has the next step.
+- Errors: `410 email_code_expired`, `422 invalid_email_code`, `429 rate_limit_exceeded` (5 wrong codes per mail,
+  10 per address per day; the link keeps working).
+- The link: the mail points to `CP_EMAIL_LINK_PATH` (now the Django page `/dj/auth/email/<token>/`). When cp-web
+  has its own page (e.g. `/auth/email?t=<token>`), we switch the setting; that page must sign in on a **button
+  press or script**, not on load by the server, because mail scanners open links. It posts `{ "token" }` here.
+
+**`POST /api/auth/password-sign-ins`** `{ "identifier": "ali@example.com", "password": "…", "role": "organizer", "eventCode": null }`
+→ `200 signed_in`, same shape. `identifier` = phone (E.164) or email. Errors: `404 event_not_found`,
+`422 invalid_credentials | invalid_role | validation_error`, `429 rate_limit_exceeded` (10 wrong passwords per
+phone/email per 15 min).
+
+**`PUT /api/me/password`** `{ "password": "abc123", "currentPassword": null }` → `200 password_set`
+`{ "user": {…}, "nextStep": "consent" }`. At least 6 characters, no other rules; stays signed in.
+`currentPassword` is needed only if the account already has a password and the last sign-in was not an email
+link/code in the last 15 minutes. Errors: `403 current_password_invalid`, `422 password_too_short`.
+
 ### 3.2 The signed-in user
 
 **`GET /api/me`** → `200 profile_retrieved`, the `user` object above. `401` when signed out (use this on app start to know whether a session exists).
 
 | Field | Notes |
 | --- | --- |
-| `phoneNumber` | `null` for accounts without a phone (email sign-up, coming). Don't use it as the account's identity; that is `id`. |
+| `phoneNumber` | `null` for accounts without a phone (email sign-up). Don't use it as the account's identity; that is `id`. |
 | `accountRoles` | Any of `participant`, `organizer`, `photographer`, `admin`. UI visibility only; the server checks everything. `participant` = has joined at least one event. |
 | `hasConsent` | KVKK explicit consent given **to the current document version**. A new version makes it `false` for everyone until they consent again. |
 | `consentVersion` | The version the user last consented to (`null` = never). Differs from `kvkk.version` when the text was updated since. |
@@ -848,4 +884,4 @@ message). Pass the interface language as `lang`. Sort themes whose `eventTypes` 
 
 Live iyzico payments (sandbox now), real OTP delivery (WhatsApp; SMS parked), push notifications (new photos of you, end of event), a WhatsApp message to a newly added uploader, emailing the documents after payment,
 organizer activity feed, participant access revoke, choosing the cover from the event's photos,
-covers for participants (`coverThumbnailUrl` in `/api/me/events`), email sign-up and sign-in (in progress), guest access (in progress). Ask before building screens that need them.
+covers for participants (`coverThumbnailUrl` in `/api/me/events`), guest access (in progress). Ask before building screens that need them.
