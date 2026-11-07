@@ -25,6 +25,7 @@ from django.utils import timezone
 from common.api import ApiError
 from common.ratelimit import allow
 from notify import dispatch
+from notify.alerts import alert
 
 from . import uploader
 from .models import EmailChallenge, Role, User, normalize_email
@@ -131,6 +132,10 @@ def request_mail(email: str, purpose: str, role: str, event, locale: str, ip: st
                        text.format(code=code, link=link, minutes=settings.EMAIL_CODE_TTL // 60),
                        kind=f"email_{purpose}", user=User.objects.filter(email=email).first(), event=event)
     log.info("sign-in mail (%s) for %s queued (challenge %s)", purpose, email, challenge.pk)
+    if purpose == EmailChallenge.Purpose.RESET:
+        account = User.objects.filter(email=email).values_list("pk", flat=True).first()
+        if account is not None:      # no address in the message; an unknown address is not worth a message
+            alert("accounts.resetpass", f"Password reset mail requested for account {account}", key=f"reset:{account}")
     return challenge
 
 
@@ -174,6 +179,8 @@ def verify(challenge_id: str = "", code: str = "", token: str = ""):
             is_new = user is None
             if is_new:
                 user = User.objects.create_user(email=challenge.email)
+                transaction.on_commit(lambda u=user, r=challenge.role: alert(
+                    "accounts.new", f"New account {u.pk} by email ({r})", key=f"new:{u.pk}"))
             user.email_verified_at = user.email_verified_at or now
             event = challenge.event
             uploader_entry = uploader.is_uploader_entry(user, challenge.role, event)

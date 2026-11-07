@@ -23,6 +23,7 @@ from media.ingest import IngestError, ingest_selfie
 from media.matching import my_photos, selfie_state
 from media.models import Image
 from media.storage import file_response, soft_delete
+from notify.alerts import alert
 
 from . import kvkk, uploader
 from .backends import SESSION_BACKEND
@@ -503,4 +504,5 @@ def contact_message(request, data: ContactIn):
         user=request.user if request.user.is_authenticated else None,
         ip=ip or None, user_agent=request.META.get("HTTP_USER_AGENT", "")[:500])
     log.info("contact message %s from %s", msg.pk, msg.email)
+    alert("contact.new", f"Contact message {msg.pk}: {msg.subject[:100]}\n{msg.message[:200]}", key=f"contact:{msg.pk}")
     return respond(request, "contact_message_received", {"messageId": str(msg.pk)}, status=201)
