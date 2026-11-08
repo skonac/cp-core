@@ -819,7 +819,7 @@ These answer `nextStep: "uploader_home"` (after `set_password` for a new account
 role is added. The uploader is a normal account: `user.id` set, its verified email carries the upload rights.
 
 **Sign-in by phone.** The uploader uses the organizer entry (`role: "organizer"`). The OTP verification answers
-`nextStep: "uploader_home"` with `uploaderAccesses: [{ id, organizerName, uploaderName }]`. Without an account
+`nextStep: "uploader_home"` with `uploaderAccesses: [{ id, organizerName, uploaderName, creditBalance, canUpload }]`. Without an account
 the `user` object has `"id": ""`, `fullName` = the name the organizer gave, no roles, no consent, no selfie; `GET /api/me`
 returns the same while the session lasts. A phone that already has an account (say a former wedding guest) is simply
 signed in as that account (no organizer role added), with the same `nextStep`. An organizer account whose phone is also
@@ -830,7 +830,7 @@ someone's uploader gets `organizer_home`, and `uploaderAccesses` lists the other
 
 | Endpoint | Code | Notes |
 | --- | --- | --- |
-| `GET /api/uploader/accesses` | `uploader_accesses_retrieved` | `{ accesses: [{ id, organizerName, uploaderName }] }` |
+| `GET /api/uploader/accesses` | `uploader_accesses_retrieved` | `{ accesses: [{ id, organizerName, uploaderName, creditBalance, canUpload }] }`: `creditBalance` = the organizer's balance (1 credit per uploaded photo), `canUpload` false when it has reached the organizer's floor (default -50: a balance may go slightly negative), so uploads would be refused; show it on the organizer picker |
 | `GET …/accesses/{accessId}/events` | `uploader_events_retrieved` | `{ events, total }`: the events assigned to it, not expired; event object of §3.6 with `joinUrl: null` |
 | `GET …/accesses/{accessId}/events/{code}` | `uploader_event_retrieved` | `{ event }`; cover at `…/events/{code}/cover/thumb.jpg` |
 | `POST …/events/{code}/photo-upload-check` | `photo_upload_eligibility_checked` | as §3.6, the organizer's balance |

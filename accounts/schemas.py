@@ -67,6 +67,10 @@ class UploaderAccessOut(Out):
     organizerName: str = Field(examples=["Futuruniq"])
     uploaderName: str = Field(description="The name the organizer gave this uploader.",
                                   examples=["Mert Yılmaz"])
+    creditBalance: int = Field(description="The organizer's credit balance (uploads spend it, 1 per photo).",
+                               examples=[340])
+    canUpload: bool = Field(description="false when the balance leaves no credit for even one photo "
+                                        "(at the organizer's floor): uploads would be refused.", examples=[True])
 
 
 class SignInOut(Out):

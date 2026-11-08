@@ -244,7 +244,9 @@ class EmailUploaderTests(TempMedia, TestCase):
         self.assertFalse(acct.is_organizer)                          # an uploader is no organizer
         r = u.put_json("/api/me/password", {"password": "foto12"})
         self.assertEqual(r.json()["data"]["nextStep"], "uploader_home")
-        access_id = u.get("/api/uploader/accesses").json()["data"]["accesses"][0]["id"]
+        acc = u.get("/api/uploader/accesses").json()["data"]["accesses"][0]
+        self.assertEqual((acc["creditBalance"], acc["canUpload"]), (10, True))   # the organizer's balance
+        access_id = acc["id"]
         root = f"/api/uploader/accesses/{access_id}/events"
         self.assertEqual([e["code"] for e in u.get(root).json()["data"]["events"]], [self.event.display_code])
         r = u.post(f"{root}/{self.event.display_code}/photos", {"files": [_file(5)]}, **u.csrf_headers())
@@ -252,6 +254,10 @@ class EmailUploaderTests(TempMedia, TestCase):
         self.assertEqual(Image.objects.get(event=self.event, kind="photo", uploaded_by__email="mert@example.com").owner,
                          self.org)                                    # on the organizer's credits
         self.assertEqual(u.get(f"{root}/{self.event.display_code}/photos").json()["data"]["total"], 1)
+        User.objects.filter(pk=self.org.pk).update(credit_balance=settings.CREDIT_FLOOR_DEFAULT)   # at the floor
+        acc = u.get("/api/uploader/accesses").json()["data"]["accesses"][0]
+        self.assertEqual((acc["creditBalance"], acc["canUpload"]), (settings.CREDIT_FLOOR_DEFAULT, False))
+        User.objects.filter(pk=self.org.pk).update(credit_balance=9)
         self.assertEqual(u.get("/api/organizer/events").status_code, 403)
 
         # later: email + password through the organizer entry

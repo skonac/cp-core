@@ -1,6 +1,7 @@
 """Uploader API (/api/uploader/…): a phone or email an organizer added as uploader
 (accounts.UploaderAccess) lists the organizer's events it is assigned to and uploads photos to them
-on the organizer's credits. Nothing else: no event settings, participants, credits, shop or uploader management.
+on the organizer's credits. Nothing else: no event settings, participants, shop or uploader management; the only
+credit information is the organizer's balance (in the access list and the upload answers).
 Shapes are the organizer API's (docs/api.md §3.10); an uploader sees and deletes only the photos
 uploaded with their phone/email. Every request re-checks the access, so a revoke takes effect at once.
 

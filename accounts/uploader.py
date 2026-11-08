@@ -77,8 +77,10 @@ def organizer_name(organizer) -> str:
 
 
 def access_json(access: UploaderAccess) -> dict:
-    return {"id": str(access.pk), "organizerName": organizer_name(access.organizer),
-            "uploaderName": access.full_name}
+    org = access.organizer
+    return {"id": str(access.pk), "organizerName": organizer_name(org), "uploaderName": access.full_name,
+            # the organizer's balance, spent by this uploader's uploads (1 credit per photo)
+            "creditBalance": org.credit_balance, "canUpload": org.credit_balance - org.effective_credit_floor >= 1}
 
 
 def uploader_user_json(phone: str, accesses) -> dict:
