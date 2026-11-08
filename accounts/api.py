@@ -364,8 +364,10 @@ def put_password(request, body: PasswordIn):
     emailauth.set_password(request, body.password, body.current_password)
     event_id = request.session.get(emailauth.SESSION_EVENT)
     event = Event.objects.filter(pk=event_id).first() if event_id else None
-    step = "uploader_home" if request.session.get(emailauth.SESSION_UPLOADER) else next_step(request.user, event)
-    return respond(request, "password_set", {"user": user_json(request.user), "nextStep": step},
+    uploader_entry = bool(request.session.get(emailauth.SESSION_UPLOADER))
+    step = "uploader_home" if uploader_entry else next_step(request.user, event)
+    return respond(request, "password_set", {"user": user_json(request.user), "nextStep": step,
+                                             "eventCode": event.display_code if event and not uploader_entry else None},
                    message="Şifre kaydedildi.")
 
 

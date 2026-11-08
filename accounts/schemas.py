@@ -55,6 +55,8 @@ class PasswordSetOut(Out):
     nextStep: Literal["consent", "selfie", "gallery", "organizer_home", "account_home", "uploader_home"] = Field(
         description="Where to go now (the event of the sign-in, if any; uploader_home after an uploader's "
                     "organizer-entry sign-in).")
+    eventCode: str | None = Field(description="The event the sign-in was for (consent/selfie/gallery are about "
+                                              "it); null without one.", examples=["RK238X"])
 
 
 class MembershipOut(Out):

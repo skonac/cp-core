@@ -166,7 +166,7 @@ class EmailSignInTests(TestCase):
         u = User.objects.get(email="ali@example.com")
         self.assertTrue(EventMember.objects.filter(user=u, event=event).exists())
         d = self.c.put_json("/api/me/password", {"password": "123456"}).json()["data"]
-        self.assertEqual(d["nextStep"], "consent")   # the event's next step
+        self.assertEqual((d["nextStep"], d["eventCode"]), ("consent", event.display_code))   # the event's next step
 
     def test_unverified_email_on_a_phone_account(self):
         phone_user = User.objects.create_user("+905550000602", email="ali@example.com")   # typed, never verified

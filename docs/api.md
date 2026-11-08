@@ -221,9 +221,9 @@ or it was a reset, ask for a password: the user is already signed in, the passwo
 phone/email per 15 min).
 
 **`PUT /api/me/password`** `{ "password": "abc123", "currentPassword": null }` → `200 password_set`
-`{ "user": {…}, "nextStep": "consent" }`. At least 6 characters, no other rules; stays signed in.
+`{ "user": {…}, "nextStep": "selfie", "eventCode": "RK238X" }`. At least 6 characters, no other rules; stays signed in.
 `currentPassword` is needed only if the account already has a password and the last sign-in was not an email
-link/code in the last 15 minutes. Errors: `403 current_password_invalid`, `422 password_too_short`.
+link/code in the last 15 minutes. Errors: `403 current_password_invalid`, `422 password_too_short`. `eventCode`: the event the sign-in was for (from an event link), `null` otherwise; consent/selfie/gallery are about it.
 
 #### Guest access (no account)
 
