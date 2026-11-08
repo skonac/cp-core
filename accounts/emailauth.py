@@ -50,18 +50,19 @@ TEXTS = {
                         "or enter this code: {code}\n\n"
                         "The link and the code are valid for {minutes} minutes and work once. "
                         "If you didn't ask for this, you can ignore this email.\n\nCleverphotos"),
+    # Invitations carry the link only (no code to type; Nov 8) and stay valid longer (EMAIL_INVITE_TTL_HOURS).
     ("invite", "tr"): ("{organizer} seni Cleverphotos'a fotoğraf yüklemek için ekledi",
                        "Merhaba,\n\n{organizer} seni Cleverphotos'ta etkinlik fotoğraflarını yüklemen için ekledi.\n\n"
-                       "Girmek için bu bağlantıya tıkla:\n{link}\n\nya da şu kodu gir: {code}\n\n"
+                       "Başlamak için bu bağlantıya tıkla:\n{link}\n\n"
                        "Ardından bir şifre seçeceksin; sonraki girişlerde e-postan ve şifrenle, organizatör "
-                       "girişinden girebilirsin. Bağlantı ve kod {minutes} dakika geçerli ve bir kez kullanılabilir; "
-                       "süresi geçerse organizatör girişinden e-posta ile giriş yapabilirsin.\n\nCleverphotos"),
+                       "girişinden girebilirsin. Bağlantı {hours} saat geçerli ve bir kez kullanılabilir; süresi "
+                       "geçerse {organizer} sana yeniden gönderebilir.\n\nCleverphotos"),
     ("invite", "en"): ("{organizer} added you to Cleverphotos to upload photos",
                        "Hello,\n\n{organizer} added you on Cleverphotos to upload their event photos.\n\n"
-                       "Click this link to sign in:\n{link}\n\nor enter this code: {code}\n\n"
+                       "Click this link to get started:\n{link}\n\n"
                        "Then you'll choose a password; next time sign in with your email and password through the "
-                       "organizer entry. The link and the code are valid for {minutes} minutes and work once; after "
-                       "that, sign in by email through the organizer entry.\n\nCleverphotos"),
+                       "organizer entry. The link is valid for {hours} hours and works once; if it expires, "
+                       "{organizer} can send it again.\n\nCleverphotos"),
     ("reset", "tr"): ("Cleverphotos şifre sıfırlama kodun: {code}",
                       "Merhaba,\n\nCleverphotos şifreni yenilemek için bu bağlantıya tıkla:\n{link}\n\n"
                       "ya da şu kodu gir: {code}\n\nArdından yeni şifreni seçeceksin. "
@@ -86,6 +87,13 @@ def clean_email(text: str) -> str:
     except ValidationError:
         raise ApiError(422, "invalid_email", "Geçerli bir e-posta adresi gir.") from None
     return email
+
+
+def _ttl(purpose: str) -> int:
+    """Seconds a mail's link (and code) stays valid."""
+    if purpose == EmailChallenge.Purpose.INVITE:
+        return settings.EMAIL_INVITE_TTL_HOURS * 3600
+    return settings.EMAIL_CODE_TTL
 
 
 def _fails_today(email: str, now) -> int:
@@ -118,7 +126,7 @@ def request_mail(email: str, purpose: str, role: str, event, locale: str, ip: st
 
     code, token = f"{secrets.randbelow(10 ** 4):04d}", secrets.token_urlsafe(24)
     challenge = EmailChallenge(email=email, purpose=purpose, role=role, event=event, locale=locale, ip=ip,
-                               expires_at=now + timedelta(seconds=settings.EMAIL_CODE_TTL))
+                               expires_at=now + timedelta(seconds=_ttl(purpose)))
     challenge.code_hash = _hmac(f"{challenge.pk}:{code}")
     challenge.link_hash = hashlib.sha256(token.encode()).hexdigest()
     if settings.EMAIL_DELIVERY == "log":
@@ -129,7 +137,8 @@ def request_mail(email: str, purpose: str, role: str, event, locale: str, ip: st
     with transaction.atomic():
         challenge.save()
         dispatch.email(email, subject.format(code=code),
-                       text.format(code=code, link=link, minutes=settings.EMAIL_CODE_TTL // 60),
+                       text.format(code=code, link=link, minutes=settings.EMAIL_CODE_TTL // 60,
+                                   hours=settings.EMAIL_INVITE_TTL_HOURS),
                        kind=f"email_{purpose}", user=User.objects.filter(email=email).first(), event=event)
     log.info("sign-in mail (%s) for %s queued (challenge %s)", purpose, email, challenge.pk)
     if purpose == EmailChallenge.Purpose.RESET:

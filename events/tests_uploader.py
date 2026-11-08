@@ -223,6 +223,9 @@ class EmailUploaderTests(TempMedia, TestCase):
         self.assertEqual((up["email"], up["phoneNumber"]), ("mert@example.com", None))
         mail, ch = self.invitation()
         self.assertIn("Futuruniq", mail.title)
+        self.assertNotIn(ch.dev_code, mail.text.split("/dj/auth/email/")[0])   # link only, no code to type
+        self.assertIn("72 hours", mail.text) if "hours" in mail.text else self.assertIn("72 saat", mail.text)
+        self.assertGreater((ch.expires_at - ch.created_at).total_seconds(), 71 * 3600)
         self.assertEqual((mail.to, ch.purpose, ch.role), ("mert@example.com", "invite", "organizer"))
         r = c.post_json("/api/organizer/uploaders", {"fullName": "Mert 2", "email": "mert@example.com"})
         self.assertEqual((r.status_code, r.json()["code"]), (409, "uploader_already_exists"))

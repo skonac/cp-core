@@ -65,11 +65,22 @@ class EmailSignInTests(TestCase):
         self.assertContains(page, "Continue")
         self.assertEqual(EmailChallenge.objects.get().consumed_at, None)
         r = self.c.post(f"/dj/auth/email/{token}/", **self.c.csrf_headers())
-        self.assertRedirects(r, "/dj/auth/password/", fetch_redirect_response=False)
-        r = self.c.post("/dj/auth/password/", {"password": "abcdef"}, **self.c.csrf_headers())
-        self.assertRedirects(r, "/dj/consent/", fetch_redirect_response=False)   # KVKK first
+        self.assertRedirects(r, "/set-password", fetch_redirect_response=False)   # on to cp-web
+        # cp-web's password screen: no old password needed right after the link
+        r = self.c.put_json("/api/me/password", {"password": "abcdef"})
+        self.assertEqual((r.status_code, r.json()["data"]["nextStep"]), (200, "consent"))   # KVKK first
         self.assertTrue(User.objects.get(email="ali@example.com").check_password("abcdef"))
         self.assertEqual(self.verify(token=token).json()["code"], "invalid_email_code")   # once
+        # an account that has a password: the link goes to cp-web's start page
+        self.c.delete_("/api/auth/session")
+        cache.clear()
+        EmailChallenge.objects.all().delete()
+        _, _, token = self.ask()
+        r = self.c.post(f"/dj/auth/email/{token}/", **self.c.csrf_headers())
+        self.assertRedirects(r, "/", fetch_redirect_response=False)
+        # the Django test pages (code entry) still go to the Django password page
+        r = self.c.post("/dj/auth/password/", {"password": "ghijkl"}, **self.c.csrf_headers())
+        self.assertEqual(r.status_code, 302)
 
     def test_django_request_and_code_pages(self):
         r = self.c.post("/dj/auth/email/", {"email": "veli@example.com", "purpose": "sign_in", "role": "organizer",

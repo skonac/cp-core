@@ -207,9 +207,13 @@ or it was a reset, ask for a password: the user is already signed in, the passwo
   (`consent` first whenever the account hasn't given KVKK consent, with or without an event).
 - Errors: `410 email_code_expired`, `422 invalid_email_code`, `429 rate_limit_exceeded` (5 wrong codes per mail,
   10 per address per day; the link keeps working).
-- The link: the mail points to `CP_EMAIL_LINK_PATH` (now the Django page `/dj/auth/email/<token>/`). When cp-web
-  has its own page (e.g. `/auth/email?t=<token>`), we switch the setting; that page must sign in on a **button
-  press or script**, not on load by the server, because mail scanners open links. It posts `{ "token" }` here.
+- The link: the mail points to `/dj/auth/email/<token>/`, a small page with a Continue button (mail scanners open
+  links, so opening it must not sign in). Continue signs in and sends the browser **to cp-web**: `/set-password` when a
+  password is needed (new account, uploader invitation, reset), otherwise `/` (route by `GET /api/me`). The session
+  cookie is shared (same domain). cp-web's **`/set-password`** page: `PUT /api/me/password { password }` (no
+  `currentPassword` needed for 15 minutes after the link), then follow its `nextStep`. Paths: `CP_WEB_SET_PASSWORD_PATH`,
+  `CP_WEB_HOME_PATH`. If cp-web later wants the whole link (its own page posting `{ "token" }` here on a button
+  press), we point `CP_EMAIL_LINK_PATH` at it.
 
 **`POST /api/auth/password-sign-ins`** `{ "identifier": "ali@example.com", "password": "…", "role": "organizer", "eventCode": null }`
 → `200 signed_in`, same shape. `identifier` = phone (E.164) or email. Errors: `404 event_not_found`,
@@ -791,8 +795,9 @@ changes the assignment at any time.
   (`phoneNumber` or `email` is `null`, whichever wasn't given).
 - **`POST /api/organizer/uploaders`** `{ "fullName": "Mert Yılmaz", "email": "mert@example.com", "eventCodes": ["RK238"], "locale": "tr" }` →
   `201 organizer_uploader_created` `{ uploader }`. **Use `email`** (Nov 7; `phoneNumber` still works but needs SMS/WhatsApp, which we
-  can't send yet). The uploader gets an **invitation mail** (link + 4-digit code, `locale` = its language) that signs in to an
-  account for that email, created if new: `nextStep: "set_password"`, then `uploader_home`. An email that already has an account
+  can't send yet). The uploader gets an **invitation mail** (a link only, no code; valid 72 hours, `CP_EMAIL_INVITE_TTL_HOURS`;
+  `locale` = its language) that signs in to an account for that email, created if new, and lands on cp-web's `/set-password`;
+  after the password, `nextStep: "uploader_home"`. An email that already has an account
   signs in to it (no organizer role is added). `eventCodes`: this organizer's events, not expired (may be empty).
   One uploader per email/phone per organizer: to give an existing one more events, PATCH it. Errors: `409 uploader_already_exists`,
   `422 invalid_email | invalid_phone_number`, `422 validation_error` (neither given; or an unknown, foreign or expired code:

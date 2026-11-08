@@ -3,9 +3,11 @@
     /dj/auth/email/                    ask for a mail (?purpose=reset for "forgot password", ?role=organizer)
     /dj/auth/email/code/<challenge>/   enter the mail's code
     /dj/auth/email/<token>/            the mail's link: a button that signs in (mail scanners only GET links,
-                                       so the GET itself must not use up the link)
+                                       so the GET itself must not use up the link), then on to cp-web:
+                                       CP_WEB_SET_PASSWORD_PATH (/set-password) or CP_WEB_HOME_PATH (/)
     /dj/auth/password/                 choose a password (signed in)
 """
+from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
@@ -62,7 +64,12 @@ def email_link(request, token):
     if request.method == "POST":
         try:
             user, _, event, purpose, up = emailauth.verify(token=token)
-            return _signed_in(request, user, event, purpose, up)
+            # From a mail: on to cp-web (the customer-facing pages), not the Django test pages.
+            login(request, user, backend=SESSION_BACKEND)
+            emailauth.after_sign_in(request, event, may_set_password=True, uploader_entry=up)
+            if emailauth.needs_password(user, purpose):
+                return redirect(settings.WEB_SET_PASSWORD_PATH)
+            return redirect(settings.WEB_HOME_PATH)
         except ApiError as e:
             error = e.message
     return render(request, "accounts/email_link.html", {"error": error})

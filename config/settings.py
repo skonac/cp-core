@@ -187,6 +187,11 @@ EMAIL_CODE_MAX_FAILS_PER_DAY = 10 # wrong codes per address per 24 h, all mails 
 # Where the mail's link points; {token} is replaced. cp-web can take this over with its own page that
 # posts the token to /api/auth/email-verifications.
 EMAIL_LINK_PATH = env("CP_EMAIL_LINK_PATH", "/dj/auth/email/{token}/")
+EMAIL_INVITE_TTL_HOURS = int(env("CP_EMAIL_INVITE_TTL_HOURS", "72"))   # uploader invitations (link only)
+# Where the mail link's page sends the browser after signing in (cp-web pages, same domain: the session cookie
+# is shared): the password screen when one is needed, else cp-web's start page, which routes by GET /api/me.
+WEB_SET_PASSWORD_PATH = env("CP_WEB_SET_PASSWORD_PATH", "/set-password")
+WEB_HOME_PATH = env("CP_WEB_HOME_PATH", "/")
 PASSWORD_MIN_LENGTH = 6           # characters; no other rules
 PASSWORD_SET_WINDOW = 15 * 60     # seconds after an email sign-in in which a password may be set without the old one
 PASSWORD_SIGN_IN_MAX_FAILS = 10   # wrong passwords per phone/email per 15 min
