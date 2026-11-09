@@ -207,13 +207,15 @@ or it was a reset, ask for a password: the user is already signed in, the passwo
   (`consent` first whenever the account hasn't given KVKK consent, with or without an event).
 - Errors: `410 email_code_expired`, `422 invalid_email_code`, `429 rate_limit_exceeded` (5 wrong codes per mail,
   10 per address per day; the link keeps working).
-- The link: the mail points to `/dj/auth/email/<token>/`, a small page with a Continue button (mail scanners open
-  links, so opening it must not sign in). Continue signs in and sends the browser **to cp-web**: `/set-password` when a
-  password is needed (new account, uploader invitation, reset), otherwise `/` (route by `GET /api/me`). The session
-  cookie is shared (same domain). cp-web's **`/set-password`** page: `PUT /api/me/password { password }` (no
-  `currentPassword` needed for 15 minutes after the link), then follow its `nextStep`. Paths: `CP_WEB_SET_PASSWORD_PATH`,
-  `CP_WEB_HOME_PATH`. If cp-web later wants the whole link (its own page posting `{ "token" }` here on a button
-  press), we point `CP_EMAIL_LINK_PATH` at it.
+- The link: the mail points to cp-web's **`/auth/link?token=…&flow=…`** (`CP_EMAIL_LINK_PATH`, set Nov 8). The page signs
+  in on a Continue press (mail scanners open links, so loading it must not sign in): `POST` here with `{ "token" }`, then
+  follow `nextStep`. **`flow`** says what the mail was for, so the page can word itself: `signup` (sign-up),
+  `signin` (an email-code sign-in of an existing account), `reset` (forgot password), `uploader` (an organizer's
+  uploader invitation; its error text should point to the organizer, who can resend it). `flow` is a hint for the
+  wording only; the server decides by the token. cp-web's **`/set-password`**: `PUT /api/me/password { password }` (no
+  `currentPassword` needed for 15 minutes after the link), then follow its `nextStep` (with its `eventCode`).
+  (Links in mails sent before Nov 8 go to `/dj/auth/email/<token>/`, which still works and forwards to
+  `CP_WEB_SET_PASSWORD_PATH` / `CP_WEB_HOME_PATH`.)
 
 **`POST /api/auth/password-sign-ins`** `{ "identifier": "ali@example.com", "password": "…", "role": "organizer", "eventCode": null }`
 → `200 signed_in`, same shape. `identifier` = phone (E.164) or email. Errors: `404 event_not_found`,

@@ -226,3 +226,37 @@ class EmailSignInTests(TestCase):
         r = self.c.post("/dj/auth/email/", {"email": "ali@example.com", "purpose": "sign_up", "role": "participant"},
                         **self.c.csrf_headers())
         self.assertContains(r, "Forgot password?")
+
+
+class MailLinkTests(TestCase):
+    def test_flow_in_the_link(self):
+        from .emailauth import mail_link
+        with self.settings(EMAIL_LINK_PATH="/auth/link?token={token}"):
+            self.assertEqual(mail_link("https://cleverphotos.org/", "T0K", "sign_up"),
+                             "https://cleverphotos.org/auth/link?token=T0K&flow=signup")
+            self.assertEqual(mail_link("https://cleverphotos.org/", "T0K", "invite"),
+                             "https://cleverphotos.org/auth/link?token=T0K&flow=uploader")
+            self.assertTrue(mail_link("https://x.org/", "T", "reset").endswith("&flow=reset"))
+            self.assertTrue(mail_link("https://x.org/", "T", "sign_in").endswith("&flow=signin"))
+        with self.settings(EMAIL_LINK_PATH="/dj/auth/email/{token}/"):
+            self.assertEqual(mail_link("https://x.org", "T", "reset"), "https://x.org/dj/auth/email/T/?flow=reset")
+        with self.settings(EMAIL_LINK_PATH="/a/{flow}?t={token}"):
+            self.assertEqual(mail_link("https://x.org", "T", "invite"), "https://x.org/a/uploader?t=T")
+
+    def test_purge_keeps_unexpired_invitations(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from .emailauth import verify
+        day_ago = timezone.now() - timedelta(hours=25)
+        mk = lambda tag, exp: EmailChallenge.objects.create(   # noqa: E731
+            email=f"{tag}@x.org", code_hash="x", link_hash=tag, created_at=day_ago, expires_at=exp)
+        old = mk("old", timezone.now() - timedelta(minutes=1))
+        invite = mk("inv", timezone.now() + timedelta(hours=40))
+        fresh = EmailChallenge.objects.create(email="a@x.org", code_hash="x", link_hash="new", purpose="sign_in",
+                                              expires_at=timezone.now() + timedelta(minutes=10))
+        import hashlib
+        fresh.link_hash = hashlib.sha256(b"tok").hexdigest()
+        fresh.save()
+        verify(token="tok")                                   # a sign-in runs the housekeeping
+        self.assertFalse(EmailChallenge.objects.filter(pk=old.pk).exists())
+        self.assertTrue(EmailChallenge.objects.filter(pk=invite.pk).exists())

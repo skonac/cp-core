@@ -89,6 +89,23 @@ def clean_email(text: str) -> str:
     return email
 
 
+# The link's `flow` parameter, so the page knows what the person came for (Nov 9).
+LINK_FLOWS = {"sign_up": "signup", "sign_in": "signin", "reset": "reset", "invite": "uploader"}
+
+
+def mail_link(link_base: str, token: str, purpose: str) -> str:
+    """link_base + EMAIL_LINK_PATH with the token, and `flow` (signup | signin | reset | uploader): through a
+    {flow} placeholder in the path, or appended as a query parameter."""
+    flow = LINK_FLOWS[purpose]
+    path = settings.EMAIL_LINK_PATH
+    if "{flow}" in path:
+        path = path.format(token=token, flow=flow)
+    else:
+        path = path.format(token=token)
+        path += ("&" if "?" in path else "?") + f"flow={flow}"
+    return link_base.rstrip("/") + path
+
+
 def _ttl(purpose: str) -> int:
     """Seconds a mail's link (and code) stays valid."""
     if purpose == EmailChallenge.Purpose.INVITE:
@@ -131,7 +148,7 @@ def request_mail(email: str, purpose: str, role: str, event, locale: str, ip: st
     challenge.link_hash = hashlib.sha256(token.encode()).hexdigest()
     if settings.EMAIL_DELIVERY == "log":
         challenge.dev_code = code
-    link = link_base.rstrip("/") + settings.EMAIL_LINK_PATH.format(token=token)
+    link = mail_link(link_base, token, purpose)
     subject, text = TEXTS[("sign_in" if purpose == EmailChallenge.Purpose.SIGN_UP else purpose, locale)]
     subject, text = subject.replace("{organizer}", organizer_name), text.replace("{organizer}", organizer_name)
     with transaction.atomic():
@@ -203,7 +220,8 @@ def verify(challenge_id: str = "", code: str = "", token: str = ""):
     if event is not None:
         from events.participant import touch_membership   # events imports accounts: import here
         touch_membership(user, event)
-    EmailChallenge.objects.filter(created_at__lt=now - timedelta(hours=24)).delete()   # housekeeping
+    # housekeeping: rows older than a day, once expired (uploader invitations live longer)
+    EmailChallenge.objects.filter(created_at__lt=now - timedelta(hours=24), expires_at__lt=now).delete()
     log.info("email sign-in: %s (%s, %s)", user.email, challenge.purpose, "new" if is_new else "existing")
     return user, is_new, event, challenge.purpose, uploader_entry
 
