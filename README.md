@@ -11,7 +11,9 @@ cp-web, and simple Django pages under `/dj/` (organizer and participant fallback
 
 ```bash
 git pull && sudo deploy/deploy.sh      # -> /opt/cleverphotos/core, settings /etc/cp-core/env
-cp-core-run                            # (re)start runserver in screen "core" (dev phase)
+cp-core-run                            # (re)start the service cp-core (gunicorn under systemd)
+journalctl -u cp-core -f               # requests and errors
+cp-core-runserver                      # fallback: Django runserver in screen "core" (sudo systemctl stop cp-core first)
 cp-core-manage <command>               # manage.py against the deployed copy
 ```
 

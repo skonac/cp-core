@@ -1,0 +1,16 @@
+[Unit]
+Description=Cleverphotos core (gunicorn)
+After=network.target postgresql.service
+
+[Service]
+User=@RUN_USER@
+WorkingDirectory=/opt/cleverphotos/core
+Environment=CP_ENV_FILE=/etc/cp-core/env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/cleverphotos/core/.venv/bin/gunicorn -c /opt/cleverphotos/core/deploy/gunicorn.conf.py config.wsgi:application
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=40
+
+[Install]
+WantedBy=multi-user.target

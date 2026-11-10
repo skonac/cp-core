@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# (Re)start the deployed cp-core in the screen session "core" (dev phase: runserver).
-#   cp-core-run           start or restart
-#   screen -r core        watch it (Ctrl-A D to leave)
-#   screen -S core -X quit   stop it
-screen -S core -X quit >/dev/null 2>&1 || true
-screen -dmS core env CP_ENV_FILE=/etc/cp-core/env PYTHONDONTWRITEBYTECODE=1 \
-       /opt/cleverphotos/core/.venv/bin/python /opt/cleverphotos/core/manage.py runserver 127.0.0.1:8000
-for i in 1 2 3 4 5 6 7 8 9 10; do
+# (Re)start cp-core (gunicorn, systemd service cp-core) and wait for /api/health.
+#   cp-core-run                 restart
+#   systemctl status cp-core    state
+#   journalctl -u cp-core -f    requests and errors
+# Fallback with Django runserver: sudo systemctl stop cp-core; cp-core-runserver
+[ "$(id -u)" = 0 ] || exec sudo "$0" "$@"
+systemctl restart cp-core
+for i in $(seq 1 20); do
   sleep 1
   if out=$(curl -fsS http://127.0.0.1:8000/api/health 2>/dev/null); then echo "cp-core is up: $out"; exit 0; fi
 done
-echo "cp-core did not answer within 10 s; look with:  screen -r core" >&2
+echo "cp-core did not answer within 20 s; look with:  journalctl -u cp-core -n 50" >&2
 exit 1

@@ -5,10 +5,10 @@
 #   sudo deploy/deploy.sh            # deploy the checked-out commit
 #   sudo deploy/deploy.sh --force    # also allow uncommitted changes (commit ends in -dirty)
 #
-# Dev phase: no systemd service. Django runs as `runserver` in the screen session "core",
-# as the user who ran sudo (your user owns the database and /photodisk). The script
-# restarts that session at the end. Settings: /etc/cp-core/env, created from .env.example
-# only when missing (then the script stops so you can edit it), never overwritten.
+# Runs as the systemd service cp-core (gunicorn, deploy/gunicorn.conf.py) as the user who ran sudo
+# (your user owns the database and /photodisk). The script installs/refreshes the unit and restarts
+# it at the end. Settings: /etc/cp-core/env, created from .env.example only when missing
+# (then the script stops so you can edit it), never overwritten.
 set -euo pipefail
 
 DEST=${DEST:-/opt/cleverphotos/core}
@@ -17,7 +17,7 @@ PY=3.12
 
 [ "$(id -u)" = 0 ] || { echo "run with sudo" >&2; exit 1; }
 RUN_USER=${SUDO_USER:?"run with sudo from your own user, not as root"}
-for cmd in git rsync runuser screen; do
+for cmd in git rsync runuser curl; do
   command -v "$cmd" >/dev/null || { echo "missing $cmd (apt install $cmd)" >&2; exit 1; }
 done
 SRC=$(cd "$(dirname "$0")/.." && pwd)
@@ -71,8 +71,8 @@ if [ -f "$CONF_DIR/env" ]; then echo "kept existing env"; else
   exit 0
 fi
 
-say "commands /usr/local/bin/cp-core-manage, cp-core-run"
-install -m 755 "$DEST/deploy/cp-core-manage" "$DEST/deploy/cp-core-run" /usr/local/bin/
+say "commands /usr/local/bin/cp-core-manage, cp-core-run, cp-core-runserver"
+install -m 755 "$DEST/deploy/cp-core-manage" "$DEST/deploy/cp-core-run" "$DEST/deploy/cp-core-runserver" /usr/local/bin/
 echo "ok"
 
 say "check + migrate (as $RUN_USER)"
@@ -80,8 +80,12 @@ as_user cp-core-manage check
 as_user cp-core-manage migrate --noinput
 
 say "collectstatic -> $DEST/static_root"
-cp-core-manage collectstatic --noinput -v 0   # as root: $DEST is root-owned; runserver (DEBUG) serves from static/ directly
+cp-core-manage collectstatic --noinput -v 0   # as root: $DEST is root-owned; nginx serves /static/ from static_root
 echo "ok"
 
-say "restart runserver in screen 'core' (as $RUN_USER)"
-as_user /usr/local/bin/cp-core-run
+say "service cp-core (systemd, gunicorn as $RUN_USER)"
+sed "s|@RUN_USER@|$RUN_USER|" "$DEST/deploy/cp-core.service" > /etc/systemd/system/cp-core.service
+systemctl daemon-reload
+systemctl enable cp-core >/dev/null 2>&1
+as_user screen -S core -X quit >/dev/null 2>&1 || true   # old runserver session, if any (port 8000)
+/usr/local/bin/cp-core-run
