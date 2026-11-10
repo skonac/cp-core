@@ -90,7 +90,8 @@ class OperationModeTests(TestCase):
         self.assertEqual(self.as_user.post("/dj/staff/mode/", {"mode": "lockdown", "reason": "x"}).status_code, 403)
         for page in ("/dj/staff/", "/dj/staff/mode/"):          # the panel: index and its own page
             r = self.as_staff.get(page)
-            self.assertContains(r, 'Now: <b style="color:var(--mode)">NORMAL</b>')
+            self.assertContains(r, 'class="card mode-normal"')
+            self.assertContains(r, 'value="normal" data-desc="Everything works." selected')
             self.assertContains(r, m.DESCRIPTIONS["lockdown"])
 
         r = self.as_staff.post("/dj/staff/mode/", {"mode": "lockdown", "reason": "", "next": "/dj/staff/"}, follow=True)

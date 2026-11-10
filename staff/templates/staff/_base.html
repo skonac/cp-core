@@ -11,6 +11,9 @@
   .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:center; font-size:13px; margin:8px 0; }
   .filters a.on { font-weight:700; color:var(--ink); }
   .mode-normal { --mode:var(--ok); } .mode-restricted { --mode:var(--warn); } .mode-lockdown { --mode:var(--bad); }
+  .mode-line { display:flex; gap:10px; align-items:center; } .mode-line b { white-space:nowrap; min-width:118px; }
+  .mode-line select { color:var(--mode); border:2px solid var(--mode); font-weight:600; max-width:220px; }
+  .mode-line input { flex:1; max-width:none; }
 </style>
 <nav class="snav"><b>Staff</b>
   <a href="{% url 'staff:index' %}">Index</a>

@@ -10,7 +10,9 @@ worker_class = "gthread"
 workers = 1
 threads = 16
 timeout = 120            # gthread: heartbeat limit, not a per-request limit; 60 MB uploads fit easily
-graceful_timeout = 30
+graceful_timeout = 3     # on stop/restart: in-flight requests get 3 s, then are cut. The face worker's long-poll
+                         # (jobs/next?wait=30) is always open, so a longer value makes every restart that slow; the
+                         # worker just retries. An upload running during a deploy is cut too (the uploader retries).
 keepalive = 5
 accesslog = "-"          # stdout/stderr -> journald: journalctl -u cp-core -f
 errorlog = "-"
