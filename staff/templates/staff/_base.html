@@ -10,6 +10,7 @@
   .thumb { height:44px; width:auto; display:block; border-radius:3px; background:#eee; }
   .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:center; font-size:13px; margin:8px 0; }
   .filters a.on { font-weight:700; color:var(--ink); }
+  .mode-normal { --mode:var(--ok); } .mode-restricted { --mode:var(--warn); } .mode-lockdown { --mode:var(--bad); }
 </style>
 <nav class="snav"><b>Staff</b>
   <a href="{% url 'staff:index' %}">Index</a>
@@ -23,7 +24,7 @@
   <a href="/api/docs">API docs</a>
 </nav>
 {% if operation_mode and operation_mode != "normal" and not mode_panel %}
-<div class="card" style="margin:0 0 14px; border-color:var(--bad); color:var(--bad)">
+<div class="card mode-{{ operation_mode }}" style="margin:0 0 14px; border:2px solid var(--mode); color:var(--mode)">
   Operation mode: <b>{{ operation_mode|upper }}</b> — <a href="{% url 'staff:index' %}#operation-mode">change</a></div>
 {% endif %}
 {% block staff %}{% endblock %}

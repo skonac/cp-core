@@ -90,7 +90,7 @@ class OperationModeTests(TestCase):
         self.assertEqual(self.as_user.post("/dj/staff/mode/", {"mode": "lockdown", "reason": "x"}).status_code, 403)
         for page in ("/dj/staff/", "/dj/staff/mode/"):          # the panel: index and its own page
             r = self.as_staff.get(page)
-            self.assertContains(r, "Now: <b>NORMAL</b>")
+            self.assertContains(r, 'Now: <b style="color:var(--mode)">NORMAL</b>')
             self.assertContains(r, m.DESCRIPTIONS["lockdown"])
 
         r = self.as_staff.post("/dj/staff/mode/", {"mode": "lockdown", "reason": "", "next": "/dj/staff/"}, follow=True)
@@ -102,7 +102,7 @@ class OperationModeTests(TestCase):
                                follow=True)
         self.assertRedirects(r, "/dj/staff/")
         self.assertContains(r, "Operation mode is now LOCKDOWN.")
-        self.assertContains(r, "Now: <b style")                           # the panel, red
+        self.assertContains(r, 'class="card mode-lockdown"')               # the panel, red
         self.assertContains(self.as_staff.get("/dj/staff/users/"), "Operation mode: <b>LOCKDOWN</b>")   # banner elsewhere
         self.assertEqual(m.current(), "lockdown")
         self.assertContains(self.as_staff.get("/dj/staff/mode/"), "double charges")   # history
