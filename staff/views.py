@@ -14,7 +14,7 @@ marking messages handled and the operation mode switch.
     /dj/staff/users/<id>/            one user: profile, consent, selfies, credits, events joined and owned
     /dj/staff/worker/                workers, queue, failed images
     /dj/staff/messages/              contact form messages (?all=1 with handled); mark handled
-    /dj/staff/mode/                  operation mode: normal / restricted / lockdown (common/mode.py), history
+    /dj/staff/mode/                  operation mode history; the switch panel is here and on the index
 """
 from collections import defaultdict
 from datetime import timedelta
@@ -27,6 +27,7 @@ from django.core.paginator import Paginator
 from django.db.models import BooleanField, Count, ExpressionWrapper, Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from PIL import Image as PILImage
 from pgvector.django import CosineDistance
@@ -93,7 +94,7 @@ def index(request):
         "messages": ContactMessage.objects.filter(handled_at__isnull=True).count(),
         "workers_live": Worker.objects.filter(last_seen_at__gte=now - timedelta(minutes=1)).count(),
     }
-    return render(request, "staff/index.html", {"stats": stats})
+    return render(request, "staff/index.html", {"stats": stats, "mode_panel": mode_context()})
 
 
 @staff_required
@@ -320,20 +321,31 @@ def messages_page(request):
     return render(request, "staff/messages.html", {"page": page, "show_all": show_all})
 
 
+
+def mode_context() -> dict:
+    """What staff/_mode_panel.html needs."""
+    from common import mode as m
+    return {"current": m.current(), "latest": m.latest(),
+            "modes": [(value, label, m.DESCRIPTIONS[value]) for value, label in m.Mode.choices]}
+
+
 @staff_required
 def mode_page(request):
-    """The operation mode switch (common/mode.py). POST mode + reason (required unless normal)."""
+    """The operation mode switch (common/mode.py) + history. The panel is also on the index; its form posts
+    here (mode, reason: required unless normal, next) and goes back to `next`."""
+    from django.contrib import messages
+    from django.utils.http import url_has_allowed_host_and_scheme
     from common import mode as m
-    error = ""
-    if request.method == "POST":
-        try:
-            m.set_mode(request.POST.get("mode", ""), request.POST.get("reason", ""), by=request.user)
-            return redirect("staff:mode")
-        except ValueError as e:
-            error = str(e)
     from common.models import OperationMode
-    history = OperationMode.objects.select_related("changed_by")[:30]
-    return render(request, "staff/mode.html", {
-        "current": m.current(), "latest": m.latest(), "history": history, "error": error,
-        "modes": [(value, label, m.DESCRIPTIONS[value]) for value, label in m.Mode.choices],
-    })
+    if request.method == "POST":
+        back = request.POST.get("next", "")
+        if not url_has_allowed_host_and_scheme(back, allowed_hosts={request.get_host()}):
+            back = reverse("staff:mode")
+        try:
+            row = m.set_mode(request.POST.get("mode", ""), request.POST.get("reason", ""), by=request.user)
+            messages.success(request, f"Operation mode is now {row.mode.upper()}.")
+        except ValueError as e:
+            messages.error(request, f"Not changed: {e}.")
+        return redirect(back)
+    history = OperationMode.objects.select_related("changed_by")[:100]
+    return render(request, "staff/mode.html", {"history": history, "mode_panel": mode_context()})

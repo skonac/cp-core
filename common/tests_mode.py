@@ -85,25 +85,30 @@ class OperationModeTests(TestCase):
 
     # --- staff page
 
-    def test_staff_page(self):
+    def test_staff_panel(self):
         self.assertEqual(self.as_user.get("/dj/staff/mode/").status_code, 403)
-        r = self.as_staff.get("/dj/staff/mode/")
-        self.assertContains(r, "Now: <b>NORMAL</b>")
-        self.assertContains(r, m.DESCRIPTIONS["lockdown"])
+        self.assertEqual(self.as_user.post("/dj/staff/mode/", {"mode": "lockdown", "reason": "x"}).status_code, 403)
+        for page in ("/dj/staff/", "/dj/staff/mode/"):          # the panel: index and its own page
+            r = self.as_staff.get(page)
+            self.assertContains(r, "Now: <b>NORMAL</b>")
+            self.assertContains(r, m.DESCRIPTIONS["lockdown"])
 
-        r = self.as_staff.post("/dj/staff/mode/", {"mode": "lockdown", "reason": ""})
-        self.assertContains(r, "a reason is required")
+        r = self.as_staff.post("/dj/staff/mode/", {"mode": "lockdown", "reason": "", "next": "/dj/staff/"}, follow=True)
+        self.assertRedirects(r, "/dj/staff/")
+        self.assertContains(r, "Not changed: a reason is required")
         self.assertEqual(m.current(), "normal")
 
-        r = self.as_staff.post("/dj/staff/mode/", {"mode": "lockdown", "reason": "double charges"})
-        self.assertRedirects(r, "/dj/staff/mode/")
+        r = self.as_staff.post("/dj/staff/mode/", {"mode": "lockdown", "reason": "double charges", "next": "/dj/staff/"},
+                               follow=True)
+        self.assertRedirects(r, "/dj/staff/")
+        self.assertContains(r, "Operation mode is now LOCKDOWN.")
+        self.assertContains(r, "Now: <b style")                           # the panel, red
+        self.assertContains(self.as_staff.get("/dj/staff/users/"), "Operation mode: <b>LOCKDOWN</b>")   # banner elsewhere
         self.assertEqual(m.current(), "lockdown")
-        r = self.as_staff.get("/dj/staff/mode/")
-        self.assertContains(r, "Now: <b>LOCKDOWN</b>")
-        self.assertContains(r, "double charges")
-        self.assertContains(self.as_staff.get("/dj/staff/"), "Operation mode: <b>LOCKDOWN</b>")
+        self.assertContains(self.as_staff.get("/dj/staff/mode/"), "double charges")   # history
 
-        self.as_staff.post("/dj/staff/mode/", {"mode": "normal", "reason": "ignored"})
+        r = self.as_staff.post("/dj/staff/mode/", {"mode": "normal", "reason": "ignored", "next": "https://evil.example/"})
+        self.assertRedirects(r, "/dj/staff/mode/", fetch_redirect_response=False)   # no off-site redirect
         self.assertEqual((m.current(), m.latest().reason), ("normal", ""))
 
     # --- command

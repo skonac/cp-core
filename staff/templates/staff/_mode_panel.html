@@ -1,0 +1,37 @@
+{# Operation mode switch (common/mode.py). Context: mode_panel (staff.views.mode_context). #}
+<div class="card" id="operation-mode" style="margin:14px 0{% if mode_panel.current != 'normal' %}; border-color:var(--bad){% endif %}">
+  <h2 style="margin-top:0">Operation mode</h2>
+  <p>Now: <b{% if mode_panel.current != 'normal' %} style="color:var(--bad)"{% endif %}>{{ mode_panel.current|upper }}</b>
+    {% if mode_panel.latest %}<span class="muted small">since {{ mode_panel.latest.changed_at|date:"Y-m-d H:i" }}
+      by {% if mode_panel.latest.changed_by %}{{ mode_panel.latest.changed_by.label }}{% else %}the command line{% endif %}{% if mode_panel.latest.reason %}: {{ mode_panel.latest.reason }}{% endif %}</span>{% endif %}</p>
+
+  <form method="post" action="{% url 'staff:mode' %}" id="mode-form">{% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <p><label for="mode">Mode</label>
+      <select name="mode" id="mode">
+        {% for value, label, desc in mode_panel.modes %}
+        <option value="{{ value }}" data-desc="{{ desc }}" {% if value == mode_panel.current %}selected{% endif %}>{{ label|upper }}</option>
+        {% endfor %}
+      </select></p>
+    <p id="mode-desc" class="small"></p>
+    <p><label for="reason">Reason (internal; required for restricted and lockdown, ignored for normal)</label>
+      <input type="text" name="reason" id="reason" maxlength="500" style="max-width:100%"></p>
+    <button type="submit">Change</button>
+    <a class="small" href="{% url 'staff:mode' %}" style="margin-left:10px">history</a>
+  </form>
+</div>
+<script>
+  (() => {
+    const sel = document.getElementById("mode"), desc = document.getElementById("mode-desc"),
+          reason = document.getElementById("reason");
+    const show = () => { desc.textContent = sel.selectedOptions[0].dataset.desc; };
+    sel.addEventListener("change", show); show();
+    document.getElementById("mode-form").addEventListener("submit", (e) => {
+      const mode = sel.value;
+      if (mode !== "normal" && !reason.value.trim()) {
+        e.preventDefault(); alert("Give a reason for " + mode.toUpperCase() + "."); reason.focus(); return;
+      }
+      if (!confirm("Switch the site to " + mode.toUpperCase() + "?")) e.preventDefault();
+    });
+  })();
+</script>

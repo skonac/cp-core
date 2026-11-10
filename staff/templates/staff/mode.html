@@ -2,29 +2,9 @@
 {% block title %}Operation mode · staff{% endblock %}
 {% block staff %}
 <h1>Operation mode</h1>
-<p class="muted small">A switch for incidents. Staff accounts are never blocked. The reason is internal: it goes to
-  the history below and the admin alert (system.mode), never to users.</p>
-
-<div class="card" style="max-width:640px; margin:14px 0">
-  <p style="margin-top:0">Now: <b>{{ current|upper }}</b>
-    {% if latest %}<span class="muted small">since {{ latest.changed_at|date:"Y-m-d H:i" }}
-      by {% if latest.changed_by %}{{ latest.changed_by.label }}{% else %}the command line{% endif %}</span>{% endif %}</p>
-
-  {% if error %}<p style="color:var(--bad)">{{ error }}</p>{% endif %}
-
-  <form method="post" id="mode-form">{% csrf_token %}
-    <p><label for="mode">Operation mode</label>
-      <select name="mode" id="mode">
-        {% for value, label, desc in modes %}
-        <option value="{{ value }}" data-desc="{{ desc }}" {% if value == current %}selected{% endif %}>{{ label|upper }}</option>
-        {% endfor %}
-      </select></p>
-    <p id="mode-desc" class="small"></p>
-    <p><label for="reason">Reason (internal; required for restricted and lockdown, ignored for normal)</label>
-      <input type="text" name="reason" id="reason" maxlength="500" style="max-width:100%"></p>
-    <button type="submit">Change</button>
-  </form>
-</div>
+<p class="muted small">A switch for incidents (also on the staff index). Staff accounts are never blocked. The reason is
+  internal: it goes to the history below and the admin alert (system.mode), never to users.</p>
+<div style="max-width:640px">{% include "staff/_mode_panel.html" %}</div>
 
 <h2>History</h2>
 <div class="scroll"><table class="t">
@@ -36,18 +16,4 @@
   {% empty %}<tr><td colspan="4" class="muted">No changes yet: the site has always been normal.</td></tr>
   {% endfor %}
 </table></div>
-
-<script>
-  const sel = document.getElementById("mode"), desc = document.getElementById("mode-desc"),
-        reason = document.getElementById("reason");
-  function show() { desc.textContent = sel.selectedOptions[0].dataset.desc; }
-  sel.addEventListener("change", show); show();
-  document.getElementById("mode-form").addEventListener("submit", (e) => {
-    const mode = sel.value;
-    if (mode !== "normal" && !reason.value.trim()) {
-      e.preventDefault(); alert("Give a reason for " + mode.toUpperCase() + "."); reason.focus(); return;
-    }
-    if (!confirm("Switch the site to " + mode.toUpperCase() + "?")) e.preventDefault();
-  });
-</script>
 {% endblock %}
