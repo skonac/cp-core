@@ -27,7 +27,7 @@ from media.ingest import FRAME_FIELDS, IngestError, delete_frame, event_cover, i
 from media.matching import my_photos, selfie_states
 from media.models import Image
 from media.storage import file_response, soft_delete
-from notify.alerts import alert
+from notify.alerts import alert, who
 from printing import render as print_render
 from printing import themes as print_themes
 
@@ -240,7 +240,7 @@ def create_event(request, data: Form[EventCreateIn], cover: File[UploadedFile] =
             except IngestError as e:
                 transaction.set_rollback(True)
                 raise _ingest_error(e) from None
-    alert("events.new", f"Event {event.code} created by account {user.pk}: {event.name[:80]}", key=f"event:{event.code}")
+    alert("events.new", f"Event {event.code} created by {who(user)}: {event.name[:80]}", key=f"event:{event.code}")
     return respond(request, "organizer_event_created", _one(request, event), status=201)
 
 

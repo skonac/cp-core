@@ -4,7 +4,7 @@ import json
 import urllib.error
 from unittest import mock
 
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from . import alerts
 from .providers import SendError
@@ -137,3 +137,20 @@ class AlertTests(SimpleTestCase):
                 alerts.on_request_exception(request=request)
         self.assertEqual(posted(urlopen)[0]["chat_id"], "-100111")
         self.assertIn("system.error: GET /x -> ValueError: bad", posted(urlopen)[0]["text"])
+
+
+class WhoTests(TestCase):
+    """Alerts name accounts by id and first name only (Telegram is a third party)."""
+
+    def test_who(self):
+        from accounts.models import User
+        from notify.alerts import who
+        named = User.objects.create_user("+905550000031", full_name="Ayşe Nur Yılmaz", email="ayse@example.com")
+        bare = User.objects.create_user("+905550000032", email="x@example.com")
+        self.assertEqual(who(named), f"account #{named.pk} (Ayşe)")
+        self.assertEqual(who(named.pk), f"account #{named.pk} (Ayşe)")
+        self.assertEqual(who(bare), f"account #{bare.pk}")
+        self.assertEqual(who(None), "an unknown account")
+        for text in (who(named), who(bare)):
+            self.assertNotIn("@", text)
+            self.assertNotIn("+90", text)

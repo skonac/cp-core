@@ -18,7 +18,7 @@ from django.utils import timezone
 
 from common.api import ApiError
 from notify import dispatch
-from notify.alerts import alert
+from notify.alerts import alert, who
 
 from .models import OtpChallenge, UploaderAccess, Role, User
 
@@ -124,7 +124,7 @@ def verify_code(challenge_id: str, code: str):
                 if is_new:
                     user = User.objects.create_user(challenge.phone)
                     transaction.on_commit(lambda u=user, r=challenge.role: alert(
-                        "accounts.new", f"New account {u.pk} by phone ({r})", key=f"new:{u.pk}"))
+                        "accounts.new", f"New {who(u)} by phone ({r})", key=f"new:{u.pk}"))
                 role_flag = {"participant": "is_participant", "organizer": "is_organizer",
                              "photographer": "is_photographer"}[challenge.role]
                 setattr(user, role_flag, True)

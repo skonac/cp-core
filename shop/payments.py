@@ -20,7 +20,7 @@ from django.utils import timezone
 
 from accounts.models import User
 from credits.models import CreditTransaction
-from notify.alerts import alert
+from notify.alerts import alert, who
 
 from . import documents, iyzico, pricing
 from .models import Product, Purchase
@@ -70,7 +70,7 @@ def complete(purchase: Purchase, payment_id: str, response: dict | None = None) 
     log.info("purchase %s paid: +%s credits for user %s", purchase.pk, purchase.credits, purchase.user_id)
     transaction.on_commit(lambda: alert("shop.success", f"Purchase {purchase.number} paid: {purchase.amount} "
                                         f"{purchase.currency}, {purchase.credits} credits ({purchase.product_name_tr}), "
-                                        f"user {purchase.user_id}", key=f"paid:{purchase.pk}"))
+                                        f"{who(purchase.user_id)}", key=f"paid:{purchase.pk}"))
     return purchase
 
 
@@ -80,7 +80,7 @@ def fail(purchase: Purchase, code: str, message: str = "", response: dict | None
     purchase.refresh_from_db()
     if changed:
         transaction.on_commit(lambda: alert("shop.fail", f"Purchase {purchase.number} failed: {code} {message[:200]} "
-                                            f"({purchase.amount} {purchase.currency}, user {purchase.user_id})",
+                                            f"({purchase.amount} {purchase.currency}, {who(purchase.user_id)})",
                                             key=f"failed:{purchase.pk}"))
     return purchase
 
@@ -128,7 +128,7 @@ def finish_iyzico(token: str) -> Purchase | None:
         purchase.refresh_from_db()
         # Pending, and the money may have moved: iyzico's webhook comes back about every 15 min (alert once per 5).
         alert("shop.stuck", f"Purchase {purchase.number} is pending, iyzico could not be asked: {e.code} {e.message[:200]} "
-                            f"({purchase.amount} {purchase.currency}, user {purchase.user_id})", key=f"stuck:{purchase.pk}")
+                            f"({purchase.amount} {purchase.currency}, {who(purchase.user_id)})", key=f"stuck:{purchase.pk}")
         return purchase
     ok = (answer.get("paymentStatus") == "SUCCESS"
           and answer.get("conversationId") == purchase.conversation_id

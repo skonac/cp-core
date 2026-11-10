@@ -72,6 +72,21 @@ def _reset() -> None:
         _recent.clear()
 
 
+def who(user) -> str:
+    """How alerts name an account (a User or its id): "account #12 (Ayşe)", the first name only; "account #12"
+    without a name. Never the surname, email or phone: Telegram is a third party, the id finds the rest on the
+    staff pages."""
+    if user is None:
+        return "an unknown account"
+    if isinstance(user, int):
+        from accounts.models import User
+        pk, full_name = user, User.objects.filter(pk=user).values_list("full_name", flat=True).first()
+    else:
+        pk, full_name = user.pk, user.full_name
+    first = (full_name or "").split()
+    return f"account #{pk} ({first[0]})" if first else f"account #{pk}"
+
+
 def routes(topic: str) -> list[str]:
     """The targets of a topic, from CP_NOTIFY_<APP>_<TAG>. No line, an empty value or "none": no targets."""
     raw = settings.NOTIFY_ROUTES.get(topic.replace(".", "_"), "")

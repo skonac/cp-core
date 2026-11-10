@@ -83,9 +83,9 @@ def set_mode(mode: str, reason: str = "", by=None, wait_alert: bool = False) -> 
     old = current()
     row = OperationMode.objects.create(mode=mode, reason=reason, changed_by=by)
     _cached = (mode, time.monotonic() + CACHE_SECONDS)   # this process sees it at once
-    who = f"account {by.pk}" if by else "the command line"
+    from notify.alerts import alert, who as account_name   # no surname, email or phone in alerts
+    who = account_name(by) if by else "the command line"
     log.warning("operation mode %s -> %s by %s: %s", old, mode, who, reason)
-    from notify.alerts import alert   # no emails or phone numbers in alerts: the account id is enough
     text = f"{old} -> {mode} by {who}" + (f": {reason}" if reason else "")
     transaction.on_commit(lambda: alert("system.mode", text, key=f"mode-{row.pk}", wait=wait_alert))
     return row
