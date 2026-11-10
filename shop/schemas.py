@@ -57,6 +57,9 @@ class CatalogOut(Out):
                                                                  "null when off.")
     documentsVersion: str = Field(description="Version of the ÖBF + MSS texts (GET /api/shop/obf, /mss); send back "
                                               "with a purchase.", examples=["001"])
+    paymentsEnabled: bool = Field(description="false while payments are off (operation mode `restricted`, §3.11): "
+                                              "disable the buy buttons and show a notice. A purchase then answers "
+                                              "503 payments_disabled. Always true for staff.", examples=[True])
 
 
 class PurchaseOut(Out):

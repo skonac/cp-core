@@ -118,3 +118,15 @@ class OperationModeTests(TestCase):
         self.assertIn("from ssh", out.getvalue())
         with self.assertRaises(CommandError):
             call_command("operation_mode", "lockdown", stdout=StringIO())
+
+    # --- what the UI reads
+
+    def test_ui_fields(self):
+        products = lambda c: c.get("/api/shop/products").json()["data"]["paymentsEnabled"]
+        mode_in_me = lambda c: c.get("/api/me").json()["data"]["operationMode"]
+        self.assertEqual((products(self.anon), products(self.as_user), mode_in_me(self.as_user)), (True, True, "normal"))
+        m.set_mode("restricted", "x")
+        self.assertEqual((products(self.anon), products(self.as_user), products(self.as_staff)), (False, False, True))
+        self.assertEqual(mode_in_me(self.as_user), "restricted")
+        m.set_mode("lockdown", "x")
+        self.assertEqual(mode_in_me(self.as_staff), "lockdown")   # staff get the banner; others get 503

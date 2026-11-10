@@ -62,6 +62,11 @@ def current() -> str:
     return mode
 
 
+def payments_enabled(user=None) -> bool:
+    """What the shop tells this caller (catalog `paymentsEnabled`): the middleware's rule, staff always pass."""
+    return current() == Mode.NORMAL or bool(user is not None and user.is_active and user.is_staff)
+
+
 def latest() -> OperationMode | None:
     return OperationMode.objects.select_related("changed_by").first()
 

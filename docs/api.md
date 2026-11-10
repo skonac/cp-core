@@ -19,7 +19,7 @@ Last updated: 2026-11-10 (operation mode) · API version 0.7
 
 | Date | Change | Where |
 | --- | --- | --- |
-| 2026-11-10 | Operation mode (staff kill switch): `GET /api/operation-mode` → `normal` / `restricted` / `lockdown`. Any endpoint can answer `503 site_locked` (lockdown), `POST /api/shop/purchases` can answer `503 payments_disabled` (restricted). `docs/openapi.json` regenerated (it had not been since Oct 31) | §2, §3.11, §5e |
+| 2026-11-10 | Operation mode (staff kill switch): `normal` / `restricted` / `lockdown`. `paymentsEnabled` in `GET /api/shop/products`, `operationMode` in every user object, `GET /api/operation-mode`. Any endpoint can answer `503 site_locked` (lockdown), `POST /api/shop/purchases` `503 payments_disabled` (restricted). `docs/openapi.json` regenerated (it had not been since Oct 31) | §2, §3.11, §5e |
 | 2026-10-31 | Printed materials (basılı materyal): `GET /api/organizer/events/{code}/print-themes`, each theme's formats (poster, table card) with `previewUrl` (HTML, for iframes and a new tab) and `pdfUrl` (download, one per format per 10 min) | §3.6, §5d |
 | 2026-10-29 | Discounts: products get `finalPrice`, `discountSource`, `discountLabel`; `discountPercent` is now the discount applied to that product (no longer "against the highest unit price"); top level `appliedPromo`, `globalDiscount`; `pricingVersion` covers the caller's prices. `POST /api/shop/promo`. A purchase discounted to 0 TL is paid at once (no iyzico). ÖBF/MSS version `002` shows list price and discount | §3.7 |
 | 2026-10-29 | Event types `holiday` and `vacation`; `GET /api/public/event-types` lists all types with their tr/en labels (use it instead of a list in cp-web) | §3.5, §3.6 |
@@ -112,6 +112,9 @@ Every response except files and `204` is:
 | 502 | `sms_not_sent` | OTP request: the SMS provider refused or can't be reached |
 | 503 | `site_locked` | Operation mode `lockdown` (§3.11): any endpoint, for every account except staff. Header `Retry-After: 300` |
 | 503 | `payments_disabled` | Operation mode `restricted` (§3.11): `POST /api/shop/purchases` only |
+
+Both 503s are deliberate and carry the JSON envelope; switch on `code`. A `502` or `504` **with an HTML body** comes
+from nginx, not cp-core (the server is down or hanging): show a generic "can't reach the server, try again".
 
 ## 3. Endpoints
 
@@ -848,18 +851,23 @@ organizer list), `404 event_not_found` (also an event not assigned, or no longer
 
 ### 3.11 Operation mode
 
-| Endpoint | Code | Data |
+Staff switch the site's mode during an incident (a bug, a payment problem, maintenance); the reason they give is
+internal and never in the API. Staff accounts are never blocked by any mode.
+
+| Mode | Effect for everyone except staff |
+| --- | --- |
+| `normal` | everything works |
+| `restricted` | payments are off: `POST /api/shop/purchases` answers `503 payments_disabled`; everything else works, and a payment already in progress still completes (iyzico's callback and webhook stay open) |
+| `lockdown` | the site is closed: every request answers `503 site_locked` (header `Retry-After: 300`), except `/api/health`, `/api/operation-mode`, iyzico's callback and webhook, the face worker and the Django admin/staff sign-in |
+
+Where the UI learns it (no polling in normal operation):
+
+| Field / endpoint | Where | Use |
 | --- | --- | --- |
-| `GET /api/operation-mode` | `operation_mode_retrieved` | `{ mode }`: `normal`, `restricted` or `lockdown` |
-
-No sign-in needed, and open in every mode. Staff switch the mode during an incident (bug, payment problem,
-maintenance); the reason they give is internal and never in the API. Staff accounts are never blocked.
-
-- `normal`: everything works.
-- `restricted`: payments are off. `POST /api/shop/purchases` answers `503 payments_disabled`; everything else works,
-  and a payment already in progress still completes (iyzico's callback and webhook stay open).
-- `lockdown`: only staff can use the site. Every other request answers `503 site_locked`, except
-  `/api/health`, `/api/operation-mode`, iyzico's callback and webhook, the face worker and the Django admin/staff sign-in.
+| `paymentsEnabled` | `GET /api/shop/products` (and `POST /api/shop/promo`) | `false` in `restricted`: disable the buy buttons with a notice. Always `true` for staff |
+| `operationMode` | every user object (`GET /api/me`, sign-in responses) | Non-staff never see `lockdown` here (they get `503 site_locked` instead); staff do: show them a banner |
+| `503 site_locked` | any response | The lockdown signal itself: whatever call comes first |
+| `GET /api/operation-mode` → `{ mode }` | no sign-in, open in every mode | Only the "closed" screen needs it, to find out when the site reopens |
 
 The mode is cached for 5 seconds on the server, so a change can take that long to show.
 
@@ -952,16 +960,18 @@ message). Pass the interface language as `lang`. Sort themes whose `eventTypes` 
 
 ### 5e. New: operation mode (no draft in cp-web)
 
-Read `GET /api/operation-mode` when the app starts, and again whenever any call answers `503 site_locked` or
-`503 payments_disabled`; a light poll (every minute or two) while the app is open lets a lockdown or its end show
-up without a reload. The wording is cp-web's (tr/en); the API only gives the mode.
+The wording is cp-web's (tr/en); the API gives only the state (§3.11). No polling while things are normal.
 
-- `restricted`: disable the buy buttons in the credit store with a notice ("payments temporarily unavailable"), and
-  treat `503 payments_disabled` from `POST /api/shop/purchases` the same way.
-- `lockdown`: a full-screen "temporarily closed, back soon" page in place of the app (keep the language switch).
-  A signed-in staff account (`accountRoles` includes `admin`) is not blocked: let it use the app normally,
-  ideally with a small banner saying the site is in lockdown.
-- `normal`: nothing to show.
+- **Fetch helper:** any `503` with `code: "site_locked"` → switch the whole app to a "temporarily closed, back soon"
+  screen (keep the language switch). `503 payments_disabled` → the payments-off notice below.
+- **Credit store:** `paymentsEnabled: false` in `GET /api/shop/products` → disable the buy buttons and show "payments
+  are temporarily unavailable". Someone already on the page when payments go off gets `503 payments_disabled` from
+  `POST /api/shop/purchases`: show the same notice and reload the products.
+- **The closed screen:** check `GET /api/operation-mode` about once a minute (only while this screen shows), or offer
+  a "try again" button; when it answers anything but `lockdown`, reload the app.
+- **Staff banner:** `user.operationMode` other than `normal` for a staff account (`accountRoles` includes `admin`) →
+  a small banner "site is in LOCKDOWN / RESTRICTED". Staff are never blocked.
+- `502`/`504` with an HTML body is nginx (server down), not a lockdown: generic "can't reach the server".
 
 ## 6. Not yet in this API
 

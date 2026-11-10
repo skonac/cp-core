@@ -13,6 +13,7 @@ from pydantic import Field
 
 from accounts.models import User
 from common.api import ApiError, CamelSchema, errors, file_doc, respond
+from common.mode import payments_enabled
 from common.ratelimit import allow, hits
 
 from . import documents, pricing
@@ -87,7 +88,8 @@ def catalog_json(request) -> dict:
     return {"creditBalance": balance, "pricingVersion": pricing.pricing_version(on_sale, priced), "products": out,
             "appliedPromo": promo.code.upper() if promo else None,
             "globalDiscount": pricing.global_discount(),
-            "documentsVersion": settings.SALES_DOCS_VERSION}
+            "documentsVersion": settings.SALES_DOCS_VERSION,
+            "paymentsEnabled": payments_enabled(request.user)}
 
 
 class PromoIn(CamelSchema):

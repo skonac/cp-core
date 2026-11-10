@@ -35,6 +35,9 @@ class UserOut(Out):
     kvkk: KvkkDocumentsOut
     selfieState: SelfieState = Field(examples=["no_selfie"])
     selfieThumbnailUrl: str | None = Field(description="Primary selfie's thumbnail.", examples=[None])
+    operationMode: Literal["normal", "restricted", "lockdown"] = Field(
+        description="The site's operation mode (§3.11), the same in every user object. Only staff ever see "
+                    "`lockdown` here (everyone else gets 503 site_locked): show them a banner.", examples=["normal"])
 
 
 class OtpChallengeOut(Out):

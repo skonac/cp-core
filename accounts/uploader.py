@@ -11,6 +11,8 @@ from typing import NamedTuple
 
 from django.db.models import Q
 
+from common.mode import current as operation_mode
+
 from . import kvkk
 from .models import UploaderAccess
 
@@ -90,4 +92,4 @@ def uploader_user_json(phone: str, accesses) -> dict:
     return {"id": "", "phoneNumber": phone, "fullName": first.full_name if first else None, "email": None,
             "profileCompleted": True, "accountRoles": [], "hasConsent": False, "consentVersion": None,
             "kvkk": kvkk.documents(), "selfieState": "no_selfie", "selfieThumbnailUrl": None,
-            "isGuest": False}
+            "isGuest": False, "operationMode": operation_mode()}

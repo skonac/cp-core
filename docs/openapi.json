@@ -7092,6 +7092,19 @@
               null
             ],
             "title": "Selfiethumbnailurl"
+          },
+          "operationMode": {
+            "description": "The site's operation mode (§3.11), the same in every user object. Only staff ever see `lockdown` here (everyone else gets 503 site_locked): show them a banner.",
+            "enum": [
+              "normal",
+              "restricted",
+              "lockdown"
+            ],
+            "examples": [
+              "normal"
+            ],
+            "title": "Operationmode",
+            "type": "string"
           }
         },
         "required": [
@@ -7106,7 +7119,8 @@
           "consentVersion",
           "kvkk",
           "selfieState",
-          "selfieThumbnailUrl"
+          "selfieThumbnailUrl",
+          "operationMode"
         ],
         "title": "UserOut",
         "type": "object"
@@ -11965,6 +11979,14 @@
             ],
             "title": "Documentsversion",
             "type": "string"
+          },
+          "paymentsEnabled": {
+            "description": "false while payments are off (operation mode `restricted`, §3.11): disable the buy buttons and show a notice. A purchase then answers 503 payments_disabled. Always true for staff.",
+            "examples": [
+              true
+            ],
+            "title": "Paymentsenabled",
+            "type": "boolean"
           }
         },
         "required": [
@@ -11973,7 +11995,8 @@
           "products",
           "appliedPromo",
           "globalDiscount",
-          "documentsVersion"
+          "documentsVersion",
+          "paymentsEnabled"
         ],
         "title": "CatalogOut",
         "type": "object"

@@ -15,6 +15,7 @@ from ninja.security import django_auth
 from pydantic import Field
 
 from common.api import ApiError, CamelSchema, errors, file_doc, respond
+from common.mode import current as operation_mode
 from common.ratelimit import allow
 from events.codes import normalize_code
 from events.models import Event, EventMember
@@ -63,6 +64,7 @@ def user_json(user: User) -> dict:
         "hasConsent": user.is_consent, "consentVersion": user.kvkk_version or None, "kvkk": kvkk.documents(),
         "selfieState": selfie_state(user),
         "selfieThumbnailUrl": f"/api/me/selfies/{first.pk}/thumb.jpg" if first else None,
+        "operationMode": operation_mode(),
     }
 
 
