@@ -21,6 +21,7 @@
     <p><a href="{% url 'staff:users' %}">Users</a> — profiles, roles, selfies, credits, events</p>
     <p><a href="{% url 'staff:worker' %}">Worker &amp; queue</a> — workers, queue per event, failed images</p>
     <p><a href="{% url 'staff:messages' %}">Messages</a> — contact form, mark handled</p>
+    <p><a href="{% url 'staff:mode' %}">Operation mode</a> — normal / restricted (payments off) / lockdown (staff only)</p>
     <p><a href="{% url 'staff:print' %}">Print themes</a> — posters and table cards per theme, with any event; Show and PDF</p>
     <p><a href="/admin/">Django admin</a> — edit anything; credit adjustments: Credits → Add</p>
   </div>
@@ -34,7 +35,8 @@
   <div class="card"><h2 style="margin-top:0">Other</h2>
     <p><a href="/api/docs">/api/docs</a> — Swagger · <a href="/api/openapi.json">openapi.json</a></p>
     <p><a href="/api/health">/api/health</a> — version, build</p>
-    <p><a href="/photodisk/">/photodisk/</a> — raw file listing (nginx; remove before real users)</p>
+    <p>Raw file listing: <code>ssh -L 8081:127.0.0.1:8081 ogesli@cleverphotos.org</code>, then
+       <a href="http://localhost:8081/photodisk/">localhost:8081/photodisk/</a> (nginx, server-local only)</p>
   </div>
 </div>
 {% endblock %}

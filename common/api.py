@@ -69,6 +69,7 @@ _ERROR_EXAMPLES = {
     429: ("rate_limit_exceeded", "Çok fazla istek. Biraz sonra tekrar dene.", None),
     501: ("payment_not_available", "Ödeme henüz kullanılamıyor.", None),
     502: ("payment_provider_error", "Ödeme başlatılamadı.", None),
+    503: ("site_locked", "Site geçici olarak kapalı. Biraz sonra tekrar dene.", None),
 }
 _ERROR_MODELS = {
     status: create_model(f"Error{status}", __base__=ErrorOut,

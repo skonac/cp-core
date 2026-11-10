@@ -17,9 +17,14 @@
   <a href="{% url 'staff:users' %}">Users</a>
   <a href="{% url 'staff:worker' %}">Worker &amp; queue</a>
   <a href="{% url 'staff:messages' %}">Messages</a>
+  <a href="{% url 'staff:mode' %}">Operation mode</a>
   <a href="{% url 'staff:print' %}">Print themes</a>
   <a href="/admin/">Admin</a>
   <a href="/api/docs">API docs</a>
 </nav>
+{% if operation_mode and operation_mode != "normal" %}
+<div class="card" style="margin:0 0 14px; border-color:var(--bad); color:var(--bad)">
+  Operation mode: <b>{{ operation_mode|upper }}</b> — <a href="{% url 'staff:mode' %}">change</a></div>
+{% endif %}
 {% block staff %}{% endblock %}
 {% endblock %}

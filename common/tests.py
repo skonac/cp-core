@@ -58,6 +58,9 @@ class ApiContractTests(TempMedia, TestCase):
         self.assertEqual([t["value"] for t in types],
                          ["wedding", "sports", "graduation", "corporate", "holiday", "vacation", "other"])
         self.assertEqual(types[5]["label"], {"tr": "Seyahat", "en": "Vacation"})
+        r = c.get("/api/operation-mode")
+        self.assertCode(r, 200, "operation_mode_retrieved")
+        self.assertEqual(r.json()["data"], {"mode": "normal"})
         r = c.get(f"/api/public/events/{code.lower()}")
         self.assertCode(r, 200, "event_retrieved")
         self.assertEqual(r.json()["data"]["code"], code)

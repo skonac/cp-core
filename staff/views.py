@@ -1,6 +1,7 @@
 """Staff data browser: read-only pages over everything, under /dj/staff/ (staff accounts only).
 
-A stopgap until the admin frontend exists in cp-web. Edits stay in the Django admin (/admin/).
+A stopgap until the admin frontend exists in cp-web. Edits stay in the Django admin (/admin/), except
+marking messages handled and the operation mode switch.
 
     /dj/staff/                       index: links to every non-API page, counters
     /dj/staff/events/                all events: owner, photo counts by status, members
@@ -13,6 +14,7 @@ A stopgap until the admin frontend exists in cp-web. Edits stay in the Django ad
     /dj/staff/users/<id>/            one user: profile, consent, selfies, credits, events joined and owned
     /dj/staff/worker/                workers, queue, failed images
     /dj/staff/messages/              contact form messages (?all=1 with handled); mark handled
+    /dj/staff/mode/                  operation mode: normal / restricted / lockdown (common/mode.py), history
 """
 from collections import defaultdict
 from datetime import timedelta
@@ -316,3 +318,22 @@ def messages_page(request):
         rows = rows.filter(handled_at__isnull=True)
     page = Paginator(rows, PAGE).get_page(request.GET.get("page"))
     return render(request, "staff/messages.html", {"page": page, "show_all": show_all})
+
+
+@staff_required
+def mode_page(request):
+    """The operation mode switch (common/mode.py). POST mode + reason (required unless normal)."""
+    from common import mode as m
+    error = ""
+    if request.method == "POST":
+        try:
+            m.set_mode(request.POST.get("mode", ""), request.POST.get("reason", ""), by=request.user)
+            return redirect("staff:mode")
+        except ValueError as e:
+            error = str(e)
+    from common.models import OperationMode
+    history = OperationMode.objects.select_related("changed_by")[:30]
+    return render(request, "staff/mode.html", {
+        "current": m.current(), "latest": m.latest(), "history": history, "error": error,
+        "modes": [(value, label, m.DESCRIPTIONS[value]) for value, label in m.Mode.choices],
+    })

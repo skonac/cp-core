@@ -8,7 +8,7 @@ codes in its description. A test checks every real response against it, so it do
 TypeScript types can be generated from it: `npx openapi-typescript https://cleverphotos.org/api/openapi.json -o src/api/schema.d.ts`
 (behind the preview login: download the file first, or use `docs/openapi.json` from the repo).
 
-Last updated: 2026-10-31 (printed materials) · API version 0.7
+Last updated: 2026-11-10 (operation mode) · API version 0.7
 
 > **For an AI coding assistant working in cp-web:** read this whole file, then §5 ("Changes from cp-web's drafts"),
 > which lists every place where this API still differs from `cp-web/docs/api/*.md` and the MSW mocks. Update
@@ -19,6 +19,7 @@ Last updated: 2026-10-31 (printed materials) · API version 0.7
 
 | Date | Change | Where |
 | --- | --- | --- |
+| 2026-11-10 | Operation mode (staff kill switch): `GET /api/operation-mode` → `normal` / `restricted` / `lockdown`. Any endpoint can answer `503 site_locked` (lockdown), `POST /api/shop/purchases` can answer `503 payments_disabled` (restricted). `docs/openapi.json` regenerated (it had not been since Oct 31) | §2, §3.11, §5e |
 | 2026-10-31 | Printed materials (basılı materyal): `GET /api/organizer/events/{code}/print-themes`, each theme's formats (poster, table card) with `previewUrl` (HTML, for iframes and a new tab) and `pdfUrl` (download, one per format per 10 min) | §3.6, §5d |
 | 2026-10-29 | Discounts: products get `finalPrice`, `discountSource`, `discountLabel`; `discountPercent` is now the discount applied to that product (no longer "against the highest unit price"); top level `appliedPromo`, `globalDiscount`; `pricingVersion` covers the caller's prices. `POST /api/shop/promo`. A purchase discounted to 0 TL is paid at once (no iyzico). ÖBF/MSS version `002` shows list price and discount | §3.7 |
 | 2026-10-29 | Event types `holiday` and `vacation`; `GET /api/public/event-types` lists all types with their tr/en labels (use it instead of a list in cp-web) | §3.5, §3.6 |
@@ -109,6 +110,8 @@ Every response except files and `204` is:
 | 500 | `internal_error` | Bug; quote the `requestId` |
 | 502 | `payment_provider_error`, `payment_provider_unreachable` | Purchase: iyzico refused the request or can't be reached |
 | 502 | `sms_not_sent` | OTP request: the SMS provider refused or can't be reached |
+| 503 | `site_locked` | Operation mode `lockdown` (§3.11): any endpoint, for every account except staff. Header `Retry-After: 300` |
+| 503 | `payments_disabled` | Operation mode `restricted` (§3.11): `POST /api/shop/purchases` only |
 
 ## 3. Endpoints
 
@@ -843,6 +846,23 @@ someone's uploader gets `organizer_home`, and `uploaderAccesses` lists the other
 `…` = `/api/uploader`. Errors: `404 uploader_access_not_found` (not this uploader's, or revoked: go back to the
 organizer list), `404 event_not_found` (also an event not assigned, or no longer), `410 event_expired`, `422` as in §3.6, `403 csrf_failed`.
 
+### 3.11 Operation mode
+
+| Endpoint | Code | Data |
+| --- | --- | --- |
+| `GET /api/operation-mode` | `operation_mode_retrieved` | `{ mode }`: `normal`, `restricted` or `lockdown` |
+
+No sign-in needed, and open in every mode. Staff switch the mode during an incident (bug, payment problem,
+maintenance); the reason they give is internal and never in the API. Staff accounts are never blocked.
+
+- `normal`: everything works.
+- `restricted`: payments are off. `POST /api/shop/purchases` answers `503 payments_disabled`; everything else works,
+  and a payment already in progress still completes (iyzico's callback and webhook stay open).
+- `lockdown`: only staff can use the site. Every other request answers `503 site_locked`, except
+  `/api/health`, `/api/operation-mode`, iyzico's callback and webhook, the face worker and the Django admin/staff sign-in.
+
+The mode is cached for 5 seconds on the server, so a change can take that long to show.
+
 ## 4. Flows
 
 **Guest via QR** (`/…?event=RK238` in cp-web):
@@ -929,6 +949,19 @@ A "Basılı materyal" section on the organizer's event page: tabs or rows per fo
 per theme with a live thumbnail (iframe, §3.6), the theme's name in the current language, and two buttons:
 **Göster** (new tab, `previewUrl?lang=…`) and **PDF** (`pdfUrl?lang=…`, spinner while it renders; on 429 show the
 message). Pass the interface language as `lang`. Sort themes whose `eventTypes` include the event's type first.
+
+### 5e. New: operation mode (no draft in cp-web)
+
+Read `GET /api/operation-mode` when the app starts, and again whenever any call answers `503 site_locked` or
+`503 payments_disabled`; a light poll (every minute or two) while the app is open lets a lockdown or its end show
+up without a reload. The wording is cp-web's (tr/en); the API only gives the mode.
+
+- `restricted`: disable the buy buttons in the credit store with a notice ("payments temporarily unavailable"), and
+  treat `503 payments_disabled` from `POST /api/shop/purchases` the same way.
+- `lockdown`: a full-screen "temporarily closed, back soon" page in place of the app (keep the language switch).
+  A signed-in staff account (`accountRoles` includes `admin`) is not blocked: let it use the app normally,
+  ideally with a small banner saying the site is in lockdown.
+- `normal`: nothing to show.
 
 ## 6. Not yet in this API
 

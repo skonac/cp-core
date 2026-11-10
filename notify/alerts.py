@@ -50,6 +50,7 @@ TOPICS = {
     "notify.fail": "every provider of a channel (SMS, email) is failing",
     "system.error": "an unhandled server error",
     "system.disk": "the photo disk is nearly full",
+    "system.mode": "staff changed the operation mode (normal / restricted / lockdown)",
     "contact.new": "a contact form message arrived",
     "report.daily": "the daily summary",
 }

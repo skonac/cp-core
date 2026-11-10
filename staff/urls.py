@@ -16,6 +16,7 @@ urlpatterns = [
     path("users/<int:user_id>/", views.user, name="user"),
     path("worker/", views.worker, name="worker"),
     path("messages/", views.messages_page, name="messages"),
+    path("mode/", views.mode_page, name="mode"),
     path("purchases/<int:purchase_id>/documents/", views.purchase_documents, name="purchase_documents"),
     path("print/", print_views.page, name="print"),
     path("print/<str:theme_id>/<str:fmt>.html", print_views.html, name="print_html"),

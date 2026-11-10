@@ -29,6 +29,29 @@
         ]
       }
     },
+    "/api/operation-mode": {
+      "get": {
+        "operationId": "config_api_operation_mode",
+        "summary": "Operation Mode",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationModeResponse"
+                }
+              }
+            }
+          }
+        },
+        "description": "The site's operation mode, set by staff during an incident. Open in every mode and without sign-in:\nread it at app start (and when an API call answers 503 site_locked or payments_disabled) and show the\nstate: restricted -> disable the buy buttons with a notice; lockdown -> a \"temporarily closed\" screen.",
+        "tags": [
+          "system"
+        ]
+      }
+    },
     "/api/auth/csrf": {
       "get": {
         "operationId": "accounts_api_csrf",
@@ -188,6 +211,278 @@
         }
       }
     },
+    "/api/auth/email-requests": {
+      "post": {
+        "operationId": "accounts_api_email_request",
+        "summary": "Email Request",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailSentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error409"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        },
+        "description": "Mails a sign-in link and a 4-digit code (dev: to the server log and the admin). One flow for sign-up,\nsign-in and \"forgot password\" (`purpose: reset`). Either the link or the code signs in\n(POST /api/auth/email-verifications), creating the account for a new email.\n\n`purpose: sign_up` answers 409 email_already_registered (no mail) when the email already has an account with a\npassword: offer password sign-in and \"forgot password\".\n\nErrors: 404 event_not_found · 409 email_already_registered · 422 invalid_email, invalid_purpose, invalid_role,\nvalidation_error ·\n429 rate_limit_exceeded (3 mails per address per 15 min; 30 s between mails).",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailRequestIn"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/auth/email-verifications": {
+      "post": {
+        "operationId": "accounts_api_email_verify",
+        "summary": "Email Verify",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailSignInResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        },
+        "description": "Signs in with the mail's code (`challengeId` + `code`) or its link (`token`), creating the account for a\nnew email. Sets the session cookie. `nextStep: set_password` = ask for a password now (new account, an\naccount without one, or a reset); the user is already signed in either way.\n\nErrors: 410 email_code_expired · 422 invalid_email_code, validation_error ·\n429 rate_limit_exceeded (5 wrong codes per mail, 10 per address per day; the link still works).",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailVerifyIn"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/auth/password-sign-ins": {
+      "post": {
+        "operationId": "accounts_api_password_sign_in",
+        "summary": "Password Sign In",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordSignInResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        },
+        "description": "Phone or email + password. `role` is added to the account like a code sign-in does.\n\nErrors: 404 event_not_found · 422 invalid_credentials, invalid_role, validation_error ·\n429 rate_limit_exceeded (10 wrong passwords per phone/email per 15 min).",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordSignInIn"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/auth/guest-sessions": {
+      "post": {
+        "operationId": "accounts_api_guest_session",
+        "summary": "Guest Session",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestSessionResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error423"
+                }
+              }
+            }
+          }
+        },
+        "description": "Continue without an account: a guest session for this event only (consent, selfie, my photos,\ndownloads). Deleted after a few hours. Calling it again as the same event's guest keeps the session.\nA selfie upload by a guest needs a Turnstile token (`turnstileToken`).\n\nErrors: 403 guest_access_disabled (switched off for this event or everywhere) · 404 event_not_found ·\n410 event_expired · 423 event_access_closed.",
+        "tags": [
+          "auth"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuestSessionIn"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
     "/api/auth/session": {
       "delete": {
         "operationId": "accounts_api_sign_out",
@@ -292,7 +587,7 @@
             }
           }
         },
-        "description": "Profile: fullName (required), email (optional, null clears).\n\nErrors: 403 csrf_failed · 409 email_already_in_use · 422 validation_error.",
+        "description": "Profile: fullName (required), email (optional, null clears).\n\nErrors: 403 csrf_failed, guest_not_allowed · 409 email_already_in_use · 422 validation_error, email_is_sign_in (an account\nwithout a phone can't change or clear its email here).",
         "tags": [
           "me"
         ],
@@ -301,6 +596,74 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/MeUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/me/password": {
+      "put": {
+        "operationId": "accounts_api_put_password",
+        "summary": "Put Password",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordSetResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          }
+        },
+        "description": "Sets the password (at least 6 characters, no other rules) and stays signed in. `currentPassword` is\nneeded only when the account already has a password and the last sign-in was not by email within\n15 minutes.\n\nErrors: 403 csrf_failed, current_password_invalid, guest_not_allowed · 422 password_too_short, validation_error.",
+        "tags": [
+          "me"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordIn"
               }
             }
           },
@@ -510,9 +873,19 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
           }
         },
-        "description": "multipart/form-data: file (JPEG/PNG/WebP/HEIC, ≤ 50 MB), slot. Replaces the slot's selfie.\nProcessing is asynchronous: poll GET /api/me/selfies.\n\nErrors: 403 consent_required, csrf_failed · 422 unsupported_file_type, unreadable_image,\nfile_too_large, invalid_slot, validation_error.",
+        "description": "multipart/form-data: file (JPEG/PNG/WebP/HEIC, ≤ 50 MB), slot, and for guests `turnstileToken` (the\nCloudflare Turnstile widget's token; site key: `turnstileSiteKey` in GET /api/public/events/{code}). Replaces the slot's selfie.\nProcessing is asynchronous: poll GET /api/me/selfies.\n\nErrors: 403 consent_required, csrf_failed, turnstile_failed · 422 unsupported_file_type, unreadable_image,\nfile_too_large, invalid_slot, validation_error · 429 rate_limit_exceeded (guests: 2 per 10 min).",
         "tags": [
           "me"
         ],
@@ -529,6 +902,11 @@
                   "slot": {
                     "default": "primary",
                     "title": "Slot",
+                    "type": "string"
+                  },
+                  "turnstileToken": {
+                    "default": "",
+                    "title": "Turnstiletoken",
                     "type": "string"
                   }
                 },
@@ -918,7 +1296,7 @@
             }
           }
         },
-        "description": "The welcome screen: no photos, no counts. With a session, also adds the event to the user's events.\n\nErrors: 404 event_not_found · 410 event_expired · 423 event_access_closed ·\n429 rate_limit_exceeded (30 per minute per IP).",
+        "description": "The welcome screen: no photos, no counts. With a session, also adds the event to the user's events.\n\nErrors: 404 event_not_found · 410 event_expired · 423 event_access_closed ·\n429 rate_limit_exceeded (per IP per minute: CP_EVENT_LOOKUP_PER_MIN, default 30).",
         "tags": [
           "events"
         ]
@@ -1985,7 +2363,7 @@
             }
           }
         },
-        "description": "multipart/form-data: name, type, date (YYYY-MM-DD), city, venue (optional), hasFaceSearch,\nallowsBrowseAll, requiresConsent (optional, defaults true/false/true), cover (optional image).\nThe event is open at once; the code is generated. Creating costs nothing.\n\nErrors: 403 organizer_access_required · 422 validation_error, invalid_event_settings,\nunsupported_file_type, unreadable_image, file_too_large (cover).",
+        "description": "multipart/form-data: name, type, date (YYYY-MM-DD), city, venue (optional), hasFaceSearch,\nallowsBrowseAll, requiresConsent, allowsGuestAccess (optional, defaults true/false/true/true), cover (optional image).\nThe event is open at once; the code is generated. Creating costs nothing.\n\nErrors: 403 organizer_access_required · 422 validation_error, invalid_event_settings,\nunsupported_file_type, unreadable_image, file_too_large (cover).",
         "tags": [
           "organizer"
         ],
@@ -2046,6 +2424,11 @@
                   "requiresConsent": {
                     "default": true,
                     "title": "Requiresconsent",
+                    "type": "boolean"
+                  },
+                  "allowsGuestAccess": {
+                    "default": true,
+                    "title": "Allowsguestaccess",
                     "type": "boolean"
                   },
                   "cover": {
@@ -4017,9 +4400,19 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
           }
         },
-        "description": "Let a phone number upload to the chosen events (`eventCodes`, this organizer's, not expired), on this\norganizer's credits. No account is created for it; the uploader signs in with the organizer entry.\nOne uploader per phone: to give it more events, PATCH it.\n\nErrors: 403 organizer_access_required · 409 uploader_already_exists (this phone is already an\nactive uploader of this organizer) · 422 invalid_phone_number, validation_error (also an unknown or\nexpired event code, in errors.eventCodes).",
+        "description": "Let an email and/or a phone upload to the chosen events (`eventCodes`, this organizer's, not expired),\non this organizer's credits. One uploader per email/phone: to give it more events, PATCH it.\n- `email` (works now): the uploader gets an invitation mail (link + 4-digit code) that signs in to an\n  account for that email (created if new; they choose a password), straight to the uploader home.\n  Later: email + password (or an email code) through the organizer entry.\n- `phoneNumber`: no account; the uploader signs in with the organizer entry by OTP (needs WhatsApp/SMS).\n\nErrors: 403 organizer_access_required · 409 uploader_already_exists (this email/phone is already an\nactive uploader of this organizer) · 422 invalid_email, invalid_phone_number, validation_error (neither\ngiven; also an unknown or expired event code, in errors.eventCodes) · 429 rate_limit_exceeded (mails to\nthis address).",
         "tags": [
           "organizer"
         ],
@@ -4033,6 +4426,114 @@
           },
           "required": true
         },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ]
+      }
+    },
+    "/api/organizer/uploaders/{uploader_id}/invitation": {
+      "post": {
+        "operationId": "events_organizer_api_resend_invitation",
+        "summary": "Resend Invitation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uploader_id",
+            "schema": {
+              "title": "Uploader Id",
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "locale",
+            "schema": {
+              "default": "tr",
+              "title": "Locale",
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploaderInvitedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error401"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error403"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error410"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error422"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error429"
+                }
+              }
+            }
+          }
+        },
+        "description": "Mail the invitation (sign-in link + code) again. Errors: 403 organizer_access_required ·\n404 uploader_not_found · 410 uploader_revoked · 422 validation_error (no email on this uploader) ·\n429 rate_limit_exceeded (3 mails per address per 15 min, 30 s apart).",
+        "tags": [
+          "organizer"
+        ],
         "security": [
           {
             "SessionAuth": []
@@ -4193,7 +4694,7 @@
             }
           }
         },
-        "description": "Revoke: the phone can no longer upload for this organizer, at once (also in an open session).\nThe row stays (status `revoked`, its events kept for the record), with the photos it uploaded. Idempotent.\n\nErrors: 403 organizer_access_required · 404 uploader_not_found.",
+        "description": "Revoke: the email/phone can no longer upload for this organizer, at once (also in an open session).\nThe row stays (status `revoked`, its events kept for the record), with the photos it uploaded. Idempotent.\n\nErrors: 403 organizer_access_required · 404 uploader_not_found.",
         "tags": [
           "organizer"
         ],
@@ -5747,6 +6248,69 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "OperationModeOut": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "description": "normal: everything works · restricted: payments are off (starting a purchase answers 503 payments_disabled) · lockdown: only staff can use the site (everything else answers 503 site_locked). Staff are never blocked.",
+            "enum": [
+              "normal",
+              "restricted",
+              "lockdown"
+            ],
+            "examples": [
+              "normal"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "OperationModeOut",
+        "type": "object"
+      },
+      "OperationModeResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "operation_mode_retrieved",
+            "default": "operation_mode_retrieved",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/OperationModeOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "OperationModeResponse",
+        "type": "object"
+      },
       "CsrfResponse": {
         "additionalProperties": false,
         "properties": {
@@ -6236,8 +6800,9 @@
             "description": "For an uploader without an account: id is empty, no roles."
           },
           "nextStep": {
-            "description": "consent/selfie/gallery: signed in from an event link; organizer_home/account_home: no event; uploader_home: organizer entry by a phone an organizer added as uploader (§3.10).",
+            "description": "set_password: email sign-in of an account without a password, or a password reset: ask for one (PUT /api/me/password), its answer gives the next step; consent/selfie/gallery: signed in from an event link, or without one while KVKK consent is missing; organizer_home/account_home: no event; uploader_home: organizer entry (role organizer) by a phone or email an organizer added as uploader (§3.10).",
             "enum": [
+              "set_password",
               "consent",
               "selfie",
               "gallery",
@@ -6364,12 +6929,30 @@
             ],
             "title": "Uploadername",
             "type": "string"
+          },
+          "creditBalance": {
+            "description": "The organizer's credit balance (uploads spend it, 1 per photo).",
+            "examples": [
+              340
+            ],
+            "title": "Creditbalance",
+            "type": "integer"
+          },
+          "canUpload": {
+            "description": "false when the balance leaves no credit for even one photo (at the organizer's floor): uploads would be refused.",
+            "examples": [
+              true
+            ],
+            "title": "Canupload",
+            "type": "boolean"
           }
         },
         "required": [
           "id",
           "organizerName",
-          "uploaderName"
+          "uploaderName",
+          "creditBalance",
+          "canUpload"
         ],
         "title": "UploaderAccessOut",
         "type": "object"
@@ -6385,11 +6968,19 @@
             "type": "string"
           },
           "phoneNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null for accounts without a phone (email sign-up).",
             "examples": [
               "+905551234567"
             ],
-            "title": "Phonenumber",
-            "type": "string"
+            "title": "Phonenumber"
           },
           "fullName": {
             "anyOf": [
@@ -6442,6 +7033,14 @@
             },
             "title": "Accountroles",
             "type": "array"
+          },
+          "isGuest": {
+            "description": "A guest session (no account): one event only, no profile or password; deleted after a few hours.",
+            "examples": [
+              false
+            ],
+            "title": "Isguest",
+            "type": "boolean"
           },
           "hasConsent": {
             "description": "Consent given to the CURRENT KVKK version (kvkk.version).",
@@ -6502,6 +7101,7 @@
           "email",
           "profileCompleted",
           "accountRoles",
+          "isGuest",
           "hasConsent",
           "consentVersion",
           "kvkk",
@@ -6593,6 +7193,504 @@
           "code"
         ],
         "title": "OtpVerifyIn",
+        "type": "object"
+      },
+      "EmailChallengeOut": {
+        "additionalProperties": false,
+        "properties": {
+          "challengeId": {
+            "examples": [
+              "em_WcM7QQ-RIA9d2osCR_Mx6A"
+            ],
+            "title": "Challengeid",
+            "type": "string"
+          },
+          "expiresInSeconds": {
+            "examples": [
+              900
+            ],
+            "title": "Expiresinseconds",
+            "type": "integer"
+          },
+          "resendAfterSeconds": {
+            "examples": [
+              30
+            ],
+            "title": "Resendafterseconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "challengeId",
+          "expiresInSeconds",
+          "resendAfterSeconds"
+        ],
+        "title": "EmailChallengeOut",
+        "type": "object"
+      },
+      "EmailSentResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "email_sent",
+            "default": "email_sent",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EmailChallengeOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "EmailSentResponse",
+        "type": "object"
+      },
+      "Error409": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "consent_version_outdated"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Metin güncellendi; lütfen güncel metni oku."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              null
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error409",
+        "type": "object"
+      },
+      "EmailRequestIn": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "purpose": {
+            "default": "sign_in",
+            "title": "Purpose",
+            "type": "string"
+          },
+          "role": {
+            "default": "participant",
+            "title": "Role",
+            "type": "string"
+          },
+          "eventCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eventcode"
+          },
+          "locale": {
+            "default": "tr",
+            "title": "Locale",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "EmailRequestIn",
+        "type": "object"
+      },
+      "EmailSignInResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "email_verified",
+            "default": "email_verified",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SignInOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "EmailSignInResponse",
+        "type": "object"
+      },
+      "EmailVerifyIn": {
+        "properties": {
+          "challengeId": {
+            "default": "",
+            "title": "Challengeid",
+            "type": "string"
+          },
+          "code": {
+            "default": "",
+            "title": "Code",
+            "type": "string"
+          },
+          "token": {
+            "default": "",
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "title": "EmailVerifyIn",
+        "type": "object"
+      },
+      "PasswordSignInResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "signed_in",
+            "default": "signed_in",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SignInOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "PasswordSignInResponse",
+        "type": "object"
+      },
+      "PasswordSignInIn": {
+        "properties": {
+          "identifier": {
+            "title": "Identifier",
+            "type": "string"
+          },
+          "password": {
+            "title": "Password",
+            "type": "string"
+          },
+          "role": {
+            "default": "participant",
+            "title": "Role",
+            "type": "string"
+          },
+          "eventCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eventcode"
+          }
+        },
+        "required": [
+          "identifier",
+          "password"
+        ],
+        "title": "PasswordSignInIn",
+        "type": "object"
+      },
+      "GuestSessionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "guest_session_started",
+            "default": "guest_session_started",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SignInOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "GuestSessionResponse",
+        "type": "object"
+      },
+      "Error403": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "consent_required"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Bu etkinlik için açık rıza gerekli."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              null
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error403",
+        "type": "object"
+      },
+      "Error423": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": false,
+            "default": false,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "examples": [
+              "event_access_closed"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Turkish, safe to show.",
+            "examples": [
+              "Bu etkinliğe erişim kapatıldı."
+            ],
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "title": "Data",
+            "type": "null"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "422 validation_error only: field -> messages.",
+            "examples": [
+              null
+            ],
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId"
+        ],
+        "title": "Error423",
+        "type": "object"
+      },
+      "GuestSessionIn": {
+        "properties": {
+          "eventCode": {
+            "title": "Eventcode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "eventCode"
+        ],
+        "title": "GuestSessionIn",
         "type": "object"
       },
       "ProfileResponse": {
@@ -6741,138 +7839,6 @@
         "title": "ProfileUpdatedResponse",
         "type": "object"
       },
-      "Error403": {
-        "additionalProperties": false,
-        "properties": {
-          "success": {
-            "const": false,
-            "default": false,
-            "title": "Success",
-            "type": "boolean"
-          },
-          "code": {
-            "examples": [
-              "consent_required"
-            ],
-            "title": "Code",
-            "type": "string"
-          },
-          "message": {
-            "description": "Turkish, safe to show.",
-            "examples": [
-              "Bu etkinlik için açık rıza gerekli."
-            ],
-            "title": "Message",
-            "type": "string"
-          },
-          "data": {
-            "title": "Data",
-            "type": "null"
-          },
-          "requestId": {
-            "description": "Also in the X-Request-ID header; quote it in bug reports.",
-            "examples": [
-              "req_3dc994887c3ed300"
-            ],
-            "title": "Requestid",
-            "type": "string"
-          },
-          "errors": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "422 validation_error only: field -> messages.",
-            "examples": [
-              null
-            ],
-            "title": "Errors"
-          }
-        },
-        "required": [
-          "code",
-          "message",
-          "requestId"
-        ],
-        "title": "Error403",
-        "type": "object"
-      },
-      "Error409": {
-        "additionalProperties": false,
-        "properties": {
-          "success": {
-            "const": false,
-            "default": false,
-            "title": "Success",
-            "type": "boolean"
-          },
-          "code": {
-            "examples": [
-              "consent_version_outdated"
-            ],
-            "title": "Code",
-            "type": "string"
-          },
-          "message": {
-            "description": "Turkish, safe to show.",
-            "examples": [
-              "Metin güncellendi; lütfen güncel metni oku."
-            ],
-            "title": "Message",
-            "type": "string"
-          },
-          "data": {
-            "title": "Data",
-            "type": "null"
-          },
-          "requestId": {
-            "description": "Also in the X-Request-ID header; quote it in bug reports.",
-            "examples": [
-              "req_3dc994887c3ed300"
-            ],
-            "title": "Requestid",
-            "type": "string"
-          },
-          "errors": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "422 validation_error only: field -> messages.",
-            "examples": [
-              null
-            ],
-            "title": "Errors"
-          }
-        },
-        "required": [
-          "code",
-          "message",
-          "requestId"
-        ],
-        "title": "Error409",
-        "type": "object"
-      },
       "MeUpdateIn": {
         "properties": {
           "fullName": {
@@ -6895,6 +7861,113 @@
           "fullName"
         ],
         "title": "MeUpdateIn",
+        "type": "object"
+      },
+      "PasswordSetOut": {
+        "additionalProperties": false,
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserOut"
+          },
+          "nextStep": {
+            "description": "Where to go now (the event of the sign-in, if any; uploader_home after an uploader's organizer-entry sign-in).",
+            "enum": [
+              "consent",
+              "selfie",
+              "gallery",
+              "organizer_home",
+              "account_home",
+              "uploader_home"
+            ],
+            "title": "Nextstep",
+            "type": "string"
+          },
+          "eventCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The event the sign-in was for (consent/selfie/gallery are about it); null without one.",
+            "examples": [
+              "RK238X"
+            ],
+            "title": "Eventcode"
+          }
+        },
+        "required": [
+          "user",
+          "nextStep",
+          "eventCode"
+        ],
+        "title": "PasswordSetOut",
+        "type": "object"
+      },
+      "PasswordSetResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "password_set",
+            "default": "password_set",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PasswordSetOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "PasswordSetResponse",
+        "type": "object"
+      },
+      "PasswordIn": {
+        "properties": {
+          "password": {
+            "title": "Password",
+            "type": "string"
+          },
+          "currentPassword": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentpassword"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "PasswordIn",
         "type": "object"
       },
       "ConsentOut": {
@@ -7696,6 +8769,19 @@
           "requiresConsent": {
             "title": "Requiresconsent",
             "type": "boolean"
+          },
+          "allowsGuestAccess": {
+            "description": "Offer \"continue without an account\" (POST /api/auth/guest-sessions).",
+            "title": "Allowsguestaccess",
+            "type": "boolean"
+          },
+          "turnstileSiteKey": {
+            "description": "Cloudflare Turnstile site key for the widget on a guest's selfie upload.",
+            "examples": [
+              "1x00000000000000000000AA"
+            ],
+            "title": "Turnstilesitekey",
+            "type": "string"
           }
         },
         "required": [
@@ -7707,7 +8793,9 @@
           "status",
           "hasFaceSearch",
           "allowsBrowseAll",
-          "requiresConsent"
+          "requiresConsent",
+          "allowsGuestAccess",
+          "turnstileSiteKey"
         ],
         "title": "PublicEventOut",
         "type": "object"
@@ -7750,72 +8838,6 @@
           "requestId"
         ],
         "title": "PublicEventResponse",
-        "type": "object"
-      },
-      "Error423": {
-        "additionalProperties": false,
-        "properties": {
-          "success": {
-            "const": false,
-            "default": false,
-            "title": "Success",
-            "type": "boolean"
-          },
-          "code": {
-            "examples": [
-              "event_access_closed"
-            ],
-            "title": "Code",
-            "type": "string"
-          },
-          "message": {
-            "description": "Turkish, safe to show.",
-            "examples": [
-              "Bu etkinliğe erişim kapatıldı."
-            ],
-            "title": "Message",
-            "type": "string"
-          },
-          "data": {
-            "title": "Data",
-            "type": "null"
-          },
-          "requestId": {
-            "description": "Also in the X-Request-ID header; quote it in bug reports.",
-            "examples": [
-              "req_3dc994887c3ed300"
-            ],
-            "title": "Requestid",
-            "type": "string"
-          },
-          "errors": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "422 validation_error only: field -> messages.",
-            "examples": [
-              null
-            ],
-            "title": "Errors"
-          }
-        },
-        "required": [
-          "code",
-          "message",
-          "requestId"
-        ],
-        "title": "Error423",
         "type": "object"
       },
       "GalleryOut": {
@@ -8600,6 +9622,11 @@
             "title": "Requiresconsent",
             "type": "boolean"
           },
+          "allowsGuestAccess": {
+            "description": "QR visitors may use the event without an account (also needs the server-wide switch).",
+            "title": "Allowsguestaccess",
+            "type": "boolean"
+          },
           "photoCount": {
             "examples": [
               684
@@ -8722,6 +9749,7 @@
           "hasFaceSearch",
           "allowsBrowseAll",
           "requiresConsent",
+          "allowsGuestAccess",
           "photoCount",
           "processedPhotoCount",
           "pendingPhotoCount",
@@ -8904,6 +9932,11 @@
           "requiresConsent": {
             "default": true,
             "title": "Requiresconsent",
+            "type": "boolean"
+          },
+          "allowsGuestAccess": {
+            "default": true,
+            "title": "Allowsguestaccess",
             "type": "boolean"
           }
         },
@@ -9112,6 +10145,17 @@
               }
             ],
             "title": "Requiresconsent"
+          },
+          "allowsGuestAccess": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowsguestaccess"
           }
         },
         "title": "EventPatchIn",
@@ -10072,11 +11116,19 @@
             "title": "Displayname"
           },
           "maskedPhone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null when the participant's account has no phone.",
             "examples": [
               "•••••••••4218"
             ],
-            "title": "Maskedphone",
-            "type": "string"
+            "title": "Maskedphone"
           },
           "joinedAt": {
             "title": "Joinedat",
@@ -10115,6 +11167,11 @@
               18
             ],
             "title": "Matchedphotocount"
+          },
+          "isGuest": {
+            "description": "A guest (no account; deleted after a few hours).",
+            "title": "Isguest",
+            "type": "boolean"
           }
         },
         "required": [
@@ -10125,7 +11182,8 @@
           "lastActiveAt",
           "hasConsent",
           "matchStatus",
-          "matchedPhotoCount"
+          "matchedPhotoCount",
+          "isGuest"
         ],
         "title": "ParticipantOut",
         "type": "object"
@@ -10246,11 +11304,34 @@
             "type": "string"
           },
           "phoneNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null for an uploader added by email.",
             "examples": [
               "+905550000001"
             ],
-            "title": "Phonenumber",
-            "type": "string"
+            "title": "Phonenumber"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null for an uploader added by phone.",
+            "examples": [
+              "mert@example.com"
+            ],
+            "title": "Email"
           },
           "status": {
             "enum": [
@@ -10294,6 +11375,7 @@
           "id",
           "fullName",
           "phoneNumber",
+          "email",
           "status",
           "events",
           "createdAt",
@@ -10363,9 +11445,27 @@
             "title": "Fullname",
             "type": "string"
           },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
           "phoneNumber": {
-            "title": "Phonenumber",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phonenumber"
           },
           "eventCodes": {
             "items": {
@@ -10374,13 +11474,57 @@
             "maxItems": 500,
             "title": "Eventcodes",
             "type": "array"
+          },
+          "locale": {
+            "default": "tr",
+            "title": "Locale",
+            "type": "string"
           }
         },
         "required": [
-          "fullName",
-          "phoneNumber"
+          "fullName"
         ],
         "title": "UploaderIn",
+        "type": "object"
+      },
+      "UploaderInvitedResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "const": true,
+            "default": true,
+            "title": "Success",
+            "type": "boolean"
+          },
+          "code": {
+            "const": "organizer_uploader_invited",
+            "default": "organizer_uploader_invited",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "default": "",
+            "description": "Turkish text; never toast it on success.",
+            "title": "Message",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploaderDataOut"
+          },
+          "requestId": {
+            "description": "Also in the X-Request-ID header; quote it in bug reports.",
+            "examples": [
+              "req_3dc994887c3ed300"
+            ],
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data",
+          "requestId"
+        ],
+        "title": "UploaderInvitedResponse",
         "type": "object"
       },
       "UploaderUpdatedResponse": {

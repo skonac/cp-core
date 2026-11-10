@@ -75,6 +75,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "accounts.middleware.GuestExpiryMiddleware",   # expired guests are signed out
+    "common.middleware.OperationModeMiddleware",   # normal / restricted / lockdown (common/mode.py); staff pass
     "worker.middleware.SilentWorkerMiddleware",    # alerts when images wait and no worker polls (admin alert worker.silent)
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -98,6 +99,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "common.context_processors.operation_mode",
             ],
         },
     },
