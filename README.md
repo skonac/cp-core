@@ -17,6 +17,18 @@ cp-core-runserver                      # fallback: Django runserver in screen "c
 cp-core-manage <command>               # manage.py against the deployed copy
 ```
 
+Service user (one time, before the first deploy): cp-core runs as its own system user `cpcore`, not as your login.
+
+```bash
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin cpcore
+sudo usermod -aG cpcore $USER                      # optional: lets you read what it writes (log in again)
+sudo -u postgres createuser cpcore                 # Postgres role = Linux user name ("peer" auth, no password)
+sudo -u postgres createdb -O cpcore cpcore
+sudo -u postgres psql cpcore -c 'CREATE EXTENSION IF NOT EXISTS vector'
+sudo mkdir -p /photodisk/events /photodisk/selfies && sudo chown -R cpcore:cpcore /photodisk/events /photodisk/selfies
+```
+`CP_DB_USER=cpcore` in `/etc/cp-core/env`. `cp-core-manage` and `cp-core-runserver` switch to that user by themselves; `psql` as the app: `sudo -u cpcore psql cpcore`.
+
 First install: `deploy.sh` creates `/etc/cp-core/env` from `.env.example` and stops; edit it
 (`sudoedit /etc/cp-core/env`) and run it again. Needs Postgres with the `vector` extension
 (created by the postgres superuser) and the media folder (`CP_MEDIA_ROOT`, `/photodisk`).

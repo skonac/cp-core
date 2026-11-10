@@ -3,5 +3,7 @@
 #   cp-core-manage migrate
 #   cp-core-manage import_photos --event rk238 ~/photos
 #   cp-core-manage shell
+# Settings are readable by the service user (cpcore) only: run as that user (root may run it too).
+if [ "$(id -un)" != cpcore ] && [ "$(id -u)" != 0 ]; then exec sudo -u cpcore "$0" "$@"; fi
 exec env CP_ENV_FILE=/etc/cp-core/env PYTHONDONTWRITEBYTECODE=1 \
      /opt/cleverphotos/core/.venv/bin/python /opt/cleverphotos/core/manage.py "$@"
