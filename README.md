@@ -17,6 +17,9 @@ cp-core-runserver                      # fallback: Django runserver in screen "c
 cp-core-manage <command>               # manage.py against the deployed copy
 ```
 
+Every command (scripts, our management commands, useful Django ones, what is risky on the live server):
+[`docs/commands.md`](docs/commands.md).
+
 Service user (one time, before the first deploy): cp-core runs as its own system user `cpcore`, not as your login.
 
 ```bash
