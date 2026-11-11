@@ -19,6 +19,7 @@ Last updated: 2026-11-10 (operation mode) · API version 0.7
 
 | Date | Change | Where |
 | --- | --- | --- |
+| 2026-11-11 | Photo upload results (`POST …/photos`, organizer and uploader): per-file `status` is now only `accepted` or `rejected` (was `queued` / `ready` / `rejected`). Whether a stored photo is still waiting for face processing is its own status in `GET …/photos` (`queued`, `processing`, `ready`, `failed`), unchanged | §3.6 |
 | 2026-11-10 | Operation mode (staff kill switch): `normal` / `restricted` / `lockdown`. `paymentsEnabled` in `GET /api/shop/products`, `operationMode` in every user object, `GET /api/operation-mode`. Any endpoint can answer `503 site_locked` (lockdown), `POST /api/shop/purchases` `503 payments_disabled` (restricted). `docs/openapi.json` regenerated (it had not been since Oct 31) | §2, §3.11, §5e |
 | 2026-10-31 | Printed materials (basılı materyal): `GET /api/organizer/events/{code}/print-themes`, each theme's formats (poster, table card) with `previewUrl` (HTML, for iframes and a new tab) and `pdfUrl` (download, one per format per 10 min) | §3.6, §5d |
 | 2026-10-29 | Discounts: products get `finalPrice`, `discountSource`, `discountLabel`; `discountPercent` is now the discount applied to that product (no longer "against the highest unit price"); top level `appliedPromo`, `globalDiscount`; `pricingVersion` covers the caller's prices. `POST /api/shop/promo`. A purchase discounted to 0 TL is paid at once (no iyzico). ÖBF/MSS version `002` shows list price and discount | §3.7 |
@@ -575,13 +576,13 @@ Send large selections as several requests of a few files each (2 in parallel is 
 ```json
 { "acceptedCount": 2, "rejectedCount": 1, "creditBalance": 178,
   "results": [
-    { "clientId": "local-1", "photoId": "00045", "fileName": "00045.jpg", "status": "queued", "errorCode": null },
-    { "clientId": "local-2", "photoId": "00046", "fileName": "00046.jpg", "status": "queued", "errorCode": null },
+    { "clientId": "local-1", "photoId": "00045", "fileName": "00045.jpg", "status": "accepted", "errorCode": null },
+    { "clientId": "local-2", "photoId": "00046", "fileName": "00046.jpg", "status": "accepted", "errorCode": null },
     { "clientId": "local-3", "photoId": null, "fileName": null, "status": "rejected", "errorCode": "duplicate_photo" } ] }
 ```
 
-Each file is accepted or rejected on its own. `status`: `queued` (waiting for face processing), `ready`
-(event without face search), `rejected`. `fileName` is our name; the uploaded file name is not kept.
+Each file is accepted or rejected on its own. `status`: `accepted` or `rejected` (nothing else: whether the
+photo is still waiting for face processing is the photo's own status, see the list below). `fileName` is our name; the uploaded file name is not kept.
 Per-file `errorCode`: `unsupported_file_type`, `unreadable_image`, `file_too_large`, `duplicate_photo`
 (same file already in this event, not charged), `insufficient_credits` (balance at the floor: buy credits).
 Errors for the whole request: `410 event_expired`, `422 too_many_files`, `422 validation_error` (clientIds count).
@@ -930,7 +931,7 @@ and the KVKK `.pdf` URLs (#8): remove them.
 | O4 | `availableCredits` | `creditBalance` (dashboard, upload check, upload, delete, store); may be negative | Rename; show negative balances as they are |
 | O5 | Event detail `matchedPhotoCount` | Not provided; per-participant counts are in the participants list | Drop the stat or sum the participants' counts |
 | O6 | Event object without settings | Adds `hasFaceSearch`, `allowsBrowseAll`, `requiresConsent`, `pendingPhotoCount`, `failedPhotoCount`, `coverIsUploaded`, `createdAt`; `PATCH` changes them | Settings tab can use them |
-| O7 | Upload result `{clientId, fileName, status: ready\|rejected, errorCode: photo_invalid}` | Adds `photoId`; `fileName` is our name (`00045.jpg`, `null` when rejected); `status` `queued` \| `ready` \| `rejected`; specific `errorCode`s | Map the codes; match results by `clientId`. Max 20 files and 60 MB per request |
+| O7 | Upload result `{clientId, fileName, status: ready\|rejected, errorCode: photo_invalid}` | Adds `photoId`; `fileName` is our name (`00045.jpg`, `null` when rejected); `status` `accepted` \| `rejected`; specific `errorCode`s | Map the codes; match results by `clientId`. Max 20 files and 60 MB per request |
 | O8 | Photo list `{id, fileName, thumbnailUrl, status, uploadedAt, errorCode}` | Adds `faceCount`, `displayUrl`, `width`, `height`, `takenAt`, `nextCursor`; `?status=` filter, paging | — |
 | O9 | `POST …/photos/retry` | Removed: a failed photo is rare and fixed on our side | Remove the retry action |
 | O10 | Participants: `joinMethod`, `accessStatus`, `DELETE …/participants/{id}/access` (revoke) | Not in v1 (no revoke); `matchStatus` adds `consent_pending`, drops `matching_pending`; adds `hasConsent`; `counts` has no `active` | Remove revoke and those fields |

@@ -10655,10 +10655,9 @@
             "title": "Filename"
           },
           "status": {
-            "description": "queued = waiting for face processing.",
+            "description": "accepted = stored (face processing follows on its own; see GET …/photos for the photo's own status); rejected = see errorCode.",
             "enum": [
-              "queued",
-              "ready",
+              "accepted",
               "rejected"
             ],
             "title": "Status",

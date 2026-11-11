@@ -135,7 +135,7 @@ class OrganizerApiTests(TempMedia, TestCase):
         data = r.json()["data"]
         self.assertEqual((data["acceptedCount"], data["rejectedCount"], data["creditBalance"]), (2, 2, 1))
         self.assertEqual([(x["clientId"], x["status"], x["photoId"], x["errorCode"]) for x in data["results"]],
-                         [("a", "queued", "00001", None), ("b", "queued", "00002", None),
+                         [("a", "accepted", "00001", None), ("b", "accepted", "00002", None),
                           ("c", "rejected", None, "unreadable_image"), ("d", "rejected", None, "duplicate_photo")])
         self.assertCode(self.post_form(f"{base}/photos", {"files": [_file(12)], "clientIds": ["x", "y"]}),
                         422, "validation_error")

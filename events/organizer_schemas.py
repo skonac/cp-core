@@ -82,7 +82,7 @@ class UploadResultOut(Out):
     clientId: str = Field(examples=["local-1"])
     photoId: str | None = Field(description="Accepted: the photo number.", examples=["00045"])
     fileName: str | None = Field(description="Accepted: our name for it (never the uploaded name).", examples=["00045.jpg"])
-    status: Literal["queued", "ready", "rejected"] = Field(description="queued = waiting for face processing.")
+    status: Literal["accepted", "rejected"] = Field(description="accepted = stored (face processing follows on its own; see GET …/photos for the photo's own status); rejected = see errorCode.")
     errorCode: str | None = Field(examples=[None])
 
 

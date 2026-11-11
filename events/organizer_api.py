@@ -541,7 +541,7 @@ def upload_photos(request, code: str, files: File[list[UploadedFile]], clientIds
             continue
         accepted += 1
         results.append({"clientId": client_id, "photoId": image.seq_str, "fileName": f"{image.seq_str}.jpg",
-                        "status": "queued" if event.is_processing_faces else "ready", "errorCode": None})
+                        "status": "accepted", "errorCode": None})
     return respond(request, "organizer_photos_uploaded", {
         "acceptedCount": accepted, "rejectedCount": len(files) - accepted,
         "creditBalance": _balance(event.owner), "results": results})
