@@ -775,17 +775,20 @@ The phone number is the account's.
 { "type": "company", "firstName": "Ece", "lastName": "Yılmaz", "identityNumber": "",
   "companyName": "Foto Ltd. Şti.", "taxOffice": "Çankaya", "taxNumber": "1234567890",
   "email": "ece@example.com", "address": "Atatürk Cad. No: 1 D: 2", "district": "Çankaya", "city": "Ankara",
-  "postalCode": "06680", "country": "Türkiye" }
+  "postalCode": "06680", "country": "TR" }
 ```
 
 | Field | Rule |
 | --- | --- |
 | `type` | `individual` or `company` |
+| `country` | ISO 3166-1 alpha-2 code (`TR`, `DE`, `US`…), default `TR`; decides the rules below |
 | `firstName`, `lastName` | always; for a company, the contact person |
-| `identityNumber` | TC kimlik no, 11 digits with the official checksum; required for individuals, optional for companies |
-| `companyName`, `taxOffice`, `taxNumber` | companies only, all required; `taxNumber` = VKN, 10 digits with the official checksum |
-| `email`, `address`, `district` (ilçe), `city` (il) | always required |
-| `postalCode` | optional; `country` defaults to `Türkiye` |
+| `email`, `address`, `city` | always required |
+| `district` | `TR`: ilçe, required. Elsewhere: state/region, optional |
+| `postalCode` | optional |
+| `identityNumber` | `TR`: TC kimlik no, 11 digits with the official checksum; required for individuals, optional for companies. Elsewhere: optional, any form (e.g. passport no) |
+| `companyName`, `taxNumber` | companies only, required. `TR`: `taxNumber` = VKN, 10 digits with the official checksum. Elsewhere: the VAT/tax id, any form (e.g. `DE123456789`) |
+| `taxOffice` | `TR` companies only, required; ignored elsewhere |
 
 Errors: `422 validation_error` with `errors` per field, e.g. `{"identityNumber": ["invalid TC kimlik no"], "city": ["required"]}`.
 

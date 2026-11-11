@@ -21,6 +21,8 @@ from decimal import Decimal
 import iyzipay
 from django.conf import settings
 
+from .billing import country_name
+
 log = logging.getLogger("cp.iyzico")
 
 TIMEOUT = 20   # seconds per call to iyzico
@@ -84,8 +86,8 @@ def _send(resource, method: str, body: dict) -> dict:
 def build_initialize_request(purchase, user, profile, callback_url: str) -> dict:
     """The checkout form request: buyer and billing address from the billing profile, one VIRTUAL item."""
     name = f"{profile.first_name} {profile.last_name}".strip()
-    city, country = profile.city, profile.country or "Türkiye"
-    address = f"{profile.address}, {profile.district}"
+    city, country = profile.city, country_name(profile.country or "TR")
+    address = ", ".join(x for x in (profile.address, profile.district) if x)
     price = _money(purchase.amount)
     return {
         "locale": "tr",

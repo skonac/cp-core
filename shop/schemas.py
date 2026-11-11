@@ -106,16 +106,16 @@ class BillingOut(Out):
     type: Literal["individual", "company"]
     firstName: str = Field(description="The buyer; for a company, the contact person.", examples=["Ece"])
     lastName: str = Field(examples=["Yılmaz"])
-    identityNumber: str = Field(description="TC kimlik no; required for individuals.", examples=["10000000146"])
+    identityNumber: str = Field(description="TC kimlik no (required for TR individuals); abroad optional, e.g. a passport no.", examples=["10000000146"])
     companyName: str = Field(description="Unvan; companies only.", examples=[""])
-    taxOffice: str = Field(description="Vergi dairesi; companies only.", examples=[""])
-    taxNumber: str = Field(description="VKN, 10 digits; companies only.", examples=[""])
+    taxOffice: str = Field(description="Vergi dairesi; TR companies only.", examples=[""])
+    taxNumber: str = Field(description="Companies only: VKN (10 digits) in TR, the VAT/tax id elsewhere.", examples=[""])
     email: str = Field(examples=["ece@example.com"])
     address: str = Field(examples=["Atatürk Cad. No: 1 D: 2"])
-    district: str = Field(description="İlçe.", examples=["Çankaya"])
+    district: str = Field(description="İlçe (required in TR); state/region elsewhere, optional.", examples=["Çankaya"])
     city: str = Field(description="İl.", examples=["Ankara"])
     postalCode: str = Field(examples=["06680"])
-    country: str = Field(examples=["Türkiye"])
+    country: str = Field(description="ISO 3166-1 alpha-2 code.", examples=["TR"])
 
 
 class BillingDataOut(Out):

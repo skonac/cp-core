@@ -94,10 +94,12 @@ class Purchase(models.Model):
 
 
 class BillingProfile(models.Model):
-    """Who pays: an individual (TC kimlik no) or a company (unvan, vergi dairesi, VKN). Asked at the
-    first purchase, editable in the profile. The payment provider needs a buyer name, identity number,
-    email, phone (the account's) and an address; an invoice needs the company data. Checks:
-    shop/billing.py."""
+    """Who pays: an individual or a company. Asked at the first purchase, editable in the profile.
+    The payment provider needs a buyer name, identity number, email, phone (the account's) and an
+    address; an invoice needs the company data. Turkish buyers (country TR) give a TC kimlik no
+    (individuals) or unvan + vergi dairesi + VKN (companies), checked with the official checksums;
+    foreign buyers give whatever identity/VAT number their country uses, unchecked, and no tax office.
+    Checks: shop/billing.py."""
     class Type(models.TextChoices):
         INDIVIDUAL = "individual"
         COMPANY = "company"
@@ -106,16 +108,16 @@ class BillingProfile(models.Model):
     type = models.CharField(max_length=10, choices=Type.choices, default=Type.INDIVIDUAL)
     first_name = models.CharField(max_length=80)            # the buyer; for a company, the contact person
     last_name = models.CharField(max_length=80)
-    identity_number = models.CharField(max_length=11, blank=True)   # TC kimlik no: required for individuals
+    identity_number = models.CharField(max_length=20, blank=True)   # TC kimlik no (TR individuals: required); passport no etc. abroad
     company_name = models.CharField(max_length=200, blank=True)   # unvan
-    tax_office = models.CharField(max_length=80, blank=True)      # vergi dairesi
-    tax_number = models.CharField(max_length=10, blank=True)      # VKN, 10 digits
+    tax_office = models.CharField(max_length=80, blank=True)      # vergi dairesi (TR companies only)
+    tax_number = models.CharField(max_length=20, blank=True)      # VKN, 10 digits (TR); VAT id abroad, e.g. DE123456789
     email = models.EmailField()
     address = models.CharField(max_length=300)
-    district = models.CharField(max_length=80)              # ilçe
+    district = models.CharField(max_length=80, blank=True)  # ilçe (TR: required); state/region abroad, optional
     city = models.CharField(max_length=80)                  # il
     postal_code = models.CharField(max_length=10, blank=True)
-    country = models.CharField(max_length=60, default="Türkiye")
+    country = models.CharField(max_length=2, default="TR")  # ISO 3166-1 alpha-2
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 

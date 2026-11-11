@@ -304,26 +304,30 @@ class BillingIn(CamelSchema):
     type: Literal["individual", "company"] = "individual"
     first_name: str = Field("", max_length=80)
     last_name: str = Field("", max_length=80)
-    identity_number: str = Field("", max_length=11)
+    identity_number: str = Field("", max_length=20)
     company_name: str = Field("", max_length=200)
     tax_office: str = Field("", max_length=80)
-    tax_number: str = Field("", max_length=10)
+    tax_number: str = Field("", max_length=20)
     email: str = Field("", max_length=254)
     address: str = Field("", max_length=300)
     district: str = Field("", max_length=80)
     city: str = Field("", max_length=80)
     postal_code: str = Field("", max_length=10)
-    country: str = Field("Türkiye", max_length=60)
+    country: str = Field("TR", max_length=2, description="ISO 3166-1 alpha-2 code.")
 
 
 @billing_router.put("", response={200: S.BillingSavedResponse, **errors(401, 422)})
 def put_billing(request, data: BillingIn):
-    """Save the whole billing profile. Individuals: name, TC kimlik no, email, address, district, city.
-    Companies: name of the contact person, company name (unvan), tax office, VKN, email, address,
-    district, city (TC kimlik no optional). Checked with the official TC kimlik / VKN checksums.
+    """Save the whole billing profile. `country` is an ISO 3166-1 alpha-2 code (default TR).
+    Everyone: name, email, address, city, country. Turkey (TR): individuals also a TC kimlik no;
+    companies also company name (unvan), tax office, VKN (TC kimlik no of the contact optional); both
+    also district (ilçe). TC kimlik / VKN are checked with the official checksums. Other countries:
+    individuals' identity number optional and unchecked; companies also company name and a tax/VAT
+    number of any form (no tax office); district (state/region) optional.
 
     Errors: 422 validation_error with `errors` per field (e.g. {"identityNumber": ["invalid TC kimlik no"]})."""
     values = {field: getattr(data, field).strip() for field in BILLING_FIELDS.values()}
+    values["country"] = values["country"].upper()
     profile = _profile(request.user) or BillingProfile(user=request.user)
     for field, value in values.items():
         setattr(profile, field, value)

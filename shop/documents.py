@@ -19,6 +19,8 @@ from django.template import Context, Engine
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 
+from .billing import country_name
+
 KINDS = ("obf", "mss")
 LOCALES = ("tr", "en")
 ORDER = (("obf", "tr"), ("mss", "tr"), ("obf", "en"), ("mss", "en"))   # the stored page
@@ -61,7 +63,7 @@ def _buyer(billing: dict, phone: str) -> dict:
     person = f"{b.get('firstName', '')} {b.get('lastName', '')}".strip()
     place = " ".join(x for x in (b.get("postalCode", ""), b.get("district", "")) if x)
     address = ", ".join(x for x in (b.get("address", ""), " / ".join(x for x in (place, b.get("city", "")) if x),
-                                    b.get("country", "")) if x)
+                                    country_name(b.get("country", ""))) if x)
     return {"name": (b.get("companyName") if company else person) or person or EMPTY,
             "tax_id": (b.get("taxNumber") if company else b.get("identityNumber")) or EMPTY,
             "tax_office": (b.get("taxOffice") if company else "") or EMPTY,

@@ -22,7 +22,7 @@ from config.api import api
 from credits.models import CreditTransaction
 
 from .apps import check_payment_provider, check_sales_documents
-from .billing import tckn_valid, vkn_valid
+from .billing import billing_errors, country_name, tckn_valid, vkn_valid
 from . import pricing
 from .models import BillingProfile, Product, PromoCode, Purchase
 from .documents import attach
@@ -127,6 +127,15 @@ class ShopApiTests(TestCase):
         r = c.put("/api/me/billing", {**PERSON, "type": "company", "identityNumber": "", "companyName": "Foto Ltd.",
                                       "taxOffice": "Çankaya", "taxNumber": "1234567890"},
                   content_type="application/json", **c.csrf_headers())
+        self.assertCode(r, 200, "billing_saved")
+        r = c.put("/api/me/billing", {**PERSON, "type": "company", "identityNumber": "", "companyName": "Foto GmbH",
+                                      "taxNumber": "DE123456789", "district": "", "city": "Berlin", "country": "de"},
+                  content_type="application/json", **c.csrf_headers())   # abroad: no tax office, no district, any VAT id
+        self.assertCode(r, 200, "billing_saved")
+        self.assertEqual((r.json()["data"]["billing"]["country"], r.json()["data"]["isComplete"]), ("DE", True))
+        r = c.put("/api/me/billing", {**PERSON, "type": "company", "identityNumber": "", "companyName": "Foto Ltd.",
+                                      "taxOffice": "Çankaya", "taxNumber": "1234567890"},
+                  content_type="application/json", **c.csrf_headers())   # back to the Turkish company for the rest
         self.assertCode(r, 200, "billing_saved")
 
         # --- the two documents, read before buying, then the purchase stores them
@@ -339,6 +348,40 @@ class BillingChecksTests(TestCase):
         self.assertTrue(vkn_valid("1234567890"))
         self.assertEqual(sum(vkn_valid("123456789" + str(d)) for d in range(10)), 1)   # one check digit per prefix
         self.assertFalse(vkn_valid("123456789"))
+
+    def test_country_rules(self):
+        base = dict(first_name="Ece", last_name="Yılmaz", email="e@x.co", address="Cad. 1", city="Ankara")
+        tr = BillingProfile(**base, country="TR", district="Çankaya")
+        self.assertEqual(set(billing_errors(BillingProfile(**base, country="TR"))), {"district", "identity_number"})
+        self.assertEqual(billing_errors(BillingProfile(**base, country="TR", district="Çankaya", type="company",
+                                                       company_name="Foto Ltd.", tax_number="DE123456789")),
+                         {"tax_office": "required", "tax_number": "invalid vergi kimlik no"})
+        self.assertEqual(billing_errors(BillingProfile(**base, country="T1")), {"country": "invalid country code"})
+        # abroad: no district, no identity number, any tax number, no tax office
+        self.assertEqual(billing_errors(BillingProfile(**base, country="DE")), {})
+        self.assertEqual(billing_errors(BillingProfile(**base, country="US", identity_number="X1234567", city="Austin",
+                                                       district="TX", postal_code="73301")), {})
+        self.assertEqual(billing_errors(BillingProfile(**base, country="DE", type="company")),
+                         {"company_name": "required", "tax_number": "required"})
+        self.assertEqual(billing_errors(BillingProfile(**base, country="DE", type="company", company_name="Foto GmbH",
+                                                       tax_number="DE123456789")), {})
+        self.assertEqual((country_name("TR"), country_name("DE"), tr.is_complete), ("Türkiye", "DE", False))
+
+    def test_foreign_buyer_request(self):
+        from .iyzico import build_initialize_request
+        from .documents import _buyer
+        user = User.objects.create_user("+15550000401")
+        profile = BillingProfile(user=user, type="company", first_name="Ann", last_name="Lee", email="a@x.co",
+                                 company_name="Foto GmbH", tax_number="DE123456789", address="Str. 1", city="Berlin",
+                                 postal_code="10115", country="DE")
+        purchase = Purchase(pk=1, amount=Decimal("100.00"), currency="TRY", conversation_id="c", product_id=1,
+                            product_name_tr="P")
+        body = build_initialize_request(purchase, user, profile, "https://x/cb")
+        self.assertEqual((body["buyer"]["country"], body["buyer"]["registrationAddress"], body["buyer"]["identityNumber"]),
+                         ("DE", "Str. 1", "11111111111"))
+        self.assertEqual(_buyer({"type": "company", "companyName": "Foto GmbH", "taxNumber": "DE123456789",
+                                 "address": "Str. 1", "postalCode": "10115", "city": "Berlin", "country": "DE"}, "")["address"],
+                         "Str. 1, 10115 / Berlin, DE")
 
 
 class DocumentsTests(TestCase):
