@@ -5,6 +5,7 @@ import random
 import tempfile
 from pathlib import Path
 
+from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase
 from PIL import ExifTags, Image as PILImage
@@ -70,7 +71,7 @@ class RejectionMatchingTests(TempMedia, TestCase):
 
     def setUp(self):
         self.owner = User.objects.create_user("+905550000001", credit_balance=100)
-        self.son = User.objects.create_user("+905550000002", kvkk_version="002")
+        self.son = User.objects.create_user("+905550000002", kvkk_version=settings.KVKK_VERSION)
         self.event = make_event(self.owner)
         me = person(1)
         father = relative_of(me, 0.55, seed=7)

@@ -278,12 +278,12 @@ LEGAL_DIR = BASE_DIR / "legal"
 
 # KVKK consent document (design/core.md, "Consent"). The pair legal/kvkk_tr_<v>.html + kvkk_en_<v>.html;
 # a user has consent when User.kvkk_version equals this. Changing it = everyone consents again.
-KVKK_VERSION = env("CP_KVKK_VERSION", "002")
+KVKK_VERSION = env("CP_KVKK_VERSION", "003")
 KVKK_LOCALES = ("tr", "en")
 
 # Sales documents (design/core.md, "Checkout documents"): Ön Bilgilendirme Formu + Mesafeli Satış
 # Sözleşmesi, TR + EN: legal/{obf,mss}_{tr,en}_<v>.html + sales_page_<v>.html. A published version is never edited.
-SALES_DOCS_VERSION = env("CP_SALES_DOCS_VERSION", "002")
+SALES_DOCS_VERSION = env("CP_SALES_DOCS_VERSION", "003")
 
 WORKER_TOKEN = env("CP_WORKER_TOKEN", "")
 WORKER_LEASE = 120          # seconds a claimed job belongs to its worker

@@ -19,6 +19,7 @@ Last updated: 2026-11-10 (operation mode) · API version 0.7
 
 | Date | Change | Where |
 | --- | --- | --- |
+| 2026-11-11 | Legal texts version **003** (KVKK, ÖBF, MSS; only the contact address changed to contact@cleverphotos.org). `kvkk.version` in the user object and `documentsVersion` in the shop catalog are now `003`; everyone gives KVKK consent again (the same flow as any new version). Always read the version from the API, never hard-code it | §3.2, §3.3, §3.7 |
 | 2026-11-11 | `GET /api/me/selfies?eventCode=`: `eventMatch` with `matchedPhotoCount` (the gallery's number, all selfies combined), `photosPending`, `matching`, `blocked`. Without `eventCode`, `eventMatch` is `null` | §3.4 |
 | 2026-11-11 | Photo upload results (`POST …/photos`, organizer and uploader): per-file `status` is now only `accepted` or `rejected` (was `queued` / `ready` / `rejected`). Whether a stored photo is still waiting for face processing is its own status in `GET …/photos` (`queued`, `processing`, `ready`, `failed`), unchanged | §3.6 |
 | 2026-11-10 | Operation mode (staff kill switch): `normal` / `restricted` / `lockdown`. `paymentsEnabled` in `GET /api/shop/products`, `operationMode` in every user object, `GET /api/operation-mode`. Any endpoint can answer `503 site_locked` (lockdown), `POST /api/shop/purchases` `503 payments_disabled` (restricted). `docs/openapi.json` regenerated (it had not been since Oct 31) | §2, §3.11, §5e |
@@ -168,7 +169,7 @@ The event context comes from the challenge; `eventCode` in this body is not need
   "user": { "id": "69", "phoneNumber": "+905551234567", "fullName": null, "email": null,
             "profileCompleted": false, "accountRoles": ["participant"], "hasConsent": false,
             "consentVersion": null,
-            "kvkk": { "version": "002", "urls": { "tr": "/api/kvkk/kvkk_tr_002.html", "en": "/api/kvkk/kvkk_en_002.html" } },
+            "kvkk": { "version": "003", "urls": { "tr": "/api/kvkk/kvkk_tr_003.html", "en": "/api/kvkk/kvkk_en_003.html" } },
             "selfieState": "no_selfie", "selfieThumbnailUrl": null },
   "nextStep": "consent",
   "isNewUser": true,
@@ -293,13 +294,13 @@ To keep a guest's work, the user signs up by email (the guest's selfie is not ca
 ### 3.3 Consent
 
 The KVKK notice and explicit consent text is an HTML page, one per language, versioned as a pair
-(`kvkk_tr_002.html` + `kvkk_en_002.html`; no PDFs). The current version and its URLs are in the user object
+(`kvkk_tr_003.html` + `kvkk_en_003.html`; no PDFs). The current version and its URLs are in the user object
 (`user.kvkk`, from `GET /api/me` or the OTP verification).
 
-**`GET /api/kvkk/{file}`** (no session needed) → the page (`text/html`), e.g. `/api/kvkk/kvkk_tr_002.html`. Show it in
+**`GET /api/kvkk/{file}`** (no session needed) → the page (`text/html`), e.g. `/api/kvkk/kvkk_tr_003.html`. Show it in
 an `iframe` or a new tab. Older versions stay available. Unknown file → `404 not_found`.
 
-**`POST /api/me/consent`** `{ "granted": true, "version": "002", "locale": "tr" }` → `201 consent_recorded` `{ "hasConsent": true, "version": "002" }`.
+**`POST /api/me/consent`** `{ "granted": true, "version": "003", "locale": "tr" }` → `201 consent_recorded` `{ "hasConsent": true, "version": "003" }`.
 
 - `version`: required, the `user.kvkk.version` the screen showed. If the document was updated meanwhile →
   `409 consent_version_outdated`: re-fetch `GET /api/me` and show the new text.
@@ -663,7 +664,7 @@ not filled in (fall back to the other language, or hide it).
   "appliedPromo": null,
   "globalDiscount": { "percent": 15, "title": { "tr": "LANSMANA ÖZEL", "en": "LANSMANA ÖZEL" },
                       "banner": { "tr": "HERKESE LANSMANA ÖZEL %15 İNDİRİM!", "en": "HERKESE LANSMANA ÖZEL %15 İNDİRİM!" } },
-  "documentsVersion": "002" }
+  "documentsVersion": "003" }
 ```
 
 No session needed. `creditBalance` is `null` when signed out. `products`: the ones on sale, in display order.
@@ -728,7 +729,7 @@ purchase time. `status`: `pending` (payment not finished), `paid` (credits added
 the buyer accepted for this purchase (`null` on purchases from before the documents existed); show it as a link
 ("Sözleşme" / "Agreement") in the purchase history.
 
-**`POST /api/shop/purchases`** `{ "productId": "2", "pricingVersion": "3f9a1c0b2d4e", "documentsVersion": "002",
+**`POST /api/shop/purchases`** `{ "productId": "2", "pricingVersion": "3f9a1c0b2d4e", "documentsVersion": "003",
 "acceptedObf": true, "acceptedMss": true }` →
 `201 purchase_started` `{ "purchase": {…}, "paymentPageUrl": "https://sandbox-cpp.iyzipay.com?token=…", "creditBalance": 1840 }`.
 
