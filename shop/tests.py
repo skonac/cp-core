@@ -65,6 +65,7 @@ class ShopApiTests(TestCase):
     def assertCode(self, r, status, code):
         self.assertEqual((r.status_code, r.json().get("code")), (status, code), r.content[:400])
 
+    @override_settings(PAYMENT_PROVIDER="simulated")   # the server's env is iyzico-production: never reach iyzico from a test
     def test_shop_flow_and_contract(self):
         cache.clear()
         c = ApiClient()
@@ -359,8 +360,8 @@ class BillingChecksTests(TestCase):
         self.assertEqual(billing_errors(BillingProfile(**base, country="T1")), {"country": "invalid country code"})
         # abroad: no district, no identity number, any tax number, no tax office
         self.assertEqual(billing_errors(BillingProfile(**base, country="DE")), {})
-        self.assertEqual(billing_errors(BillingProfile(**base, country="US", identity_number="X1234567", city="Austin",
-                                                       district="TX", postal_code="73301")), {})
+        self.assertEqual(billing_errors(BillingProfile(**base, country="US", identity_number="X1234567", district="TX",
+                                                       postal_code="73301")), {})
         self.assertEqual(billing_errors(BillingProfile(**base, country="DE", type="company")),
                          {"company_name": "required", "tax_number": "required"})
         self.assertEqual(billing_errors(BillingProfile(**base, country="DE", type="company", company_name="Foto GmbH",
