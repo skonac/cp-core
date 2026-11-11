@@ -86,7 +86,9 @@ def image(request, image_id: int):
     img = Image.objects.filter(pk=image_id, deleted_at__isnull=True).first()
     if img is None:
         return JsonResponse({"error": "no such image"}, status=404)
-    return file_response(img.relpath("d"))
+    # Not X-Accel: the worker calls gunicorn directly (nginx closes /api/faceworker/), so an empty body
+    # with an X-Accel-Redirect header would reach it as 0 bytes ("cannot decode 0 bytes").
+    return file_response(img.relpath("d"), accel=False)
 
 
 @csrf_exempt   # machine-to-machine; the bearer token is the protection

@@ -55,3 +55,26 @@ class SilentWorkerTests(TestCase):
         self.waiting_for(10)
         self.assertEqual(self.check().call_count, 1)
         self.assertEqual(self.check().call_count, 0)       # throttled: the database is not even asked
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="cp-worker-test-"), WORKER_TOKEN="test-token")
+class WorkerImageDownloadTests(TestCase):
+    """The worker reaches gunicorn directly: with X-Accel on it must still get the bytes."""
+
+    def setUp(self):
+        owner = User.objects.create_user("+905550000072", "pw", is_organizer=True, credit_balance=10)
+        self.image = ingest_photo(make_event(owner), owner, jpeg())
+
+    def fetch(self):
+        return self.client.get(f"/api/faceworker/images/{self.image.pk}.jpg", HTTP_AUTHORIZATION="Bearer test-token")
+
+    @override_settings(USE_X_ACCEL=True)
+    def test_bytes_are_sent_even_with_x_accel_on(self):
+        r = self.fetch()
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("X-Accel-Redirect", r)
+        self.assertGreater(len(b"".join(r.streaming_content)), 0)
+
+    @override_settings(USE_X_ACCEL=False)
+    def test_bytes_are_sent_without_x_accel(self):
+        self.assertGreater(len(b"".join(self.fetch().streaming_content)), 0)

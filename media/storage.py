@@ -27,8 +27,11 @@ def write_file(relpath: str, data: bytes) -> Path:
     return path
 
 
-def file_response(relpath: str, download_name: str | None = None, content_type: str = "image/jpeg") -> HttpResponse:
-    if settings.USE_X_ACCEL:
+def file_response(relpath: str, download_name: str | None = None, content_type: str = "image/jpeg",
+                  accel: bool = True) -> HttpResponse:
+    """accel=False: always stream from Python. For callers that do not come through nginx (the face
+    worker talks to gunicorn directly): nobody there would act on X-Accel-Redirect, the body stays empty."""
+    if settings.USE_X_ACCEL and accel:
         response = HttpResponse(content_type=content_type)
         response["X-Accel-Redirect"] = settings.X_ACCEL_PREFIX + relpath
     else:
