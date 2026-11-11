@@ -796,7 +796,18 @@
       "get": {
         "operationId": "accounts_api_selfies",
         "summary": "Selfies",
-        "parameters": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "eventCode",
+            "schema": {
+              "default": "",
+              "title": "Eventcode",
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -817,9 +828,19 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error404"
+                }
+              }
+            }
           }
         },
-        "description": "The user's selfies (slots primary, secondary). Poll after an upload until status leaves processing.",
+        "description": "The user's selfies (slots primary, secondary). Poll after an upload until status leaves processing.\n\n`?eventCode=`: also `eventMatch`, how many photos of this event the selfies find, all selfies combined, the\nsame number as `total` of the gallery's view=mine. Computed only when a selfie is ready.\n\nErrors: 404 event_not_found (with eventCode: unknown, or a guest's other event).",
         "tags": [
           "me"
         ],
@@ -8255,6 +8276,94 @@
         "title": "MyEventsResponse",
         "type": "object"
       },
+      "EventMatchOut": {
+        "additionalProperties": false,
+        "properties": {
+          "eventCode": {
+            "examples": [
+              "RK238"
+            ],
+            "title": "Eventcode",
+            "type": "string"
+          },
+          "matching": {
+            "anyOf": [
+              {
+                "enum": [
+                  "consent_required",
+                  "matching_off",
+                  "no_selfie",
+                  "selfie_processing",
+                  "selfie_rejected",
+                  "ready"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Same value as `matching` in GET /api/events/{code}/photos.",
+            "examples": [
+              "ready"
+            ],
+            "title": "Matching"
+          },
+          "blocked": {
+            "anyOf": [
+              {
+                "enum": [
+                  "closed",
+                  "expired",
+                  "consent_required",
+                  "guest_access_off"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when this person cannot use the event (then no counts).",
+            "examples": [
+              null
+            ],
+            "title": "Blocked"
+          },
+          "matchedPhotoCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The same number as `total` of the gallery's view=mine (all selfies combined). null unless matching is ready.",
+            "examples": [
+              12
+            ],
+            "title": "Matchedphotocount"
+          },
+          "photosPending": {
+            "description": "Event photos still waiting for face processing: while > 0, matchedPhotoCount can still grow.",
+            "examples": [
+              0
+            ],
+            "title": "Photospending",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "eventCode",
+          "matching",
+          "blocked",
+          "matchedPhotoCount",
+          "photosPending"
+        ],
+        "title": "EventMatchOut",
+        "type": "object"
+      },
       "SelfieOut": {
         "additionalProperties": false,
         "properties": {
@@ -8354,11 +8463,26 @@
             ],
             "title": "Selfiestate",
             "type": "string"
+          },
+          "eventMatch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventMatchOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Only with `?eventCode=`; otherwise null.",
+            "examples": [
+              null
+            ]
           }
         },
         "required": [
           "selfies",
-          "selfieState"
+          "selfieState",
+          "eventMatch"
         ],
         "title": "SelfiesOut",
         "type": "object"

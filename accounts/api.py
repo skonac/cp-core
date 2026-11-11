@@ -409,12 +409,33 @@ def my_events(request):
     return respond(request, "user_events_retrieved", {"events": events, "total": len(events)})
 
 
-@me_router.get("/selfies", response={200: S.SelfiesResponse, **errors(401)})
-def selfies(request):
-    """The user's selfies (slots primary, secondary). Poll after an upload until status leaves processing."""
+@me_router.get("/selfies", response={200: S.SelfiesResponse, **errors(401, 404)})
+def selfies(request, eventCode: str = ""):   # noqa: N803  (the query parameter's name)
+    """The user's selfies (slots primary, secondary). Poll after an upload until status leaves processing.
+
+    `?eventCode=`: also `eventMatch`, how many photos of this event the selfies find, all selfies combined, the
+    same number as `total` of the gallery's view=mine. Computed only when a selfie is ready.
+
+    Errors: 404 event_not_found (with eventCode: unknown, or a guest's other event)."""
     rows = Image.objects.filter(owner=request.user, kind=Image.Kind.SELFIE, deleted_at__isnull=True).order_by("slot")
     return respond(request, "selfies_retrieved", {"selfies": [selfie_json(s) for s in rows],
-                                                  "selfieState": selfie_state(request.user)})
+                                                  "selfieState": selfie_state(request.user),
+                                                  "eventMatch": _event_match(request.user, eventCode) if eventCode else None})
+
+
+def _event_match(user, code: str) -> dict:
+    event = Event.objects.filter(code=normalize_code(code)).first()
+    access = access_for(user, event) if event else None
+    if event is None or access.blocked == "not_found":
+        raise ApiError(404, "event_not_found", "Etkinlik bulunamadı.")
+    if access.blocked:
+        return {"eventCode": event.display_code, "matching": None, "blocked": access.blocked,
+                "matchedPhotoCount": None, "photosPending": 0}
+    photos = Image.objects.filter(event=event, kind=Image.Kind.PHOTO, deleted_at__isnull=True)
+    pending = photos.filter(status__in=["pending", "processing"]).count() if event.is_processing_faces else 0
+    matched = len(my_photos(user, event)) if access.can_match and access.matching == "ready" else None
+    return {"eventCode": event.display_code, "matching": access.matching or None, "blocked": None,
+            "matchedPhotoCount": matched, "photosPending": pending}
 
 
 @me_router.post("/selfies", response={201: S.SelfieAcceptedResponse, **errors(401, 403, 422, 429)})

@@ -190,6 +190,21 @@ class ApiContractTests(TempMedia, TestCase):
         mine = {e["code"]: e for e in r.json()["data"]["events"]}
         self.assertEqual(mine[code]["matchedPhotoCount"], 2)
 
+        # --- selfies with an event code: the same number as the gallery's "mine"
+        r = c.get("/api/me/selfies", {"eventCode": code})
+        self.assertCode(r, 200, "selfies_retrieved")
+        gallery = c.get(f"{ev}/gallery", {"view": "mine"}).json()["data"]
+        self.assertEqual(r.json()["data"]["eventMatch"], {"eventCode": code, "matching": "ready", "blocked": None,
+                                                          "matchedPhotoCount": 2, "photosPending": gallery["photosPending"]})
+        self.assertEqual(r.json()["data"]["eventMatch"]["matchedPhotoCount"], gallery["total"])
+        self.assertGreater(gallery["photosPending"], 0)   # an unprocessed photo is in this event: the count may still grow
+        self.assertIsNone(c.get("/api/me/selfies").json()["data"]["eventMatch"])
+        for event, blocked in ((self.closed, "closed"), (self.expired, "expired")):
+            self.assertEqual(c.get("/api/me/selfies", {"eventCode": event.display_code}).json()["data"]["eventMatch"],
+                             {"eventCode": event.display_code, "matching": None, "blocked": blocked,
+                              "matchedPhotoCount": None, "photosPending": 0})
+        self.assertCode(c.get("/api/me/selfies", {"eventCode": "NOPE99"}), 404, "event_not_found")
+
         # --- "not me": the frame, rejecting a stranger's face (photo stays), then my own face (photo goes), undo
         photo = c.get(f"{ev}/gallery/photos/{self.p_me.seq_str}").json()["data"]["photo"]
         my_face, = self.p_me.faces.filter(pk=int(photo["matchedFace"]["faceId"]))

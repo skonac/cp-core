@@ -128,9 +128,22 @@ class SelfieOut(Out):
     createdAt: str = Field(examples=["2026-10-19T08:30:00+00:00"])
 
 
+class EventMatchOut(Out):
+    eventCode: str = Field(examples=["RK238"])
+    matching: Matching | None = Field(description="Same value as `matching` in GET /api/events/{code}/photos.", examples=["ready"])
+    blocked: Literal["closed", "expired", "consent_required", "guest_access_off"] | None = Field(
+        description="Set when this person cannot use the event (then no counts).", examples=[None])
+    matchedPhotoCount: int | None = Field(
+        description="The same number as `total` of the gallery's view=mine (all selfies combined). null unless matching is ready.",
+        examples=[12])
+    photosPending: int = Field(description="Event photos still waiting for face processing: while > 0, "
+                                           "matchedPhotoCount can still grow.", examples=[0])
+
+
 class SelfiesOut(Out):
     selfies: list[SelfieOut]
     selfieState: SelfieState = Field(examples=["ready"])
+    eventMatch: EventMatchOut | None = Field(description="Only with `?eventCode=`; otherwise null.", examples=[None])
 
 
 CsrfResponse = envelope("CsrfResponse", None, "csrf_set")

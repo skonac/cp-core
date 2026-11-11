@@ -19,6 +19,7 @@ Last updated: 2026-11-10 (operation mode) · API version 0.7
 
 | Date | Change | Where |
 | --- | --- | --- |
+| 2026-11-11 | `GET /api/me/selfies?eventCode=`: `eventMatch` with `matchedPhotoCount` (the gallery's number, all selfies combined), `photosPending`, `matching`, `blocked`. Without `eventCode`, `eventMatch` is `null` | §3.4 |
 | 2026-11-11 | Photo upload results (`POST …/photos`, organizer and uploader): per-file `status` is now only `accepted` or `rejected` (was `queued` / `ready` / `rejected`). Whether a stored photo is still waiting for face processing is its own status in `GET …/photos` (`queued`, `processing`, `ready`, `failed`), unchanged | §3.6 |
 | 2026-11-10 | Operation mode (staff kill switch): `normal` / `restricted` / `lockdown`. `paymentsEnabled` in `GET /api/shop/products`, `operationMode` in every user object, `GET /api/operation-mode`. Any endpoint can answer `503 site_locked` (lockdown), `POST /api/shop/purchases` `503 payments_disabled` (restricted). `docs/openapi.json` regenerated (it had not been since Oct 31) | §2, §3.11, §5e |
 | 2026-10-31 | Printed materials (basılı materyal): `GET /api/organizer/events/{code}/print-themes`, each theme's formats (poster, table card) with `previewUrl` (HTML, for iframes and a new tab) and `pdfUrl` (download, one per format per 10 min) | §3.6, §5d |
@@ -320,8 +321,26 @@ upload, then poll `GET /api/me/selfies` (every 1–2 s) until the selfie's `stat
 ```json
 { "selfies": [ { "id": "68", "slot": "primary", "status": "ready", "reason": null,
                  "thumbnailUrl": "/api/me/selfies/68/thumb.jpg", "createdAt": "2026-10-19T08:30:00+00:00" } ],
-  "selfieState": "ready" }
+  "selfieState": "ready", "eventMatch": null }
 ```
+
+**`GET /api/me/selfies?eventCode=RK238`**: the same, plus how many photos of that event the selfies find
+(the point: after a selfie is `ready` with `matchedPhotoCount: 0`, tell the person to upload another face/photo):
+
+```json
+"eventMatch": { "eventCode": "RK238", "matching": "ready", "blocked": null, "matchedPhotoCount": 12, "photosPending": 0 }
+```
+
+- `matchedPhotoCount` is **the number the gallery uses**: all selfies combined (a photo counts once if any selfie
+  finds it), the same value as `total` of `GET /api/events/{code}/gallery?view=mine`, and `matchedPhotoCount` in
+  `GET /api/me/events`. `null` unless `matching` is `ready`. There are no per-selfie counts.
+- `photosPending` > 0: some of the event's photos are still waiting for face processing, so `0` is not final yet
+  (don't say "no photos found" until it is 0).
+- `matching`: as in the gallery (`ready`, `no_selfie`, `selfie_processing`, `selfie_rejected`, `consent_required`,
+  `matching_off`). `blocked` (`closed`, `expired`, `consent_required`, `guest_access_off`): the person cannot use
+  the event; then `matching` and the counts are `null`/`0`.
+- Without `eventCode`, `eventMatch` is `null`. Unknown code (or a guest asking for another event): `404 event_not_found`.
+- Poll without `eventCode` while a selfie is `processing`; ask with it once it is `ready`.
 
 | `status` | `reason` | Show |
 | --- | --- | --- |
