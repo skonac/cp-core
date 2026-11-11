@@ -78,6 +78,11 @@ class StaffPagesTest(TestCase):
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200)
 
+    def test_version_in_the_navigation(self):
+        from config import __version__
+        self.assertIn(f"cp-core {__version__}", self.client.get("/dj/staff/").content.decode())
+        self.assertTrue(__version__.startswith("0.9"))
+
     def test_cover_page(self):
         from media.ingest import ingest_cover
         cover = ingest_cover(self.event, self.org, _jpeg("yellow"))

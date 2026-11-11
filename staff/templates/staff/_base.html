@@ -25,6 +25,7 @@
   <a href="{% url 'staff:print' %}">Print themes</a>
   <a href="/admin/">Admin</a>
   <a href="/api/docs">API docs</a>
+  <span class="muted" style="margin-left:auto" title="{{ cp_version }}">cp-core {{ cp_version }}</span>
 </nav>
 {% if operation_mode and operation_mode != "normal" and not mode_panel %}
 <div class="card mode-{{ operation_mode }}" style="margin:0 0 14px; border:2px solid var(--mode); color:var(--mode)">

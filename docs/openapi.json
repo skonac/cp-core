@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "cp-core API",
-    "version": "0.1-dev",
+    "version": "0.9-dev",
     "description": "Cleverphotos core API for cp-web. Session cookie + X-CSRFToken. See docs/api.md."
   },
   "paths": {
